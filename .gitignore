@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Web and desktop build output
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Local generated installers and binaries
+*.zip
+*.msi
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime and local save/debug artifacts
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.local
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Codex/local agent scratch data
+.agents/
+.codex/
+
+# User-managed scratch/archive folder
+misc/

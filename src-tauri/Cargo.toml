@@ -1,0 +1,18 @@
+[package]
+name = "office-aquarium"
+version = "0.38.0"
+description = "Office Aquarium"
+authors = ["Office Aquarium"]
+edition = "2021"
+
+[lib]
+name = "office_aquarium_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

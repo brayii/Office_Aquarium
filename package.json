@@ -1,0 +1,15 @@
+{
+  "name": "office-aquarium",
+  "version": "0.38.0",
+  "private": true,
+  "description": "Office Aquarium desktop and web packaging tools.",
+  "scripts": {
+    "package:web": "powershell -ExecutionPolicy Bypass -File tools/package-itch-web.ps1",
+    "package:desktop-assets": "powershell -ExecutionPolicy Bypass -File tools/package-tauri-frontend.ps1",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

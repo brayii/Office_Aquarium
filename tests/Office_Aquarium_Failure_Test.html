@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Office Aquarium Failure Tester</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef6f5;
+      --panel: #ffffff;
+      --ink: #152238;
+      --muted: #667085;
+      --line: #cdd8e5;
+      --accent: #1e6f73;
+      --danger: #a83b3b;
+      --warn: #8a5a12;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      background: radial-gradient(circle at top left, #d7eeec, var(--bg) 42%, #f7fbfa);
+      color: var(--ink);
+    }
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 32px auto;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(15, 35, 55, .08);
+      padding: 22px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.6rem, 3vw, 2.25rem);
+    }
+    h2 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+    p, li {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    button, a.button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fbfc;
+      color: var(--ink);
+      font-weight: 700;
+      padding: 10px 14px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+    }
+    button.primary, a.primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    button.danger {
+      background: var(--danger);
+      color: white;
+      border-color: var(--danger);
+    }
+    button.warning {
+      background: var(--warn);
+      color: white;
+      border-color: var(--warn);
+    }
+    code {
+      background: #edf2f7;
+      border: 1px solid #d9e2ec;
+      border-radius: 6px;
+      padding: 2px 5px;
+      color: #253858;
+    }
+    .status {
+      min-height: 24px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .note {
+      border-left: 4px solid var(--warn);
+      padding-left: 12px;
+    }
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .test-box {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfdfd;
+      padding: 14px;
+    }
+    .test-box h3 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+    }
+    .check-list {
+      display: grid;
+      gap: 8px;
+      margin: 12px 0 0;
+    }
+    .check {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fbfc;
+    }
+    .check.pass {
+      border-color: #69a985;
+      background: #f1faf5;
+    }
+    .check.fail {
+      border-color: #d48a8a;
+      background: #fff6f6;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card">
+      <h1>Office Aquarium Failure Tester</h1>
+      <p>This page creates a test save for the two failure paths in the main game. After choosing a test, open <code>Office_Aquarium.html</code> and press <strong>Continue Company</strong>. The simulation should trigger the failure screen within a few seconds of running.</p>
+      <p class="note">These buttons write to the same browser save used by the game. Use <strong>Back Up Current Save</strong> before testing if you want to restore your current company afterward.</p>
+      <div class="actions">
+        <button class="primary" id="backupSave">Back Up Current Save</button>
+        <button id="restoreSave">Restore Backup</button>
+        <button id="clearBackup">Clear Backup</button>
+        <button id="inspectSave">Inspect Current Save</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Test 1: CEO Removed by Board</h2>
+      <p>Creates a save with board confidence at zero. The main game should show the Board Decision screen and say the board appointed a new CEO.</p>
+      <div class="actions">
+        <button class="danger" id="ceoFailure">Create CEO Removal Test Save</button>
+        <a class="button primary" href="Office_Aquarium.html" target="_blank" rel="noopener">Open Main Game</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Test 2: Company Failure</h2>
+      <p>Creates a save with cash below the insolvency threshold. The main game should show the failure screen and say the company ceased operations.</p>
+      <div class="actions">
+        <button class="warning" id="companyFailure">Create Company Failure Test Save</button>
+        <a class="button primary" href="Office_Aquarium.html" target="_blank" rel="noopener">Open Main Game</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Regression Test Saves</h2>
+      <p>These create targeted saves for systems that have broken or become confusing during long simulations. After creating one, open the main game and continue the company.</p>
+      <div class="actions">
+        <a class="button primary" href="Office_Aquarium.html" target="_blank" rel="noopener">Open Main Game</a>
+      </div>
+      <div class="test-grid">
+        <div class="test-box">
+          <h3>Day Rollover Guard</h3>
+          <p>Starts the game at 7:55 PM on day 70. The next tick should roll to the next day or pause with a recorded simulation error, not freeze.</p>
+          <button id="rolloverTest">Create Rollover Test Save</button>
+        </div>
+        <div class="test-box">
+          <h3>Project Archive Integrity</h3>
+          <p>Creates an old archived project and a live project with the same internal ID. The main game should preserve both by repairing the live project ID.</p>
+          <button id="projectArchiveTest">Create Project Archive Test Save</button>
+        </div>
+        <div class="test-box">
+          <h3>Near-Complete Project Closeout</h3>
+          <p>Creates a 99.6% project with no blockers. The project should close cleanly instead of getting stuck forever below 100%.</p>
+          <button id="projectCloseoutTest">Create Project Closeout Test Save</button>
+        </div>
+        <div class="test-box">
+          <h3>Hiring Pipeline</h3>
+          <p>Creates an active recruiting item and an onboarding employee. Workforce should show recruiting/onboarding instead of losing the new hire.</p>
+          <button id="hiringPipelineTest">Create Hiring Pipeline Test Save</button>
+        </div>
+        <div class="test-box">
+          <h3>CEO Inbox Decision</h3>
+          <p>Creates a queued memo with exactly three choices. The Inbox should open, pause the game, and let you choose one.</p>
+          <button id="inboxDecisionTest">Create Inbox Decision Test Save</button>
+        </div>
+        <div class="test-box">
+          <h3>Commercial Revenue</h3>
+          <p>Creates a completed launched archive project. Daily revenue should be greater than zero after the next daily close.</p>
+          <button id="commercialRevenueTest">Create Revenue Test Save</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Local Unit Checks</h2>
+      <p>These checks run on the test page itself. They do not simulate the whole game, but they catch bad saves and missing backup data before you open the main game.</p>
+      <div class="actions">
+        <button id="runLocalChecks">Run Local Checks</button>
+      </div>
+      <div id="checkList" class="check-list"></div>
+    </section>
+
+    <section class="card">
+      <h2>Current Status</h2>
+      <p id="status" class="status">Ready.</p>
+      <ul>
+        <li>If the startup screen appears, press <strong>Continue Company</strong>.</li>
+        <li>If the game is paused, press <strong>Resume</strong>.</li>
+        <li>To return to normal play, restore your backup or start a new company from the game.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    const SAVE_KEY = "office-aquarium-living-office-v3";
+    const BACKUP_KEY = "office-aquarium-failure-test-backup";
+    const SAVE_VERSION = 36;
+
+    const baseCompany = {
+      day: 12,
+      minute: 480,
+      randomState: 2463534242,
+      nextRuntimeId: 1,
+      cash: 18,
+      board: 72,
+      trust: 68,
+      chip: 22,
+      software: 31,
+      quality: 38,
+      integration: 15,
+      customers: 0,
+      dailyRevenue: 0,
+      valuation: 42,
+      phase: "prototype",
+      directive: null,
+      directiveDays: 0,
+      selected: 0,
+      paused: false,
+      speed: 1,
+      pendingEvent: null,
+      eventCooldown: 0,
+      completedEvents: [],
+      communications: [],
+      history: [],
+      log: ["Failure test save loaded. Resume the simulation to trigger the failure path."],
+      gameOver: false,
+      crisis: null,
+      crisisDays: 0,
+      crisisType: null,
+      crisisStage: null,
+      boardGovernance: { strikes: 0, pipActive: false },
+      unpaidPayrollDays: 0,
+      shareholders: { confidence: 72, pressure: 20 },
+      manufacturing: { supplyRisk: 30, readiness: 55, yield: 55, capacity: 55 },
+      workItems: [],
+      issueRecords: [],
+      employeeMessages: [],
+      escalationQueue: [],
+      operatingHealthHistory: []
+    };
+
+    function foundingEmployees() {
+      const names = ["Maya", "Leo", "Aisha", "Noah", "Priya", "Ethan", "Sofia", "Marcus"];
+      const roles = ["Chip Architect", "Firmware Engineer", "Software Lead", "Verification Engineer", "Product Manager", "QA Engineer", "Industrial Designer", "Finance Analyst"];
+      return names.map((name, id) => ({
+        id,
+        name,
+        role: roles[id],
+        active: true,
+        joinedDay: 0,
+        energy: 78,
+        stress: 34,
+        morale: 72,
+        focus: 70,
+        relationship: {},
+        social: {},
+        traits: [],
+        skills: {},
+        performance: { recentOutput: 5, absenceDays: 0, qualityMistakes: 0, coachingDays: 0, reviewRiskDays: 0, lastReviewDay: -999 },
+        learning: { caution: 0, mentor: 0, risk: 0, collaboration: 0, helpSeeking: 0, testing: 0, focusWork: 0, reporting: 0, suppression: 0, initiative: 0, recovery: 0, contextualPreferences: {} },
+        projectAffinity: {},
+        projectHistory: [],
+        proposalHistory: [],
+        action: "arriving",
+        actionMinutes: 0,
+        sickDays: 0,
+        offsite: false
+      }));
+    }
+
+    function sampleProject(id, patch = {}) {
+      return {
+        id,
+        family: "AI accelerator",
+        codename: "Test",
+        title: "QA Test Project",
+        originType: "test",
+        proposingDepartment: "hardware",
+        createdDay: 4,
+        status: "execution",
+        priority: 72,
+        scope: 1,
+        budgetApproved: 2.5,
+        budgetSpent: 0.8,
+        estimatedDuration: 72,
+        estimatedCost: 2.5,
+        estimatedBenefit: 74,
+        visibleRisk: 42,
+        visibleConfidence: 68,
+        marketVisibility: "announced",
+        requiredDepartments: ["hardware", "software", "quality"],
+        requiredSkills: { hardware: 65, software: 45, verification: 55 },
+        requiredHeadcount: { hardware: 1, software: 1, quality: 1 },
+        assignedEmployees: [],
+        workItemIds: [],
+        milestones: [],
+        deadlineDay: 92,
+        progress: 44,
+        quality: 62,
+        integration: 51,
+        customerInterest: 66,
+        teamMoraleImpact: 0,
+        strategicNarrative: "Regression test project.",
+        reviewHistory: [],
+        hiddenReality: { trueStrategicValue: 72, trueTechnicalDifficulty: 58, trueCustomerExcitement: 70, trueManufacturingComplexity: 50, trueTalentRetentionValue: 55, trueKnowledgeValue: 60 },
+        seed: `${id}-test`,
+        performance: { progress: 44, scheduleVariance: 0, budgetVariance: 0, quality: 62, integration: 51, teamHealth: 70, staffingCoverage: 95, blockerCount: 0, customerInterest: 66, strategicConfidence: 68, riskTrend: 38, benefitRealization: 0, forecastAtCompletion: 72 },
+        nextReviewDay: 20,
+        closeoutReadyDays: 0,
+        commercialStatus: "not ready",
+        convertedCustomers: 0,
+        projectedDailyRevenue: 0,
+        commercialReadiness: 0,
+        commercialPotential: 0,
+        ...patch
+      };
+    }
+
+    function setStatus(message) {
+      document.getElementById("status").textContent = message;
+    }
+
+    function writeSave(companyPatch, employeePatch = null) {
+      const company = { ...baseCompany, ...companyPatch };
+      const save = {
+        saveVersion: SAVE_VERSION,
+        savedAt: new Date().toISOString(),
+        company,
+        employees: employeePatch || []
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    }
+
+    function openGameHint(name) {
+      setStatus(`${name} save created. Open the main game, press Continue Company, and resume if it is paused.`);
+    }
+
+    document.getElementById("backupSave").onclick = () => {
+      const existing = localStorage.getItem(SAVE_KEY);
+      if (!existing) {
+        setStatus("No current game save was found to back up.");
+        return;
+      }
+      localStorage.setItem(BACKUP_KEY, existing);
+      setStatus("Current game save backed up.");
+    };
+
+    document.getElementById("restoreSave").onclick = () => {
+      const backup = localStorage.getItem(BACKUP_KEY);
+      if (!backup) {
+        setStatus("No failure-test backup was found.");
+        return;
+      }
+      localStorage.setItem(SAVE_KEY, backup);
+      setStatus("Backup restored. Open the main game and continue your company.");
+    };
+
+    document.getElementById("clearBackup").onclick = () => {
+      localStorage.removeItem(BACKUP_KEY);
+      setStatus("Failure-test backup cleared.");
+    };
+
+    document.getElementById("inspectSave").onclick = () => {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) {
+        setStatus("No current game save found.");
+        return;
+      }
+      try {
+        const save = JSON.parse(raw);
+        const company = save.company || {};
+        setStatus(`Save version ${save.saveVersion}; day ${company.day ?? "?"}; cash $${Number(company.cash || 0).toFixed(2)}M; projects ${(company.projects || []).length}; archived ${(company.projectArchive || []).length}; employees ${(save.employees || []).length || "main game will migrate defaults"}.`);
+      } catch (e) {
+        setStatus("Current save exists but could not be parsed.");
+      }
+    };
+
+    document.getElementById("ceoFailure").onclick = () => {
+      writeSave({
+        board: 0,
+        cash: 12,
+        trust: 60,
+        log: ["Failure test: board confidence is zero. The board should remove the CEO."]
+      });
+      setStatus("CEO removal test save created. Open the main game, continue company, and let time run.");
+    };
+
+    document.getElementById("companyFailure").onclick = () => {
+      writeSave({
+        cash: -3,
+        board: 60,
+        trust: 60,
+        log: ["Failure test: cash is below the insolvency threshold. The company should fail."]
+      });
+      setStatus("Company failure test save created. Open the main game, continue company, and let time run.");
+    };
+
+    document.getElementById("rolloverTest").onclick = () => {
+      writeSave({
+        day: 70,
+        minute: 1195,
+        speed: 12,
+        cash: 14,
+        board: 64,
+        trust: 61,
+        phase: "integration",
+        log: ["Regression test: day rollover guard. Resume from 7:55 PM and confirm the game does not freeze."]
+      }, foundingEmployees());
+      openGameHint("Day rollover guard");
+    };
+
+    document.getElementById("projectArchiveTest").onclick = () => {
+      const archived = sampleProject("project-2", {
+        title: "Archived Regression Project",
+        status: "completed",
+        progress: 100,
+        completedDay: 18,
+        commercialStatus: "launched",
+        projectedDailyRevenue: 0.035,
+        convertedCustomers: 9
+      });
+      const live = sampleProject("project-2", {
+        title: "Live Project With Duplicate ID",
+        status: "execution",
+        progress: 37,
+        createdDay: 30,
+        completedDay: undefined,
+        commercialStatus: "not ready"
+      });
+      writeSave({
+        day: 42,
+        nextProjectId: 2,
+        projects: [live],
+        projectArchive: [archived],
+        projectProposals: [],
+        workItems: [{ id: "work-dup-1", projectId: "project-2", status: "open", progress: 35, blockedBy: [], type: "implementation", title: "Duplicate ID regression work" }],
+        log: ["Regression test: duplicate project ID. Main game should keep the archived project and preserve/re-key the live project."]
+      }, foundingEmployees());
+      openGameHint("Project archive integrity");
+    };
+
+    document.getElementById("projectCloseoutTest").onclick = () => {
+      const project = sampleProject("project-7", {
+        title: "Near Complete Closeout Project",
+        status: "execution",
+        progress: 99.6,
+        closeoutReadyDays: 1,
+        performance: { progress: 99.6, scheduleVariance: -2, budgetVariance: 4, quality: 82, integration: 84, teamHealth: 76, staffingCoverage: 100, blockerCount: 0, customerInterest: 74, strategicConfidence: 80, riskTrend: 24, benefitRealization: 0, forecastAtCompletion: 85 }
+      });
+      writeSave({
+        day: 58,
+        minute: 1195,
+        projects: [project],
+        projectArchive: [],
+        workItems: [
+          { id: "work-closeout-1", projectId: "project-7", status: "closed", progress: 100, blockedBy: [], type: "verification", title: "Final verification" },
+          { id: "work-closeout-2", projectId: "project-7", status: "closed", progress: 100, blockedBy: [], type: "integration", title: "Release integration" }
+        ],
+        log: ["Regression test: near-complete project should archive after closeout checks."]
+      }, foundingEmployees());
+      openGameHint("Near-complete closeout");
+    };
+
+    document.getElementById("hiringPipelineTest").onclick = () => {
+      const employees = foundingEmployees();
+      employees.push({
+        id: 8,
+        name: "Test New Hire",
+        role: "Verification Engineer",
+        active: true,
+        joinedDay: 20,
+        energy: 72,
+        stress: 22,
+        morale: 70,
+        focus: 58,
+        relationship: {},
+        social: {},
+        traits: ["cautious"],
+        skills: {},
+        performance: { recentOutput: 0, absenceDays: 0, qualityMistakes: 0, coachingDays: 0, reviewRiskDays: 0, lastReviewDay: -999 },
+        learning: { caution: 0, mentor: 0, risk: 0, collaboration: 0, helpSeeking: 0, testing: 0, focusWork: 0, reporting: 0, suppression: 0, initiative: 0, recovery: 0, contextualPreferences: {} },
+        onboarding: { startDay: 20, duration: 28, quality: 72, mentorId: 3, productivity: 20, projectId: "project-9" },
+        projectAffinity: {},
+        projectHistory: [],
+        proposalHistory: [],
+        action: "onboarding",
+        actionMinutes: 15,
+        sickDays: 0,
+        offsite: false
+      });
+      writeSave({
+        day: 23,
+        recruitingPipeline: [{ id: "recruit-test-verification", day: 18, searchStartedDay: 18, stageStartedDay: 21, dueDay: 30, role: "Verification Engineer", department: "quality", mode: "specialist", status: "interviewing", stage: "interviewing", market: "average", competition: 45, salaryInflation: 5, salaryCompetitiveness: 70, talentAvailability: 68, expectedFillDays: 24, attempts: 1, project: { id: "project-9", title: "Hiring Pipeline Test Project", codename: "HireTest" } }],
+        hiringRequestHistory: [{ day: 18, role: "Verification Engineer", department: "quality", status: "approved-recruiting", confidence: 78 }],
+        log: ["Regression test: Workforce should show one recruiting role and one onboarding employee."]
+      }, employees);
+      openGameHint("Hiring pipeline");
+    };
+
+    document.getElementById("inboxDecisionTest").onclick = () => {
+      writeSave({
+        day: 16,
+        escalationQueue: [{
+          id: "test-inbox-decision",
+          repeatable: false,
+          category: "project",
+          title: "QA memo routing test",
+          copy: "A test memo should appear in the CEO Inbox with exactly three choices.",
+          generatedCommunication: {
+            type: "QA Regression Memo",
+            priority: "Decision Needed",
+            sender: { name: "QA Test Office", role: "Simulation QA" },
+            subject: "Inbox Regression Test",
+            message: "This memo verifies that queued executive communication reaches the Inbox and pauses the simulation.",
+            recs: [["QA", "Choose any option; this is a routing test.", 90]],
+            impacts: ["Inbox should show this memo", "There should be exactly three choices", "Decision should archive cleanly"]
+          },
+          choices: [
+            { title: "Approve test option", detail: "Confirm the memo decision path.", effect: { board: 1 }, directive: null, days: 0, strategy: "balanced", benefits: ["tests decision apply"], risks: ["none"], uncertainty: "Low", estimatedConfidence: 90 },
+            { title: "Delay test option", detail: "Confirm a second choice renders.", effect: { trust: 0 }, directive: null, days: 0, strategy: "quality", benefits: ["tests choice list"], risks: ["none"], uncertainty: "Low", estimatedConfidence: 88 },
+            { title: "Reject test option", detail: "Confirm a third choice renders.", effect: { cash: 0 }, directive: null, days: 0, strategy: "finance", benefits: ["tests three-choice rule"], risks: ["none"], uncertainty: "Low", estimatedConfidence: 86 }
+          ]
+        }],
+        log: ["Regression test: queued CEO memo should appear after the next decision check."]
+      }, foundingEmployees());
+      openGameHint("CEO Inbox decision");
+    };
+
+    document.getElementById("commercialRevenueTest").onclick = () => {
+      const project = sampleProject("project-12", {
+        title: "Commercial Revenue Test Project",
+        status: "completed",
+        progress: 100,
+        completedDay: 32,
+        commercialStatus: "launched",
+        commercialReadiness: 82,
+        commercialPotential: 78,
+        projectedDailyRevenue: 0.075,
+        convertedCustomers: 24,
+        customerInterest: 82
+      });
+      writeSave({
+        day: 44,
+        minute: 1195,
+        phase: "launched",
+        customers: 24,
+        projectArchive: [project],
+        projects: [],
+        dailyRevenue: 0,
+        log: ["Regression test: completed commercial project should contribute to daily revenue after daily close."]
+      }, foundingEmployees());
+      openGameHint("Commercial revenue");
+    };
+
+    document.getElementById("runLocalChecks").onclick = () => {
+      const checks = [];
+      const raw = localStorage.getItem(SAVE_KEY);
+      let parsed = null;
+      try { parsed = raw ? JSON.parse(raw) : null; } catch (e) {}
+      checks.push(["Current save exists", !!raw, "A game save is present in this browser."]);
+      checks.push(["Current save parses", !!parsed, "The save JSON can be read."]);
+      checks.push(["Save version is current", parsed?.saveVersion === SAVE_VERSION, `Expected version ${SAVE_VERSION}.`]);
+      checks.push(["Backup exists", !!localStorage.getItem(BACKUP_KEY), "Use Back Up Current Save before destructive tests."]);
+      if (parsed) {
+        const c = parsed.company || {};
+        const activeIds = new Set((c.projects || []).map(p => p.id));
+        const archiveIds = new Set((c.projectArchive || []).map(p => p.id));
+        const overlap = [...activeIds].filter(id => archiveIds.has(id));
+        const terminalActive = (c.projects || []).filter(p => ["completed", "canceled", "rejected", "merged"].includes(p.status));
+        checks.push(["No active/archive ID overlap", overlap.length === 0, overlap.length ? `Overlap: ${overlap.join(", ")}` : "Project buckets do not overlap."]);
+        checks.push(["No terminal active projects", terminalActive.length === 0, terminalActive.length ? `${terminalActive.length} terminal project(s) still active.` : "Terminal projects are not in active list."]);
+      }
+      document.getElementById("checkList").innerHTML = checks.map(([name, pass, detail]) => `<div class="check ${pass ? "pass" : "fail"}"><strong>${pass ? "PASS" : "CHECK"}: ${name}</strong><br><small>${detail}</small></div>`).join("");
+      setStatus("Local checks completed.");
+    };
+  </script>
+</body>
+</html>
