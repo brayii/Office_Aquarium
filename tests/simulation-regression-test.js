@@ -36,6 +36,28 @@ async function main() {
     if (typeof company === "undefined" || typeof simulateMinute !== "function") {
       return { ok: false, reason: "Simulation globals unavailable" };
     }
+    const learningBefore = (company.learningEpisodes || []).length;
+    const communicationsBefore = (company.communications || []).length;
+    company.escalationQueue = Array.isArray(company.escalationQueue) ? company.escalationQueue : [];
+    company.escalationQueue.unshift({
+      id: "regression-ceo-decision",
+      title: "Regression Decision Review",
+      copy: "A controlled regression memo checks whether CEO decisions still archive and create learning episodes.",
+      category: "quality",
+      repeatable: true,
+      choices: [
+        { title: "Approve a validation sprint", detail: "Use a bounded quality check before continuing.", strategy: "quality", directive: "quality", days: 3, effect: { quality: 1, integration: 0.5 }, people: { stress: 0, morale: 1 } },
+        { title: "Continue the current plan", detail: "Keep work moving without changing resources.", strategy: "speed", directive: "speed", days: 2, effect: { integration: 1 }, people: { stress: 1, morale: 0 } },
+        { title: "Delay for more evidence", detail: "Pause briefly and ask for stronger evidence.", strategy: "pilot", directive: "quality", days: 2, effect: { quality: 0.5 }, people: { stress: -1, morale: 0 } }
+      ]
+    });
+    const oldValidationMode = typeof validationMode !== "undefined" ? validationMode : false;
+    validationMode = true;
+    maybeCreateDecisionEvent();
+    validationMode = oldValidationMode;
+    const decisionApplied =
+      (company.communications || []).length > communicationsBefore &&
+      (company.learningEpisodes || []).length > learningBefore;
     company.speed = 12;
     for (let i = 0; i < 2400; i += 1) {
       company.paused = false;
@@ -51,6 +73,9 @@ async function main() {
       projects: (company.projects || []).length,
       lastSimulationError: company.lastSimulationError || null,
       lastDailyCloseStatus: company.lastDailyCloseStatus || null,
+      learningEpisodes: (company.learningEpisodes || []).length,
+      communications: (company.communications || []).length,
+      decisionApplied,
       hash: typeof stateHash === "function" ? stateHash() : null
     };
     if (typeof saveGame === "function") saveGame();
@@ -63,7 +88,7 @@ async function main() {
       hash: typeof stateHash === "function" ? stateHash() : null
     };
     return {
-      ok: company.day >= 1 && !beforeSave.lastSimulationError && loadOk && beforeSave.day === afterLoad.day && beforeSave.employees === afterLoad.employees,
+      ok: company.day >= 1 && decisionApplied && !beforeSave.lastSimulationError && loadOk && beforeSave.day === afterLoad.day && beforeSave.employees === afterLoad.employees,
       beforeSave,
       afterLoad,
       loadOk

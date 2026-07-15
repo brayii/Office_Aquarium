@@ -7,6 +7,10 @@ ${sender.role||c.role||"Leadership Team"}`};
   }
   const active=employees.filter(e=>e.active);
   const byRole=role=>active.find(e=>e.role===role);
+  if(!ev.forceLegacyTemplate){
+    const structured=structuredCommunicationForEvent(ev,active,byRole);
+    if(structured)return structured;
+  }
   const templates={
     burnout:{type:"Internal Memorandum",priority:"Urgent",sender:byRole("Product Manager")||active[0],subject:"Sustained Engineering Workload",message:"The engineering organization has maintained an accelerated schedule. Progress is visible, but stress indicators are rising and the risk of absence or resignation is becoming material. Leadership direction is needed before the pressure becomes self-reinforcing.",recs:[["Engineering","Reduce the pace and protect quality",82],["Finance","Contract support is affordable but expensive",68],["Board","Preserve the milestone if possible",61]],impacts:["Burnout and resignation risk may change","Schedule pressure will shift","Board confidence may react"]},
     milestone:{type:"Executive Report",priority:"Decision Needed",sender:byRole("Chip Architect")||active[0],subject:"Prototype Readiness Review",message:"The hardware team has reached a meaningful prototype milestone. The next decision determines whether the company exposes the product to customers, accelerates integration, or returns to research for another quality cycle.",recs:[["Engineering","Run customer testing before scaling",79],["Product","Use the milestone to build market learning",73],["Finance","All options remain fundable",66]],impacts:["Product quality and trust may change","Integration speed may increase or slow","Cash will be committed"]},
@@ -26,9 +30,35 @@ ${sender.role||c.role||"Leadership Team"}`};
 ${sender.name}
 ${sender.role}`};
 }
+function structuredCommunicationForEvent(ev,active,byRole){
+  const cat=eventCategory(ev),title=ev.title||"Executive Decision",copy=ev.copy||"The operating team needs CEO direction.";
+  const senderFor={
+    finance:byRole("Finance Analyst"),
+    board:byRole("Finance Analyst")||byRole("Product Manager"),
+    people:byRole("Product Manager"),
+    customer:byRole("Product Manager"),
+    product:byRole("Product Manager"),
+    market:byRole("Product Manager"),
+    operations:byRole("QA Engineer")||byRole("Chip Architect"),
+    quality:byRole("QA Engineer")||byRole("Chip Architect"),
+    project:byRole("Product Manager")||byRole("Software Lead")
+  }[cat]||byRole("Product Manager")||byRole("Software Lead")||active[0]||{name:"Executive Office",role:"Leadership Team"};
+  const type={
+    finance:"Finance Memo",board:"Board Memo",people:"People Memo",customer:"Customer Success Memo",
+    product:"Product Memo",market:"Market Memo",operations:"Operations Memo",quality:"Quality Memo",project:"Portfolio Memo"
+  }[cat]||"Executive Memo";
+  const priority=/urgent|critical|runway|burnout|launch|risk|failure|supply|performance/i.test(`${ev.id||""} ${title} ${copy}`)?"Urgent":"Decision Needed";
+  return {
+    type,priority,sender:senderFor,from:senderFor.name,role:senderFor.role,subject:title,message:copy,
+    recs:[],impacts:["The decision will affect operating priorities.","Departments may interpret the trade-offs differently.","Follow-up outcomes will be reviewed later."],
+    structuredPipeline:true,date:`Day ${company.day+1}`,signature:`Regards,
+${senderFor.name}
+${senderFor.role}`
+  };
+}
 function memoDepartmentFor(ev,comm={}){
   const cat=eventCategory(ev);
-  if(cat==="customer"||ev.customerSegmentId)return "product";
+  if(cat==="customer"||ev.customerSegmentId)return "customer success";
   if(ev.hiringRequest?.department)return ev.hiringRequest.department;
   if(ev.commercialProjectId)return "product";
   if(ev.projectDecision||String(ev.id||"").includes("project"))return "product";
@@ -60,12 +90,13 @@ function departmentBiasProfile(dept){
     finance:{focus:"runway, affordability, and downside protection",biasStrength:70,overconfidence:12,caution:78},
     people:{focus:"retention, fairness, burnout prevention, and succession",biasStrength:66,overconfidence:14,caution:62},
     product:{focus:"customer demand, launch timing, and market opportunity",biasStrength:62,overconfidence:24,caution:43},
+    "customer success":{focus:"renewals, churn risk, account trust, support load, and expansion quality",biasStrength:68,overconfidence:13,caution:70},
     board:{focus:"survival, capital efficiency, and leadership consistency",biasStrength:74,overconfidence:20,caution:66},
     company:{focus:"overall operating balance",biasStrength:45,overconfidence:15,caution:55}
   }[dept]||{focus:"department operating priorities",biasStrength:55,overconfidence:16,caution:55};
 }
 function reportManagerFor(dept){
-  const role={hardware:"Chip Architect",software:"Software Lead",quality:"QA Engineer",product:"Product Manager",finance:"Finance Analyst",people:"Product Manager",board:"Board Strategy Committee"}[dept];
+  const role={hardware:"Chip Architect",software:"Software Lead",quality:"QA Engineer",product:"Product Manager","customer success":"Product Manager",finance:"Finance Analyst",people:"Product Manager",board:"Board Strategy Committee"}[dept];
   const e=employees.find(x=>x.active&&x.role===role)||employees.find(x=>x.active&&employeeTeam(x)===dept)||employees.find(x=>x.active);
   return e?{name:e.name,role:e.role,department:dept}:{name:dept==="board"?"Board Strategy Committee":"Operating Council",role:dept==="board"?"Board":"Executive Review",department:dept||"company"};
 }
@@ -83,29 +114,47 @@ function memoChainOfCommand(ev,comm,dept,msg=null){
   else chain.push(`Finance, People, or the Portfolio Council may disagree based on their own priorities.`);
   return chain;
 }
+function qualitativeBand(value,{low=35,high=70,lowText="low",midText="moderate",highText="high"}={}){
+  const n=Number(value)||0;
+  if(n>=high)return highText;
+  if(n<=low)return lowText;
+  return midText;
+}
+function reportEvidencePhrase(msg){
+  const severity=qualitativeBand(msg?.severity,{low:45,high:78,lowText:"limited",midText:"material",highText:"serious"});
+  const urgency=qualitativeBand(msg?.urgency,{low:40,high:76,lowText:"not immediate",midText:"time-sensitive",highText:"urgent"});
+  const confidence=qualitativeBand(msg?.confidence,{low:45,high:75,lowText:"uncertain",midText:"credible",highText:"well-supported"});
+  return `${msg?.fromName||"An employee"} raised a ${severity}, ${urgency} ${String(msg?.type||"report").replace(/-/g," ")} that appears ${confidence}.`;
+}
+function issueEvidencePhrase(issue){
+  const severity=qualitativeBand(issue?.severity,{low:45,high:78,lowText:"limited",midText:"material",highText:"serious"});
+  const urgency=qualitativeBand(issue?.urgency,{low:40,high:76,lowText:"not immediate",midText:"time-sensitive",highText:"urgent"});
+  const impact=qualitativeBand(issue?.strategicImpact,{low:40,high:75,lowText:"mostly local",midText:"cross-functional",highText:"strategic"});
+  return `The underlying issue is ${severity}, ${urgency}, and ${impact} in scope.`;
+}
 function concreteMemoEvidence(ev,comm,dept,msg=null){
   const ctx=ev.decisionContext||decisionContextSnapshot();
   const lines=[];
   const issue=msg?.issueId?(company.issueRecords||[]).find(i=>i.id===msg.issueId):null;
   const work=msg?.workItemId?(company.workItems||[]).find(w=>w.id===msg.workItemId):null;
-  if(msg)lines.push(`${msg.fromName||"Employee"} reported severity ${msg.severity}, urgency ${msg.urgency}, confidence ${msg.confidence}.`);
-  if(issue){lines.push(`Issue severity ${issue.severity}, urgency ${issue.urgency}, strategic impact ${issue.strategicImpact}.`);(issue.evidence||[]).slice(0,2).forEach(x=>lines.push(x));}
-  if(work)lines.push(`${work.title}: ${workStatusLabel(work)}, progress ${Math.round(work.progress||0)}%, ${work.blockedBy?.length||0} blocker(s).`);
-  if(ev.hiringRequest){lines.push(`Hiring need confidence ${ev.hiringRequest.confidence}% for ${ev.hiringRequest.role}.`);(ev.hiringRequest.reasons||[]).slice(0,2).forEach(x=>lines.push(x));}
-  if(ev.projectDecision){const p=[...(company.projects||[]),...(company.projectProposals||[])].find(p=>p.id===ev.projectDecision.id);if(p)lines.push(`${p.title}: progress ${Math.round(p.progress||0)}%, risk ${Math.round(p.performance?.riskTrend||p.visibleRisk||0)}, spend $${Number(p.budgetSpent||0).toFixed(2)}M.`);}
-  if(ev.customerSegmentId){const seg=company.customerSegments?.[ev.customerSegmentId],label=CUSTOMER_SEGMENT_DEFS[ev.customerSegmentId]?.label||"Customer";if(seg)lines.push(`${label}: ${Math.round(seg.activeCustomers||0)} active customer(s), sentiment ${Math.round(seg.sentiment||0)}, churn risk ${Math.round(seg.churnRisk||0)}.`);const issue=(seg?.currentIssues||[]).find(i=>!i.resolved);if(issue)lines.push(`${label} issue: ${issue.description}`);}
-  if(String(ev.id||"").includes("project")){const h=company.portfolioHealth||{};lines.push(`Portfolio: ${h.activeProjects||0} active, ${h.atRiskProjects||0} at risk, spend $${Number(h.totalProjectSpendDaily||0).toFixed(3)}M/day.`);}
+  if(msg)lines.push(reportEvidencePhrase(msg));
+  if(issue){lines.push(issueEvidencePhrase(issue));(issue.evidence||[]).slice(0,2).map(evidenceSentence).filter(Boolean).forEach(x=>lines.push(x));}
+  if(work){const blockers=work.blockedBy?.length||0;lines.push(`${work.title} is in ${workStatusLabel(work).toLowerCase()} at about ${Math.round(work.progress||0)}% complete${blockers?`, with ${blockers} blocker${blockers===1?"":"s"}`:", with no formal blockers"}.`);}
+  if(ev.hiringRequest){lines.push(`${teamDisplayName(ev.hiringRequest.department||dept)} is asking for ${ev.hiringRequest.role} because the staffing case is ${qualitativeBand(ev.hiringRequest.confidence,{low:45,high:75,lowText:"still developing",midText:"credible",highText:"strong"})}.`);(ev.hiringRequest.reasons||[]).slice(0,2).map(evidenceSentence).filter(Boolean).forEach(x=>lines.push(x));}
+  if(ev.projectDecision){const p=[...(company.projects||[]),...(company.projectProposals||[])].find(p=>p.id===ev.projectDecision.id);if(p)lines.push(`${p.title} is about ${Math.round(p.progress||0)}% complete, with ${qualitativeBand(p.performance?.riskTrend||p.visibleRisk,{low:40,high:70,lowText:"limited",midText:"visible",highText:"elevated"})} risk and $${Number(p.budgetSpent||0).toFixed(2)}M already spent.`);}
+  if(ev.customerSegmentId){const seg=company.customerSegments?.[ev.customerSegmentId],label=CUSTOMER_SEGMENT_DEFS[ev.customerSegmentId]?.label||"Customer";if(seg)lines.push(`${label} has ${Math.round(seg.activeCustomers||0)} active customer${Math.round(seg.activeCustomers||0)===1?"":"s"}, ${qualitativeBand(seg.sentiment,{low:45,high:72,lowText:"weak",midText:"mixed",highText:"healthy"})} sentiment, and ${qualitativeBand(seg.churnRisk,{low:35,high:68,lowText:"limited",midText:"material",highText:"high"})} churn risk.`);const issue=(seg?.currentIssues||[]).find(i=>!i.resolved);if(issue)lines.push(`${label} issue: ${issue.description}`);}
+  if(String(ev.id||"").includes("project")){const h=company.portfolioHealth||{};lines.push(`Portfolio load includes ${h.activeProjects||0} active project${(h.activeProjects||0)===1?"":"s"}, with ${h.atRiskProjects||0} currently at risk and daily project spend near $${Number(h.totalProjectSpendDaily||0).toFixed(3)}M.`);}
   const text=String(ev.id+" "+ev.title+" "+ev.copy+" "+(ev.choices||[]).map(c=>c.title+" "+c.detail).join(" ")).toLowerCase();
-  if(dept==="finance"||eventCategory(ev)==="finance"||/cash|runway|fund|salary|hire|layoff|budget|spend|cost/.test(text))lines.push(`Runway ${company.finance?.runwayDays>=999?"positive":(company.finance?.runwayDays||0)+" day(s)"}, net cash flow $${Number(company.finance?.netCashFlowDaily||0).toFixed(3)}M/day.`);
-  if(dept==="people"||eventCategory(ev)==="people"||/hire|staff|burnout|morale|retention|layoff|performance|coach/.test(text))lines.push(`Average stress ${Math.round(avgStress())}; active employees ${employees.filter(e=>e.active).length}; retention cases ${employees.filter(e=>e.active&&(e.retentionRisk||0)>60).length}.`);
-  if(dept==="quality"||eventCategory(ev)==="operations"||/quality|verify|defect|supplier|manufactur|launch|pilot/.test(text))lines.push(`Quality ${Math.round(company.quality)}, unresolved mistakes ${Math.round(company.simulationMetrics?.counters?.qualityMistakes||0)}, manufacturing risk ${Math.round(company.manufacturing?.supplyRisk||0)}.`);
-  if(eventCategory(ev)==="customer"||/customer|renewal|churn|support|segment/.test(text))lines.push(`Customer base ${Math.round(company.customers||0)}, weighted sentiment ${Math.round(company.customerSentiment||0)}, daily segment revenue $${calculateCustomerRevenueDaily().toFixed(3)}M.`);
-  if(eventCategory(ev)==="board"||/board|shareholder|pip|crisis|strategy/.test(text))lines.push(`Board confidence ${Math.round(ctx.board)}, trust ${Math.round(ctx.trust)}, company risk ${Math.round(Math.min(company.cash/3,company.board/10,company.trust/10,(100-avgStress())/10)*10)/10}.`);
+  if(dept==="finance"||eventCategory(ev)==="finance"||/cash|runway|fund|salary|hire|layoff|budget|spend|cost/.test(text))lines.push(company.finance?.runwayDays>=999?`Finance sees current cash flow as positive, but the decision can still change future flexibility.`:`Runway is around ${company.finance?.runwayDays||0} days and daily cash flow is near $${Number(company.finance?.netCashFlowDaily||0).toFixed(3)}M.`);
+  if(dept==="people"||eventCategory(ev)==="people"||/hire|staff|burnout|morale|retention|layoff|performance|coach/.test(text))lines.push(`${employees.filter(e=>e.active).length} employees are active, with ${qualitativeBand(avgStress(),{low:45,high:70,lowText:"manageable",midText:"elevated",highText:"high"})} workload pressure and ${employees.filter(e=>e.active&&(e.retentionRisk||0)>60).length} elevated retention case(s).`);
+  if(dept==="quality"||eventCategory(ev)==="operations"||/quality|verify|defect|supplier|manufactur|launch|pilot/.test(text))lines.push(`Quality is ${qualitativeBand(company.quality,{low:50,high:75,lowText:"below target",midText:"mixed",highText:"healthy"})}, with ${Math.round(company.simulationMetrics?.counters?.qualityMistakes||0)} unresolved mistake(s) and ${qualitativeBand(company.manufacturing?.supplyRisk,{low:35,high:68,lowText:"limited",midText:"material",highText:"high"})} manufacturing risk.`);
+  if(eventCategory(ev)==="customer"||dept==="customer success"||/customer|renewal|churn|support|segment/.test(text))lines.push(`The company has ${Math.round(company.customers||0)} customer${Math.round(company.customers||0)===1?"":"s"}, ${qualitativeBand(company.customerSentiment,{low:45,high:72,lowText:"weak",midText:"mixed",highText:"healthy"})} customer sentiment, and about $${calculateCustomerRevenueDaily().toFixed(3)}M in daily segment revenue.`);
+  if(eventCategory(ev)==="board"||/board|shareholder|pip|crisis|strategy/.test(text))lines.push(`The board sees ${qualitativeBand(ctx.board,{low:45,high:72,lowText:"weak",midText:"mixed",highText:"strong"})} confidence, ${qualitativeBand(ctx.trust,{low:45,high:72,lowText:"fragile",midText:"mixed",highText:"healthy"})} trust, and ${qualitativeBand(Math.min(company.cash/3,company.board/10,company.trust/10,(100-avgStress())/10)*10,{low:35,high:70,lowText:"high",midText:"material",highText:"limited"})} company risk.`);
   const snapshot=buildExecutiveIntelligenceSnapshot();
   const risk=(snapshot.topRisks||[]).find(r=>evidenceSignalIds(`${r.title} ${r.detail}`).some(id=>evidenceSignalIds(text).includes(id)))||snapshot.topRisks?.[0];
   const opportunity=(snapshot.topOpportunities||[]).find(o=>evidenceSignalIds(`${o.title} ${o.detail}`).some(id=>evidenceSignalIds(text).includes(id)));
-  if(risk&&lines.length<6)lines.push(`Internal intelligence flags: ${risk.title} ${risk.detail||""}`.trim());
-  if(opportunity&&lines.length<6)lines.push(`Internal opportunity signal: ${opportunity.title} ${opportunity.detail||""}`.trim());
+  if(risk&&lines.length<6)lines.push(`Company intelligence is also watching ${risk.title.toLowerCase()}${risk.detail?`: ${risk.detail}`:""}`.trim());
+  if(opportunity&&lines.length<6)lines.push(`A related opportunity is emerging: ${opportunity.title}${opportunity.detail?`; ${opportunity.detail}`:""}`.trim());
   return [...new Set(lines)].filter(Boolean).slice(0,6);
 }
 function departmentEvidenceIds(dept){
@@ -136,12 +185,31 @@ function institutionalLessonsForChoice(choice,dept){
   if(/quality|verify|test|pilot|defect|scope|delay/.test(text))signals.push("testing","earlyQA","documentation","planning");
   if(/hire|staff|people|coach|mentor|support|contractor/.test(text))signals.push("hiringTiming","mentoring","collaboration","retention","workloadBalancing");
   if(/cash|budget|freeze|cut|spend|runway|fund/.test(text))signals.push("planning","hiringTiming","riskTaking","escalation");
-  if(/customer|market|launch|growth|revenue|feature/.test(text))signals.push("marketTiming","riskTaking","planning","quality");
+  if(/customer|market|launch|growth|revenue|feature|renewal|churn|support/.test(text))signals.push("marketTiming","riskTaking","planning","quality","retention");
   if(/report|escalat|memo|board|disclose|transparency/.test(text))signals.push("escalation","documentation","planning");
-  const lessons=(company.lessons||[]).filter(l=>(l.department==="company"||String(l.department||"").toLowerCase()===String(dept||"").toLowerCase())&&Object.entries(l.vector||{}).some(([k,v])=>signals.includes(k)&&Math.abs(Number(v)||0)>.25));
-  return lessons.slice(0,3).map(l=>{
+  if(!signals.length)return [];
+  const stateWeightFor=l=>{
+    if(typeof lessonStateWeight==="function")return lessonStateWeight(l);
+    const state=l?.state||"prior";
+    if(state==="validated")return 1;
+    if(state==="provisional")return .20;
+    if(state==="prior")return .08;
+    if(state==="contradicted")return -.10;
+    if(state==="obsolete")return 0;
+    return .04;
+  };
+  return (company.lessons||[]).map(l=>{
+    const lessonDept=String(l.department||"company").toLowerCase(),deptKey=String(dept||"company").toLowerCase();
+    const vectorScore=Object.entries(l.vector||{}).reduce((s,[k,v])=>s+(signals.includes(k)?Math.abs(Number(v)||0):0),0);
+    const deptScore=lessonDept==="company"?1.5:lessonDept===deptKey?3:0;
+    const confidenceScore=(Number(l.confidence)||0)/30;
+    const recencyScore=clamp(2-((company.day||0)-(l.lastDay||l.createdDay||0))/180,0,2);
+    const evidenceScore=Math.min(2,(l.episodeKeys?.length||0)*.35+(l.sampleCount||0)*.25);
+    const contradictionPenalty=l.state==="contradicted"?4:l.state==="obsolete"?99:0;
+    const relevance=vectorScore*2+deptScore+confidenceScore+recencyScore+evidenceScore-contradictionPenalty;
+    return {lesson:l,relevance,vectorScore,stateWeight:stateWeightFor(l)};
+  }).filter(x=>x.relevance>=4.5&&x.vectorScore>.25&&x.stateWeight!==0).sort((a,b)=>b.relevance-a.relevance).slice(0,3).map(({lesson:l,stateWeight})=>{
     const vectorScore=Object.entries(l.vector||{}).reduce((s,[k,v])=>s+(signals.includes(k)?Number(v)||0:0),0);
-    const stateWeight=typeof lessonStateWeight==="function"?lessonStateWeight(l):(l.state==="validated"?1:(l.state==="provisional"? .18 : .22));
     const influence=clamp(vectorScore*stateWeight*(Number(l.confidence)||50)/100,-8,8);
     return {key:l.key,title:l.title,state:l.state||"prior",confidence:Math.round(l.confidence||0),influence:Number(influence.toFixed(2))};
   });
@@ -169,7 +237,7 @@ function evaluateChoiceForDepartment(choice,department,context={}){
 function memoRecommendedChoice(ev,dept,evidence=[]){
   const choices=Array.isArray(ev.choices)?ev.choices:[];
   if(!choices.length)return null;
-  return choices.map(c=>({choice:c,score:evaluateChoiceForDepartment(c,dept,{event:ev,evidence}).score,evaluation:evaluateChoiceForDepartment(c,dept,{event:ev,evidence})})).sort((a,b)=>b.score-a.score)[0];
+  return choices.map(c=>{const evaluation=evaluateChoiceForDepartment(c,dept,{event:ev,evidence});return {choice:c,score:evaluation.score,evaluation};}).sort((a,b)=>b.score-a.score)[0];
 }
 function evidenceSignalIds(text){
   const t=String(text||"").toLowerCase(),ids=[];
@@ -177,12 +245,12 @@ function evidenceSignalIds(text){
   if(/hire|staff|role|employee|stress|morale|retention|burnout|coach|layoff|people/.test(t))ids.push("people");
   if(/quality|defect|mistake|verify|verification|supplier|manufactur|rework|risk|blocker/.test(t))ids.push("quality");
   if(/project|portfolio|milestone|progress|deadline|scope|pause|cancel|merge|split/.test(t))ids.push("project");
+  if(/customer|renewal|churn|support|account/.test(t))ids.push("customer");
   if(/customer|market|launch|pilot|revenue|growth|demand|product/.test(t))ids.push("market");
   if(/board|trust|crisis|shareholder|pip|strategy|confidence/.test(t))ids.push("governance");
   return [...new Set(ids)];
 }
 function choiceEvidenceIds(choice){
-  if(Array.isArray(choice.evidenceIds)&&choice.evidenceIds.length)return choice.evidenceIds;
   const ids=evidenceSignalIds(`${choice.title||""} ${choice.detail||""} ${(choice.benefits||[]).join(" ")} ${(choice.risks||[]).join(" ")} ${choice.strategy||""} ${choice.directive||""}`);
   if(choice.effect?.cash!==undefined||choice.effect?.valuation!==undefined)ids.push("finance");
   if(choice.people||choice.hire||choice.hireRole||choice.deferHiring||choice.rejectHiring)ids.push("people");
@@ -190,8 +258,7 @@ function choiceEvidenceIds(choice){
   if(choice.launch||choice.projectAction||choice.commercializeProject)ids.push("project","market");
   if(choice.customerStrategy||choice.effect?.customers!==undefined)ids.push("customer","market");
   if(choice.effect?.board!==undefined||choice.effect?.trust!==undefined)ids.push("governance");
-  choice.evidenceIds=[...new Set(ids)];
-  return choice.evidenceIds;
+  return [...new Set([...(Array.isArray(choice.evidenceIds)?choice.evidenceIds:[]),...ids])];
 }
 function memoInterpretationFor(ev,dept,evidence,cred,recommended=null){
   const bias=departmentBiasProfile(dept);
@@ -246,6 +313,7 @@ function departmentViewpointReason(dept,ev,choice=null){
   if(dept==="people")return avgStress()>68?`People is worried that the team is already absorbing too much work and may turn execution pressure into retention risk.`:`People sees this mainly through workload, fairness, and whether managers can explain the decision to the team.`;
   if(dept==="quality")return `Quality is focused on whether the company is preventing defects before customers experience them, not only whether the schedule still looks achievable.`;
   if(dept==="product")return company.customers>0?`Product is weighing customer trust and timing; a faster move helps only if the promise can be kept.`:`Product is weighing whether this creates useful market learning or simply adds scope before the company has evidence.`;
+  if(dept==="customer success")return `Customer Success is focused on whether the decision protects renewals, support capacity, and account trust after the sale.`;
   if(dept==="board")return `The Board is judging whether this decision makes management look disciplined, credible, and capable of protecting long-term value.`;
   if(dept==="hardware"||dept==="software"||dept==="engineering")return p?`Engineering believes ${p.title} still contains execution uncertainty that should be resolved before the company treats the plan as safe.`:`Engineering is focused on feasibility, integration risk, and whether the team has enough margin to do the work well.`;
   return `This group is looking at the operating consequences from its own responsibilities rather than treating the decision as a simple yes-or-no item.`;
@@ -271,6 +339,7 @@ function senderVoiceProfile(dept,role=""){
   if(dept==="finance"||r.includes("finance"))return {tone:"measured and skeptical",open:["Based on current spending","I want to flag a developing financial issue","The current plan is affordable, but"],focus:"runway, affordability, downside protection, and trade-offs"};
   if(dept==="people"||r.includes("people")||r.includes("hr"))return {tone:"careful and employee-focused",open:["I am concerned about the effect this is having on the team","Several employees are showing signs that","The immediate issue is not only performance"],focus:"morale, retention, fairness, workload, and sustainability"};
   if(dept==="quality"||r.includes("qa")||r.includes("verification"))return {tone:"precise and risk-aware",open:["The quality signal is becoming clearer","I am writing because verification work is showing pressure","The current reliability risk is"],focus:"defects, verification, rework, and customer exposure"};
+  if(dept==="customer success"||r.includes("customer success")||r.includes("support"))return {tone:"account-focused and pragmatic",open:["Customers are starting to show us where the promise is holding and where it is not","I am writing because account health is becoming a leadership issue","The customer signal is not just about growth"],focus:"renewals, churn, customer trust, support load, and expansion quality"};
   if(dept==="product"||r.includes("product"))return {tone:"customer-focused and practical",open:["The customer signal is moving","I am writing because the product decision window is narrowing","The market opportunity is not fully proven, but"],focus:"customer demand, scope, timing, and product value"};
   if(dept==="hardware"||dept==="software"||r.includes("engineer")||r.includes("architect")||r.includes("software"))return {tone:"technical and evidence-driven",open:["I am writing because","The engineering team is seeing","The current technical risk is"],focus:"delivery, technical quality, integration, and schedule realism"};
   return {tone:"balanced and operational",open:["I am writing because","I want to flag","The team is beginning to see"],focus:"operating balance and leadership attention"};
@@ -694,7 +763,7 @@ function archiveCommunication(ev,choice,comm){
   company.communications=company.communications.slice(0,60);
   return archived;
 }
-function teamDisplayName(team){return {hardware:"Hardware",software:"Software",quality:"Quality",product:"Product",finance:"Finance",people:"People"}[team]||team;}
+function teamDisplayName(team){return {hardware:"Hardware",software:"Software",quality:"Quality",product:"Product",finance:"Finance",people:"People","customer success":"Customer Success",board:"Board",company:"Company"}[String(team||"").toLowerCase()]||team;}
 function departmentBriefingHtml(){
   ensureBibleSystems?.();
   return ["hardware","software","product","finance"].map(team=>{
@@ -1147,6 +1216,7 @@ function decisionOptionScore(choice,ctx,department="company"){
     software:{quality:11,speed:-3,pilot:9,people:4,innovation:6},
     quality:{quality:14,speed:-7,pilot:10,people:3,innovation:3},
     product:{revenue:10,speed:7,pilot:8,quality:3,innovation:6},
+    "customer success":{revenue:5,speed:-2,pilot:9,quality:8,people:4,"cost-control":-3},
     finance:{finance:12,"cost-control":10,revenue:7,people:-2,innovation:-2},
     board:{speed:6,revenue:8,finance:6,quality:2,people:-1},
     people:{people:14,quality:4,"cost-control":-7,speed:-4}
@@ -1308,10 +1378,11 @@ function dynamicDepartmentRecommendations(ev){
   const ctx=ev.decisionContext||decisionContextSnapshot();
   const choices=ev.choices||[];
   const comm=eventCommunication(ev),evidence=concreteMemoEvidence(ev,comm,memoDepartmentFor(ev,comm),null);
-  return ["Engineering","Product","Finance","Board"].map(dept=>{
-    const ranked=choices.map(c=>({c,score:evaluateChoiceForDepartment(c,dept,{event:ev,evidence,snapshot:ctx}).score})).sort((a,b)=>b.score-a.score);
+  const departments=eventCategory(ev)==="customer"||ev.customerSegmentId?["customer success","product","finance","board"]:["engineering","product","finance","board"];
+  return departments.map(dept=>{
+    const ranked=choices.map(c=>{const evaluation=evaluateChoiceForDepartment(c,dept,{event:ev,evidence,snapshot:ctx});return {c,score:evaluation.score,evaluation};}).sort((a,b)=>b.score-a.score);
     const best=ranked[0];
-    return [dept,best?.c?.title||"Continue monitoring",Math.round(best?.score||50)];
+    return [teamDisplayName(dept),best?.c?.title||"Continue monitoring",Math.round(best?.score||50)];
   });
 }
 function prepareStrategicDecision(ev){
