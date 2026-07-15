@@ -551,17 +551,21 @@ function lessonRelevanceScore(lesson,model){
 function institutionalLearningLine(model){
   const lessons=(company.lessons||[]).filter(l=>(!model.department||l.department===model.department||l.department==="company")&&(l.confidence||0)>50&&l.state!=="prior").map(l=>({lesson:l,score:lessonRelevanceScore(l,model)})).filter(x=>x.score>=42).sort((a,b)=>b.score-a.score)[0]?.lesson;
   if(!lessons)return "";
-  if(/verification|quality|rework|defect/i.test(`${lessons.key} ${lessons.title}`))return "Relevant company history suggests that quality risks should be surfaced before they become expensive rework.";
-  if(/burnout|overload|resignation|retention/i.test(`${lessons.key} ${lessons.title}`))return "Relevant company history suggests sustained overload can turn into talent risk if it is ignored too long.";
-  if(/runway|cash|finance|spending/i.test(`${lessons.key} ${lessons.title}`))return "Relevant finance history suggests preserving options matters when runway or fixed costs are part of the decision.";
-  if(/project|portfolio|scope|validation/i.test(`${lessons.key} ${lessons.title}`))return "Relevant project history suggests scope, timing, and validation should be weighed before adding more commitment.";
-  if(/customer|retention|churn|support/i.test(`${lessons.key} ${lessons.title}`))return "Relevant customer history suggests support and roadmap promises should be tied to evidence, not optimism.";
-  return "";
+  const evidenceCount=(lessons.episodeKeys?.length||0)+(lessons.sampleCount||0);
+  const subject=model.relatedProjectName||model.subject||teamDisplayName(model.department||"company");
+  const state=lessons.state==="validated"?"has validated":lessons.state==="provisional"?"is cautiously applying":"is testing";
+  const title=String(lessons.title||lessons.key||"a prior lesson").replace(/^Decision learning:\s*/i,"").replace(/^Communication learning:\s*/i,"");
+  if(/verification|quality|rework|defect/i.test(`${lessons.key} ${lessons.title}`))return `${teamDisplayName(lessons.department||model.department||"company")} ${state} a quality lesson from ${Math.max(1,evidenceCount)} prior signal(s): ${title}. That experience is being applied to ${subject}.`;
+  if(/burnout|overload|resignation|retention/i.test(`${lessons.key} ${lessons.title}`))return `${teamDisplayName(lessons.department||model.department||"company")} ${state} a people-risk lesson from ${Math.max(1,evidenceCount)} prior signal(s): ${title}. That experience affects how this memo weighs workload and retention.`;
+  if(/runway|cash|finance|spending/i.test(`${lessons.key} ${lessons.title}`))return `${teamDisplayName(lessons.department||"finance")} ${state} a finance lesson from ${Math.max(1,evidenceCount)} prior signal(s): ${title}. That experience shapes the runway recommendation here.`;
+  if(/project|portfolio|scope|validation/i.test(`${lessons.key} ${lessons.title}`))return `${teamDisplayName(lessons.department||model.department||"company")} ${state} a portfolio lesson from ${Math.max(1,evidenceCount)} prior signal(s): ${title}. That experience is being applied to ${subject}.`;
+  if(/customer|retention|churn|support/i.test(`${lessons.key} ${lessons.title}`))return `Customer Success ${state} a customer lesson from ${Math.max(1,evidenceCount)} prior signal(s): ${title}. That experience shapes how this memo weighs renewals, churn, and promises.`;
+  return `${teamDisplayName(lessons.department||model.department||"company")} ${state} a relevant company lesson from ${Math.max(1,evidenceCount)} prior signal(s): ${title}.`;
 }
 function buildStructuredExecutiveMessage(ev,comm,intel){
   const dept=intel.department||memoDepartmentFor(ev,comm),cred=ensureSenderCredibility(comm.from,dept),observations=selectMemoObservations(intel,ev,comm),sourceMsg=(company.employeeMessages||[]).find(m=>m.id===ev.sourceMessageId),senderEmployee=employees.find(e=>e.name===comm.from),project=decisionProjectSubject(ev),sourceIds=[ev.id,ev.sourceMessageId,sourceMsg?.issueId,sourceMsg?.workItemId].filter(Boolean);
   const role=ev.hiringRequest?.role||ev.hireRole||ev.deferHiring?.role||ev.rejectHiring?.role||null;
-  const model={senderId:senderEmployee?.id??null,senderName:comm.from||"Executive Office",senderRole:comm.role||"Leadership Team",department:dept,subject:comm.subject||ev.title,sentDay:company.day,sentMinute:company.minute||0,reasonForWriting:"",observations,assessment:"",recommendation:"",confidenceBand:confidenceBand((cred.evidenceQuality||58)*.45+(cred.estimateAccuracy||55)*.35+(100-(cred.overconfidence||0))*.2),uncertaintyNote:"",sourceIds,relatedProjectId:project?.id||null,relatedProjectName:project?.title||null,relatedRoleIds:role?[role]:[],relatedEmployeeIds:intel.originEmployeeIds||[],relatedDecisionId:ev.id,senderPersonality:senderPersonalityFor(comm,dept),senderCredibility:cred,debug:{senderBias:departmentBiasProfile(dept),recommendationScores:(ev.choices||[]).map(c=>({choice:c.title,score:Math.round(evaluateChoiceForDepartment(c,dept,{event:ev,evidence:intel.evidence||[]}).score)})),observationsRaw:intel.evidence||[],institutionalLearning:[]}};
+  const model={senderId:senderEmployee?.id??null,senderName:comm.from||"Executive Office",senderRole:comm.role||"Leadership Team",department:dept,subject:comm.subject||ev.title,sentDay:company.day,sentMinute:company.minute||0,reasonForWriting:"",observations,assessment:"",recommendation:"",confidenceBand:confidenceBand((cred.evidenceQuality||58)*.45+(cred.estimateAccuracy||55)*.35+(100-(cred.overconfidence||0))*.2),uncertaintyNote:"",sourceIds,relatedProjectId:project?.id||null,relatedProjectName:project?.title||null,relatedRoleIds:role?[role]:[],relatedEmployeeIds:intel.originEmployeeIds||[],relatedDecisionId:ev.id,senderPersonality:senderPersonalityFor(comm,dept),senderCredibility:{...cred},debug:{senderBias:departmentBiasProfile(dept),recommendationScores:(ev.choices||[]).map(c=>({choice:c.title,score:Math.round(evaluateChoiceForDepartment(c,dept,{event:ev,evidence:intel.evidence||[]}).score)})),observationsRaw:intel.evidence||[],institutionalLearning:[]}};
   model.contextKind=ev.hiringRequest?"hiring":ev.customerSegmentId?"customer":ev.projectDecision||project?"project":eventCategory(ev);
   model.reasonForWriting=memoOpeningSentence(model,ev);
   model.assessment=memoAssessmentSentence(model);
@@ -1052,7 +1056,9 @@ function internalReportsHtml(){
     else if(issue){lines.push(`Current issue: ${issue.type.replace(/-/g," ")}; route ${issue.status}`);(issue.evidence||[]).slice(0,2).forEach(x=>lines.push(x));}
     else lines.push(...(m.evidence||[]).slice(0,3));
     if(m.count>1)lines.push(`${m.count} similar report(s): ${m.names.slice(0,3).join(", ")}`);
-    return "<div class=\"report-item\"><strong>"+subject+"</strong><small>"+m.type.replace(/-/g," ")+" from "+(m.fromName||"employee")+" - "+teamDisplayName(m.department)+" - day "+((m.createdDay??0)+1)+" ("+age+" day(s) ago) - severity "+m.severity+", confidence "+m.confidence+"<br>"+lines.slice(0,4).join("<br>")+"</small></div>";
+    const severityText=qualitativeBand(m.severity,{low:45,high:78,lowText:"limited concern",midText:"material concern",highText:"serious concern"});
+    const confidenceText=qualitativeBand(m.confidence,{low:45,high:75,lowText:"uncertain evidence",midText:"credible evidence",highText:"well-supported evidence"});
+    return "<div class=\"report-item\"><strong>"+subject+"</strong><small>"+m.type.replace(/-/g," ")+" from "+(m.fromName||"employee")+" - "+teamDisplayName(m.department)+" - day "+((m.createdDay??0)+1)+" ("+age+" day(s) ago) - "+severityText+", "+confidenceText+"<br>"+lines.slice(0,4).join("<br>")+"</small></div>";
   }).join("");
 }
 function releaseReadinessHtml(){
@@ -1065,8 +1071,8 @@ function memoEvidenceHtml(ev,comm){
   const work=msg?.workItemId?(company.workItems||[]).find(w=>w.id===msg.workItemId):null;
   const suppressed=(company.employeeMessages||[]).filter(m=>m.status==="suppressed"&&company.day-(m.createdDay??0)<=7&&(m.contentCode===msg?.contentCode||!msg)).length;
   const lines=[];
-  if(msg){lines.push(`Reported by ${msg.fromName||"employee"} from ${teamDisplayName(msg.department)} on day ${(msg.createdDay??0)+1}.`);lines.push(`Report type: ${msg.type}; severity ${msg.severity}, urgency ${msg.urgency}, confidence ${msg.confidence}.`);}
-  if(issue){lines.push(`Issue route: ${issue.status}; strategic impact ${issue.strategicImpact}; novelty ${issue.novelty}.`);(issue.evidence||[]).slice(0,3).forEach(x=>lines.push(x));}
+  if(msg){lines.push(`Reported by ${msg.fromName||"employee"} from ${teamDisplayName(msg.department)} on day ${(msg.createdDay??0)+1}.`);lines.push(reportEvidencePhrase(msg));}
+  if(issue){lines.push(issueEvidencePhrase(issue));(issue.evidence||[]).slice(0,3).map(evidenceSentence).filter(Boolean).forEach(x=>lines.push(x));}
   if(work)lines.push(`${work.title}: ${workStatusLabel(work)}, quality risk ${Math.round(work.qualityRisk||0)}.`);
   if(suppressed)lines.push(`${suppressed} related report(s) were suppressed or delayed recently.`);
   if(!lines.length){lines.push(`This memo was generated from company operating conditions, not a direct employee escalation.`);(comm.impacts||[]).slice(0,3).forEach(x=>lines.push(x));}

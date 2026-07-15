@@ -36,56 +36,52 @@ async function main() {
     if (typeof company === "undefined" || typeof simulateMinute !== "function") {
       return { ok: false, reason: "Simulation globals unavailable" };
     }
+    function canonicalize(value) {
+      const volatileKeys = new Set([
+        "runtime",
+        "completedAt",
+        "savedAt",
+        "startedAt",
+        "bodyPreview",
+        "executiveBriefing",
+        "executiveIntelligenceSnapshot",
+        "pendingCommunication"
+      ]);
+      if (value === null || typeof value !== "object") {
+        if (typeof value === "number") return Number.isFinite(value) ? Number(value.toFixed(6)) : 0;
+        return value;
+      }
+      if (Array.isArray(value)) return value.map(canonicalize);
+      const out = {};
+      for (const key of Object.keys(value).sort()) {
+        if (volatileKeys.has(key)) continue;
+        out[key] = canonicalize(value[key]);
+      }
+      return out;
+    }
+    function refreshDerivedStateForSnapshot() {
+      const savedRandomState = company.randomState;
+      const savedNextRuntimeId = company.nextRuntimeId;
+      if (typeof updateProjectCommercialStats === "function") {
+        [
+          ...(company.projects || []),
+          ...(company.projectProposals || []),
+          ...(company.projectArchive || [])
+        ].forEach(project => updateProjectCommercialStats(project));
+      }
+      if (typeof updatePortfolioHealth === "function") updatePortfolioHealth();
+      if (typeof updateCompanyRiskComponents === "function") updateCompanyRiskComponents();
+      company.randomState = savedRandomState;
+      company.nextRuntimeId = savedNextRuntimeId;
+    }
     function stableSnapshotHash() {
-      const activeEmployees = employees
-        .filter(e => e.active)
-        .map(e => ({
-          id: e.id,
-          role: e.role,
-          action: e.action,
-          stress: Math.round(e.stress || 0),
-          morale: Math.round(e.morale || 0),
-          focus: Math.round(e.focus || 0),
-          energy: Math.round(e.energy || 0),
-          offsite: !!e.offsite,
-          sickDays: e.sickDays || 0,
-          recentOutput: Number(e.recentOutput || 0).toFixed(3)
-        }))
-        .sort((a, b) => a.id - b.id);
-      const projects = [...(company.projects || []), ...(company.projectArchive || [])]
-        .map(p => ({
-          id: p.id,
-          status: p.status,
-          progress: Number(p.progress || 0).toFixed(2),
-          budgetSpent: Number(p.budgetSpent || 0).toFixed(3),
-          revenue: Number(p.dailyRevenue || 0).toFixed(4),
-          customers: Math.round(p.customers || 0),
-          risk: Math.round(p.performance?.riskTrend ?? p.visibleRisk ?? 0)
-        }))
-        .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      refreshDerivedStateForSnapshot();
       const snapshot = {
-        day: company.day,
-        minute: company.minute,
-        randomState: company.randomState,
-        phase: company.phase,
-        cash: Number(company.cash || 0).toFixed(4),
-        board: Math.round(company.board || 0),
-        trust: Math.round(company.trust || 0),
-        quality: Math.round(company.quality || 0),
-        integration: Math.round(company.integration || 0),
-        customers: Math.round(company.customers || 0),
-        valuation: Number(company.valuation || 0).toFixed(3),
-        dailyRevenue: Number(company.dailyRevenue || 0).toFixed(4),
-        eventCooldown: company.eventCooldown || 0,
-        directive: company.directive || null,
-        directiveDays: company.directiveDays || 0,
-        employees: activeEmployees,
-        projects,
-        messages: (company.messages || []).length,
-        communications: (company.communications || []).length,
-        learningEpisodes: (company.learningEpisodes || []).length,
-        lessons: (company.lessons || []).map(l => [l.key, l.state, Math.round(l.confidence || 0), l.reinforcements || 0]).slice(0, 20),
-        decisionThreads: (company.decisionThreads || []).map(t => [t.id, t.phase, t.state]).slice(0, 20)
+        company: canonicalize(company),
+        employees: canonicalize(employees.map(e => ({
+          ...e,
+          recentOutput: Number(e.performance?.recentOutput ?? e.recentOutput ?? 0)
+        })).sort((a, b) => a.id - b.id))
       };
       const text = JSON.stringify(snapshot);
       let hash = 2166136261 >>> 0;
@@ -125,9 +121,22 @@ async function main() {
     validationMode = true;
     maybeCreateDecisionEvent();
     validationMode = oldValidationMode;
+    const regressionArchive = (company.communications || []).find(m => m.eventId === "regression-ceo-decision");
+    const regressionDecisionHistory = (company.decisionHistory || []).find(h => h.eventId === "regression-ceo-decision");
+    const regressionLearningEpisode = (company.learningEpisodes || []).find(ep =>
+      ep.domain === "decision" &&
+      ep.sourceId === "regression-ceo-decision" &&
+      ep.choiceTitle === regressionArchive?.decision &&
+      ep.decisionId
+    );
     const decisionApplied =
       (company.communications || []).length > communicationsBefore &&
-      (company.learningEpisodes || []).length > learningBefore;
+      (company.learningEpisodes || []).length > learningBefore &&
+      !!regressionArchive &&
+      !!regressionDecisionHistory &&
+      regressionArchive.decision === regressionDecisionHistory.choice &&
+      !!regressionLearningEpisode &&
+      !company.pendingEvent;
     company.speed = 12;
     for (let i = 0; i < 2400; i += 1) {
       company.paused = false;
@@ -146,6 +155,14 @@ async function main() {
       learningEpisodes: (company.learningEpisodes || []).length,
       communications: (company.communications || []).length,
       decisionApplied,
+      regressionDecision: {
+        archived: !!regressionArchive,
+        history: !!regressionDecisionHistory,
+        learningEpisode: !!regressionLearningEpisode,
+        archivedChoice: regressionArchive?.decision || null,
+        historyChoice: regressionDecisionHistory?.choice || null,
+        episodeChoice: regressionLearningEpisode?.choiceTitle || null
+      },
       hash: stableSnapshotHash()
     };
     if (typeof saveGame === "function") saveGame();

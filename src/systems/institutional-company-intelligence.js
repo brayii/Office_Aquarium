@@ -45,12 +45,23 @@ function recordLearningEvidence({domain="institutional",eventType="general",acti
 }
 function companyLearningBaseline(){
   const active=employees.filter(e=>e.active);
+  const staffing=company.staffingModel||{};
+  const staffingCoverage=Object.values(staffing).reduce((s,x)=>s+(Number(x.coverage??x.staffingCoverage??100)||0),0)/Math.max(1,Object.keys(staffing).length);
+  const departmentBacklog=Object.values(company.teams||{}).reduce((s,t)=>s+(Number(t.backlog)||0),0);
+  const overtimeLoad=active.reduce((s,e)=>s+Math.max(0,(Number(e.stress)||0)-65),0)/Math.max(1,active.length);
+  const onboarding=(company.hiringPipeline||[]).filter(r=>/onboarding/i.test(String(r.status||""))).length;
+  const openRoles=(company.hiringPipeline||[]).filter(r=>!/filled|rejected|canceled/i.test(String(r.status||""))).length+(company.openRoles||[]).length;
+  const segmentSnapshot=Object.fromEntries(Object.entries(company.customerSegments||{}).map(([id,seg])=>[id,{customers:Number(seg.activeCustomers)||0,sentiment:Number(seg.sentiment)||0,churnRisk:Number(seg.churnRisk)||0,revenue:Number(seg.dailyRevenue||seg.revenueDaily)||0,supportLoad:Number(seg.supportLoad||seg.openIssues?.length||seg.currentIssues?.length||0)}]));
   return {
     day:company.day,cash:Number(company.cash)||0,board:Number(company.board)||0,trust:Number(company.trust)||0,
     quality:Number(company.quality)||0,integration:Number(company.integration)||0,customers:Number(company.customers)||0,
     dailyRevenue:Number(company.dailyRevenue)||0,valuation:Number(company.valuation)||0,
     morale:active.reduce((s,e)=>s+(Number(e.morale)||0),0)/Math.max(1,active.length),
     stress:active.reduce((s,e)=>s+(Number(e.stress)||0),0)/Math.max(1,active.length),
+    staffingCoverage,departmentBacklog,overtimeLoad,onboarding,openRoles,
+    retentionRate:active.filter(e=>(Number(e.retentionRisk)||0)<60).length/Math.max(1,active.length)*100,
+    roleOutput:active.reduce((s,e)=>s+Number(e.performance?.recentOutput ?? e.recentOutput ?? 0),0)/Math.max(1,active.length),
+    customerSegments:segmentSnapshot,
     risk:Number(company.companyRiskComponents?.total??0),portfolioHealth:Number(company.portfolioHealth?.portfolioHealth??derivedOperatingHealth?.().portfolioHealth??50),
     phase:company.phase
   };
@@ -74,21 +85,22 @@ function expectedChannelsForEpisode(domain,strategy="",choiceTitle=""){
   const add=(k,direction,weight)=>channels[k]={direction,weight};
   if(subtype==="decision.project.validation"){add("quality",1,.28);add("integration",1,.18);add("projectRisk",-1,.24);add("portfolioHealth",1,.18);add("cash",-1,.12);}
   else if(subtype==="decision.project.scope-reduction"){add("projectRisk",-1,.30);add("portfolioHealth",1,.22);add("cash",1,.16);add("morale",-1,.12);add("schedule",-1,.20);}
-  else if(subtype==="decision.workforce.hiring"){add("morale",1,.22);add("stress",-1,.24);add("portfolioHealth",1,.20);add("cash",-1,.18);add("risk",-1,.16);}
-  else if(subtype==="decision.workforce.hiring-delay"){add("cash",1,.28);add("stress",1,.22);add("portfolioHealth",-1,.20);add("morale",-1,.18);add("risk",1,.12);}
-  else if(subtype==="decision.customer.recovery"||subtype==="customer.launch-support"){add("customers",1,.24);add("customerSentiment",1,.28);add("dailyRevenue",1,.18);add("trust",1,.16);add("cash",-1,.14);}
+  else if(subtype==="decision.workforce.hiring"){add("staffingCoverage",1,.28);add("departmentBacklog",-1,.18);add("overtimeLoad",-1,.18);add("retentionRate",1,.14);add("roleOutput",1,.12);add("cash",-1,.10);}
+  else if(subtype==="decision.workforce.hiring-delay"){add("cash",1,.22);add("staffingCoverage",-1,.22);add("departmentBacklog",1,.18);add("overtimeLoad",1,.16);add("retentionRate",-1,.12);add("risk",1,.10);}
+  else if(subtype==="decision.customer.recovery"||subtype==="customer.launch-support"){add("segmentCustomers",1,.22);add("segmentSentiment",1,.28);add("segmentChurnRisk",-1,.22);add("segmentRevenue",1,.16);add("supportLoad",-1,.12);}
   else if(subtype==="decision.finance.spending-control"){add("cash",1,.30);add("risk",-1,.18);add("board",1,.16);add("morale",-1,.16);add("portfolioHealth",-1,.20);}
   else if(subtype==="board.market-overreaction"){add("valuationQuality",1,.28);add("board",1,.18);add("valuation",1,.14);add("risk",-1,.20);add("trust",1,.20);}
   else {add("portfolioHealth",1,.18);add("risk",-1,.18);add("trust",1,.16);add("morale",1,.12);add("cash",1,.12);add("quality",1,.12);add("integration",1,.12);}
   return channels;
 }
-function createLearningEpisode({domain="decision",subtype=null,sourceId=null,decisionId=null,decisionTitle="",choiceTitle="",strategy="balanced",department="company",projectId=null,employeeIds=[],messageId=null,baseline=null,expectedChannels=null,attributionSources=[],attributionQuality=null,reviewSchedule=null,hypotheses=[],protectedChannel=false}={}){
+function createLearningEpisode({domain="decision",subtype=null,sourceId=null,decisionId=null,decisionTitle="",choiceTitle="",strategy="balanced",department="company",projectId=null,employeeIds=[],messageId=null,baseline=null,expectedChannels=null,attributionSources=[],attributionQuality=null,reviewSchedule=null,hypotheses=[],protectedChannel=false,customerSegmentIds=null,customerExperienceIds=null,interventionType=null}={}){
   ensureBibleSystems();
   company.learningEpisodes=Array.isArray(company.learningEpisodes)?company.learningEpisodes:[];
   company.nextLearningEpisodeId=Math.max(1,Number(company.nextLearningEpisodeId)||1);
   const id=company.nextLearningEpisodeId++;
   subtype=subtype||learningEpisodeSubtype(domain,strategy,choiceTitle||decisionTitle);
-  const episode={id,domain,subtype,sourceId,decisionId,decisionTitle,choiceTitle,strategy,department,projectId,employeeIds:Array.isArray(employeeIds)?employeeIds:[],messageId,protectedChannel,createdDay:company.day,baseline:baseline||companyLearningBaseline(),expectedChannels:expectedChannels||expectedChannelsForEpisode(domain,strategy,choiceTitle||decisionTitle),attributionSources:Array.isArray(attributionSources)?attributionSources:[],attributionQuality:Number.isFinite(attributionQuality)?attributionQuality:null,reviewSchedule:reviewSchedule||[company.day+7,company.day+21,company.day+60],observations:[],contradictions:[],status:"pending",resolution:null,hypotheses:Array.isArray(hypotheses)?hypotheses:[]};
+  const initialAttributionQuality=Number.isFinite(attributionQuality)?attributionQuality:null;
+  const episode={id,domain,subtype,sourceId,decisionId,decisionTitle,choiceTitle,strategy,department,projectId,employeeIds:Array.isArray(employeeIds)?employeeIds:[],messageId,protectedChannel,customerSegmentIds:Array.isArray(customerSegmentIds)?customerSegmentIds:[],customerExperienceIds:Array.isArray(customerExperienceIds)?customerExperienceIds:[],interventionType,createdDay:company.day,baseline:baseline||companyLearningBaseline(),expectedChannels:expectedChannels||expectedChannelsForEpisode(domain,strategy,choiceTitle||decisionTitle),attributionSources:Array.isArray(attributionSources)?attributionSources:[],initialAttributionQuality,currentAttributionQuality:initialAttributionQuality,attributionQuality:initialAttributionQuality,reviewSchedule:reviewSchedule||[company.day+7,company.day+21,company.day+60],observations:[],contradictions:[],status:"pending",resolution:null,hypotheses:Array.isArray(hypotheses)?hypotheses:[]};
   company.learningEpisodes.unshift(episode);
   company.learningEpisodes=company.learningEpisodes.slice(0,180);
   return episode;
@@ -98,6 +110,13 @@ function learningCurrentState(){
   return {...base,customerSentiment:Number(company.customerSentiment)||0,valuationQuality:Number(company.valuationQuality)||50};
 }
 function episodeChannelDelta(channel,b,current){
+  if(["segmentCustomers","segmentSentiment","segmentChurnRisk","segmentRevenue","supportLoad"].includes(channel)){
+    const ids=(current.episodeCustomerSegmentIds||b.customerSegmentIds||[]).length?(current.episodeCustomerSegmentIds||b.customerSegmentIds):Object.keys(current.customerSegments||{});
+    const key={segmentCustomers:"customers",segmentSentiment:"sentiment",segmentChurnRisk:"churnRisk",segmentRevenue:"revenue",supportLoad:"supportLoad"}[channel];
+    const before=ids.reduce((s,id)=>s+(Number(b.customerSegments?.[id]?.[key])||0),0)/Math.max(1,ids.length);
+    const after=ids.reduce((s,id)=>s+(Number(current.customerSegments?.[id]?.[key])||0),0)/Math.max(1,ids.length);
+    return after-before;
+  }
   if(channel==="projectRisk"){
     const project=[...(company.projects||[]),...(company.projectArchive||[]),...(company.projectProposals||[])].find(p=>p.id===b.projectId);
     return project?-(Number(project.performance?.riskTrend??project.visibleRisk??50)-Number(b.projectRisk??project.visibleRisk??50)):0;
@@ -110,10 +129,27 @@ function episodeChannelDelta(channel,b,current){
 }
 function scoreEpisodeChannel(channel,episode,currentState){
   const cfg=episode.expectedChannels?.[channel];if(!cfg)return 0;
-  const b={...(episode.baseline||{}),projectId:episode.projectId};
-  const delta=episodeChannelDelta(channel,b,currentState);
-  const scaled=(channel==="dailyRevenue"?delta*18:channel==="cash"?delta*.45:channel==="valuation"?delta*.08:delta*.16);
+  const b={...(episode.baseline||{}),projectId:episode.projectId,customerSegmentIds:episode.customerSegmentIds||[]};
+  const current={...currentState,episodeCustomerSegmentIds:episode.customerSegmentIds||[]};
+  const delta=episodeChannelDelta(channel,b,current);
+  const scaled=(channel==="dailyRevenue"||channel==="segmentRevenue"?delta*18:channel==="cash"?delta*.45:channel==="valuation"?delta*.08:["departmentBacklog","overtimeLoad","supportLoad"].includes(channel)?delta*.22:delta*.16);
   return scaled*(cfg.direction||1)*(cfg.weight||.1);
+}
+function communicationOutcomeScore(episode){
+  if(!episode.messageId)return 0;
+  const outcomes=(company.communicationOutcomes||[]).filter(o=>o.messageId===episode.messageId||o.id===episode.messageId);
+  if(!outcomes.length)return 0;
+  const reviewed=outcomes.filter(o=>o.reviewedDay);
+  const items=reviewed.length?reviewed:outcomes;
+  return items.reduce((sum,o)=>{
+    const materialityAccuracy=1-Math.min(1,Math.abs(Number(o.severityError)||0)/100);
+    const timingQuality=(Number(o.timingQuality)||50)/100;
+    const evidenceQuality=(Number(o.evidenceQuality)||50)/100;
+    const decisionUsefulness=o.usefulToDecision?1:0;
+    const duplicatePenalty=o.duplicate ? .35 : 0;
+    const falseAlarmPenalty=(!o.materialized&&Number(o.predictedSeverity||o.materiality||0)>60) ? .45 : 0;
+    return sum+(materialityAccuracy*.25+timingQuality*.20+evidenceQuality*.20+decisionUsefulness*.15-duplicatePenalty*.10-falseAlarmPenalty*.10);
+  },0)/Math.max(1,items.length);
 }
 function calculateEpisodeAttributionQuality(ep,current=learningCurrentState()){
   const age=company.day-(ep.createdDay||company.day);
@@ -127,7 +163,11 @@ function calculateEpisodeAttributionQuality(ep,current=learningCurrentState()){
   if(shocks)score-=Math.min(18,shocks*6);
   if(ep.domain==="communication"&&!ep.messageId)score-=12;
   if(ep.domain==="decision"&&!ep.decisionId&&!ep.sourceId)score-=10;
-  return clamp(Number.isFinite(ep.attributionQuality)?Math.max(ep.attributionQuality,score):score,0,100);
+  if(Number.isFinite(ep.initialAttributionQuality)&&ep.observations?.length===0)score=(score+ep.initialAttributionQuality)/2;
+  ep.currentAttributionQuality=clamp(score,0,100);
+  if(!Number.isFinite(ep.initialAttributionQuality))ep.initialAttributionQuality=ep.currentAttributionQuality;
+  ep.attributionQuality=ep.currentAttributionQuality;
+  return ep.currentAttributionQuality;
 }
 function weightedEpisodeScore(episode,current,weights={},fallback=.05){
   return Object.keys(episode.expectedChannels||{}).reduce((s,ch)=>{
@@ -140,13 +180,13 @@ function scoreDecisionLearningEpisode(episode,current=learningCurrentState()){
   return weightedEpisodeScore(episode,current,{quality:.20,integration:.16,projectRisk:.22,portfolioHealth:.20,cash:.10,trust:.12,risk:.15,board:.12},.08);
 }
 function scoreCommunicationLearningEpisode(episode,current=learningCurrentState()){
-  return weightedEpisodeScore(episode,current,{trust:.18,risk:.16,morale:.12,portfolioHealth:.10,quality:.10,customerSentiment:.10},.06)+((episode.messageId||episode.protectedChannel)? .25 : -.10);
+  return weightedEpisodeScore(episode,current,{trust:.12,risk:.10,morale:.08,portfolioHealth:.08,quality:.08,customerSentiment:.08},.04)+communicationOutcomeScore(episode);
 }
 function scoreCustomerLearningEpisode(episode,current=learningCurrentState()){
-  return weightedEpisodeScore(episode,current,{customers:.28,customerSentiment:.30,dailyRevenue:.20,trust:.14,cash:.08,quality:.08},.06);
+  return weightedEpisodeScore(episode,current,{segmentCustomers:.24,segmentSentiment:.30,segmentChurnRisk:.22,segmentRevenue:.16,supportLoad:.12,customers:.08,customerSentiment:.08},.04);
 }
 function scoreWorkforceLearningEpisode(episode,current=learningCurrentState()){
-  return weightedEpisodeScore(episode,current,{morale:.22,stress:.28,portfolioHealth:.18,risk:.12,cash:.12,quality:.08,integration:.08},.06);
+  return weightedEpisodeScore(episode,current,{staffingCoverage:.30,departmentBacklog:.18,overtimeLoad:.18,retentionRate:.14,roleOutput:.12,cash:.08,morale:.06,stress:.06},.05);
 }
 function scoreBoardLearningEpisode(episode,current=learningCurrentState()){
   return weightedEpisodeScore(episode,current,{board:.25,valuationQuality:.24,valuation:.14,risk:.18,trust:.14,cash:.08},.06);
@@ -166,7 +206,12 @@ function classifyLearningFailure(ep,score,attributionQuality){
   if(attributionQuality<40)return "insufficient evidence";
   const shock=(company.valuationShocks||[]).some(s=>company.day-(s.day||0)<=21&&Math.abs(s.magnitude||0)>1.5);
   if(shock)return "external shock";
-  if((company.portfolioHealth?.currentlyMissing||0)>0||avgStress()>72)return "execution failure";
+  const relatedProject=ep.projectId?[...(company.projects||[]),...(company.projectArchive||[]),...(company.projectProposals||[])].find(p=>p.id===ep.projectId):null;
+  const relatedDepartment=ep.department&&ep.department!=="company";
+  const deptPressure=relatedDepartment&&(company.teams?.[ep.department]?.pressure>72||company.staffingModel?.[ep.department]?.understaffed);
+  const projectPressure=relatedProject&&((relatedProject.performance?.staffingCoverage??100)<70||(relatedProject.performance?.blockerCount||0)>0||(relatedProject.performance?.riskTrend??0)>72);
+  if(projectPressure||deptPressure)return "execution failure";
+  if((company.portfolioHealth?.currentlyMissing||0)>0||avgStress()>72)return "low attribution from unrelated operating pressure";
   if(/launch|market|speed|expand/i.test(`${ep.strategy} ${ep.choiceTitle}`))return "timing failure";
   return score<0?"strategy mismatch":"mixed";
 }
@@ -184,10 +229,14 @@ function lessonVectorForEpisode(ep,positive=true){
   if(s.includes("report")||s.includes("escalat")){v.escalation=.7;v.documentation=.45;}
   if(positive)return v;
   const cause=ep.failureCause||"insufficient evidence";
-  if(cause==="external shock"||cause==="insufficient evidence")return Object.fromEntries(Object.entries(v).map(([k,val])=>[k,val*.08]));
+  if(cause==="external shock"||cause==="insufficient evidence"||cause==="low attribution from unrelated operating pressure")return Object.fromEntries(Object.entries(v).map(([k,val])=>[k,val*.08]));
   if(cause==="execution failure"||cause==="insufficient staffing"){v.planning=(v.planning||0)+.35;v.escalation=(v.escalation||0)+.25;return normalizeLessonVector(v);}
   if(cause==="timing failure"){v.marketTiming=-(Math.abs(v.marketTiming||.35));v.planning=(v.planning||0)+.2;return normalizeLessonVector(v);}
-  return Object.fromEntries(Object.entries(v).map(([k,val])=>[k,-val*.55]));
+  if(cause==="strategy mismatch"){
+    const implicated=/launch|market|speed|expand/.test(s)?["riskTaking","marketTiming"]:/cash|freeze|cut|runway/.test(s)?["riskTaking","hiringTiming"]:/hire|people|coach/.test(s)?["hiringTiming","workloadBalancing"]:/quality|test|verify/.test(s)?["testing","riskTaking"]:["riskTaking"];
+    return Object.fromEntries(Object.entries(v).map(([k,val])=>[k,implicated.includes(k)?-Math.abs(val)*.55:val*.10]));
+  }
+  return Object.fromEntries(Object.entries(v).map(([k,val])=>[k,-val*.25]));
 }
 function evaluateLearningEpisode(ep,reviewDay=company.day){
   const current=learningCurrentState(),score=scoreLearningEpisodeOutcome(ep,current),abs=Math.abs(score),attributionQuality=calculateEpisodeAttributionQuality(ep,current);
@@ -201,7 +250,7 @@ function evaluateLearningEpisode(ep,reviewDay=company.day){
   if(reviewIndex===0){ep.status="observing";return;}
   if(abs>=1.4||ep.observations.length>=ep.reviewSchedule.length){
     const positive=score>=0,confidence=clamp(36+abs*7+ep.observations.length*5+attributionQuality*.18,25,88);
-    const state=reviewIndex>=2&&attributionQuality>=75&&abs>=2.2?"validated":reviewIndex>=2&&attributionQuality>=60?"provisional":attributionQuality>=40?"prior":"prior";
+    const state=reviewIndex>=2&&attributionQuality>=75&&abs>=2.2?"validated":reviewIndex>=2&&attributionQuality>=60?"provisional":attributionQuality>=40?"hypothesis":"hypothesis";
     if(attributionQuality>=40){
       const key=`${ep.subtype||learningEpisodeSubtype(ep.domain,ep.strategy,ep.choiceTitle)}-${ep.projectId||ep.department||"company"}`.toLowerCase().replace(/[^a-z0-9.]+/g,"-").slice(0,82);
       createOrReinforceLesson({key,title:`${ep.domain==="communication"?"Communication":"Decision"} learning: ${ep.choiceTitle||ep.decisionTitle||ep.strategy||"company action"}`,department:ep.department||"company",vector:lessonVectorForEpisode(ep,positive),outcome,confidence,evidence:`${state} review after ${company.day-(ep.createdDay||company.day)} day(s): ${outcome}${ep.failureCause?"; cause "+ep.failureCause:""}`,importance:ep.domain==="decision"?4:3,state,episodeKey:`episode-${ep.id}`,attributionQuality,reviewWindow:reviewIndex===1?"medium":"long"});
@@ -287,13 +336,13 @@ function employeeLessonStrength(e,department){
   return veteran*proximity*lessonAcceptanceFor(e);
 }
 function lessonStateWeight(lesson){
-  const state=lesson?.state||((lesson?.confidence||0)>=72?"validated":"provisional");
+  const state=lesson?.state||"unknown";
   if(state==="validated")return 1;
-  if(state==="prior")return .22;
-  if(state==="provisional")return .18;
-  if(state==="contradicted")return -.25;
+  if(state==="provisional")return .20;
+  if(state==="hypothesis"||state==="prior")return .05;
+  if(state==="contradicted")return -.10;
   if(state==="obsolete")return 0;
-  return .45;
+  return 0;
 }
 function applyInstitutionalLessonToEmployee(e,lesson,scale=1){
   if(!e.active)return;
@@ -310,7 +359,7 @@ function createOrReinforceLesson({key,title,department="company",vector={},outco
   ensureInstitutionalLearning();
   if(!DEPARTMENTS.includes(department))department="company";
   const reviewed=!!episodeKey&&Number(attributionQuality??60)>=40;
-  if(!reviewed){confidence=Math.min(Number(confidence)||55,42);state=state==="validated"?"prior":(state||"prior");}
+  if(!reviewed){confidence=Math.min(Number(confidence)||55,42);state=state==="validated"?"hypothesis":(state||"hypothesis");}
   else if(reviewWindow==="short"&&state==="validated")state="provisional";
   const existing=company.lessons.find(l=>l.key===key&&l.department===department);
   if(!reviewed){
@@ -318,10 +367,10 @@ function createOrReinforceLesson({key,title,department="company",vector={},outco
       existing.evidence=Array.isArray(existing.evidence)?existing.evidence:[];
       if(evidence&&!existing.evidence.includes(evidence))existing.evidence.unshift(evidence);
       existing.evidence=existing.evidence.slice(0,6);
-      if(existing.state!=="validated"){existing.state="prior";existing.confidence=Math.min(existing.confidence||42,42);}
+      if(existing.state!=="validated"){existing.state="hypothesis";existing.confidence=Math.min(existing.confidence||42,42);}
       return existing;
     }
-    const prior={id:company.nextLessonId++,key,title,department,vector:normalizeLessonVector(vector),outcome,state:"prior",episodeKeys:[],confidence:clamp(confidence,0,42),evidence:evidence?[evidence]:[],createdDay:company.day,lastDay:company.day,reinforcements:0,importance,successEvidence:0,failureEvidence:0,sampleCount:0,effectEstimate:0,variance:1,pendingEvidenceOnly:true};
+    const prior={id:company.nextLessonId++,key,title,department,vector:normalizeLessonVector(vector),outcome,state:"hypothesis",episodeKeys:[],confidence:clamp(confidence,0,42),evidence:evidence?[evidence]:[],createdDay:company.day,lastDay:company.day,reinforcements:0,importance,successEvidence:0,failureEvidence:0,sampleCount:0,effectEstimate:0,variance:1,pendingEvidenceOnly:true};
     company.lessons.unshift(prior);
     company.lessons=company.lessons.slice(0,36);
     return prior;
@@ -351,7 +400,7 @@ function createOrReinforceLesson({key,title,department="company",vector={},outco
     existing.vector=normalizeLessonVector(Object.fromEntries(INSTITUTIONAL_LESSON_KEYS.map(k=>[k,(existing.vector?.[k]||0)*.92+incoming[k]*.28])));
     lesson=existing;
   }else{
-    lesson={id:company.nextLessonId++,key,title,department,vector:incoming,outcome,state:state||(episodeKey?"provisional":"prior"),episodeKeys:episodeKey?[episodeKey]:[],confidence:clamp(confidence,0,100),evidence:evidence?[evidence]:[],createdDay:company.day,lastDay:company.day,reinforcements:1,importance,successEvidence:outcome==="positive"?1:0,failureEvidence:outcome==="negative"?1:0,sampleCount:1,effectEstimate:outcome==="negative"?-magnitude:magnitude,variance:1};
+    lesson={id:company.nextLessonId++,key,title,department,vector:incoming,outcome,state:state||(episodeKey?"provisional":"hypothesis"),episodeKeys:episodeKey?[episodeKey]:[],confidence:clamp(confidence,0,100),evidence:evidence?[evidence]:[],createdDay:company.day,lastDay:company.day,reinforcements:1,importance,successEvidence:outcome==="positive"?1:0,failureEvidence:outcome==="negative"?1:0,sampleCount:1,effectEstimate:outcome==="negative"?-magnitude:magnitude,variance:1};
     company.lessons.unshift(lesson);
     company.lessons=company.lessons.slice(0,36);
   }

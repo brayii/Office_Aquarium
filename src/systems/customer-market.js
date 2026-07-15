@@ -259,10 +259,11 @@ function applyCustomerStrategyDecision(strategy){
   if(!strategy)return;
   ensureCustomerMarketSystems();
   const seg=company.customerSegments[strategy.segmentId]||company.customerSegments.enterprise,label=CUSTOMER_SEGMENT_DEFS[strategy.segmentId]?.label||"Customer";
+  const learningBaseline=typeof companyLearningBaseline==="function"?companyLearningBaseline():null;
   if(strategy.mode==="recovery"){seg.sentiment=clamp((seg.sentiment||50)+6,0,100);seg.trust=clamp((seg.trust||50)+5,0,100);seg.churnRisk=clamp((seg.churnRisk||0)-14,0,100);recordCustomerExperience(strategy.segmentId,"rapid-resolution",35,`${label} customers received a bounded recovery commitment.`,"ceo-customer",true);}
   else if(strategy.mode==="support"){seg.supportSatisfaction=clamp((seg.supportSatisfaction||50)+8,0,100);seg.churnRisk=clamp((seg.churnRisk||0)-9,0,100);recordCustomerExperience(strategy.segmentId,"rapid-resolution",30,`${label} support capacity improved after CEO approval.`,"ceo-support",false);}
   else if(strategy.mode==="hold"){seg.roadmapConfidence=clamp((seg.roadmapConfidence||50)-4,0,100);seg.churnRisk=clamp((seg.churnRisk||0)+7,0,100);recordCustomerExperience(strategy.segmentId,"roadmap-slip",58,`${label} customers saw leadership hold the roadmap line instead of making special commitments.`,"ceo-focus",true);}
-  createLearningEpisode({domain:"customer",sourceId:`customer-strategy-${strategy.segmentId}`,decisionTitle:"Customer strategy",choiceTitle:strategy.mode,strategy:strategy.mode,department:"product",customerSegmentIds:[strategy.segmentId],baseline:{day:company.day,customers:company.customers,customerSentiment:company.customerSentiment,segmentSentiment:seg.sentiment,segmentCustomers:seg.activeCustomers},reviewSchedule:[company.day+7,company.day+21,company.day+45],hypotheses:[{strategy:strategy.mode,expected:"Customer outcome will be reviewed after support, renewal, and sentiment changes appear."}]});
+  createLearningEpisode({domain:"customer",sourceId:`customer-strategy-${strategy.segmentId}`,decisionTitle:"Customer strategy",choiceTitle:strategy.mode,strategy:strategy.mode,department:"product",customerSegmentIds:[strategy.segmentId],baseline:learningBaseline,reviewSchedule:[company.day+7,company.day+21,company.day+45],hypotheses:[{strategy:strategy.mode,expected:"Customer outcome will be reviewed after support, renewal, and sentiment changes appear."}]});
   syncCustomerSummaryFromSegments();
 }
 function makeProjectCommercializationEvent(project){
