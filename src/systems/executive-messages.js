@@ -355,8 +355,7 @@ function senderPersonalityFor(comm,dept){
 function naturalizeObservation(text){
   const t=String(text||"").replace(/\s+/g," ").trim();
   if(!t)return "";
-  if(/^Internal intelligence flags:/i.test(t))return naturalizeObservation(t.replace(/^Internal intelligence flags:\s*/i,""));
-  if(/^Issue severity|^.+ reported severity|severity \d+|urgency \d+|strategic impact \d+/i.test(t))return "";
+  if(/^Internal intelligence/i.test(t))return naturalizeObservation(t.replace(/^Internal intelligence[^:]*:\s*/i,""));
   let cm=t.match(/Customer base\s+(\d+),\s+weighted sentiment\s+(\d+),\s+daily segment revenue\s+\$?([\d.]+)M/i);if(cm)return `The customer base is ${cm[1]} organization${Number(cm[1])===1?"":"s"}, with sentiment near ${cm[2]} and daily revenue around $${Number(cm[3]).toFixed(3)}M.`;
   cm=t.match(/(.+):\s+(\d+)\s+active customer\(s\), sentiment\s+(\d+), churn risk\s+(\d+)/i);if(cm)return `${cm[1]} has ${cm[2]} active customer${Number(cm[2])===1?"":"s"}, sentiment near ${cm[3]}, and churn risk around ${cm[4]}.`;
   cm=t.match(/Market context:\s+competitor pressure\s+(\d+), demand\s+(\d+)/i);if(cm)return `Market pressure is visible: competitor pressure is around ${cm[1]} and demand is around ${cm[2]}.`;

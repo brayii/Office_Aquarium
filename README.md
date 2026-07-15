@@ -40,6 +40,7 @@ The suite checks:
 - browser launch/startup
 - day rollover through daily close
 - save/load continuation
+- deterministic replay from a saved day-50 state to day 100
 - absence of recorded simulation errors during the regression run
 
 GitHub Actions also runs these checks on push and pull request through `.github/workflows/ci.yml`.
