@@ -6,10 +6,15 @@
   "scripts": {
     "package:web": "powershell -ExecutionPolicy Bypass -File tools/package-itch-web.ps1",
     "package:desktop-assets": "powershell -ExecutionPolicy Bypass -File tools/package-tauri-frontend.ps1",
+    "test:static": "node tests/static-structure-check.js",
+    "test:smoke": "node tests/browser-smoke-test.js",
+    "test:regression": "node tests/simulation-regression-test.js",
+    "test": "npm run test:static && npm run test:smoke && npm run test:regression",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
+    "@tauri-apps/cli": "^2.0.0",
+    "playwright": "^1.55.0"
   }
 }

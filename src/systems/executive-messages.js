@@ -108,20 +108,6 @@ function concreteMemoEvidence(ev,comm,dept,msg=null){
   if(opportunity&&lines.length<6)lines.push(`Internal opportunity signal: ${opportunity.title} ${opportunity.detail||""}`.trim());
   return [...new Set(lines)].filter(Boolean).slice(0,6);
 }
-function choiceDepartmentScore(choice,dept,evidence=[]){
-  const t=String(choice.title+" "+choice.detail+" "+(choice.benefits||[]).join(" ")+" "+(choice.risks||[]).join(" ")+" "+(choice.strategy||"")+" "+(choice.directive||"")).toLowerCase();
-  let score=Number(choice.estimatedConfidence)||50;
-  if(dept==="finance"){score+=(choice.effect?.cash||0)*10-(choice.effect?.board<0?3:0);if(/delay|freeze|cut|budget|runway|cost|cash/.test(t))score+=10;if(/expand|approve|hire|spend|salary/.test(t))score-=company.finance?.runwayDays<100?8:2;}
-  else if(dept==="people"){score+=(choice.people?.morale||0)*2-(choice.people?.stress||0)*1.4;if(/hire|coach|support|people|contractor|critical/.test(t))score+=10;if(/fire|layoff|cut|freeze/.test(t))score-=8;}
-  else if(dept==="quality"||dept==="hardware"||dept==="software"){score+=(choice.effect?.quality||0)*5+(choice.effect?.integration||0)*2;if(/quality|verify|pilot|pause|scope|tool|support/.test(t))score+=9;if(/speed|rush|full launch/.test(t))score-=7;}
-  else if(dept==="product"){score+=(choice.effect?.customers||0)*4+(choice.effect?.trust||0)*3;if(/launch|customer|market|experiment|validate|feature|growth/.test(t))score+=9;if(/cancel|reject|freeze/.test(t))score-=5;}
-  else if(dept==="board"){score+=(choice.effect?.board||0)*5+(choice.effect?.valuation||0)*2;if(/plan|discipline|triage|credible|risk|strategy/.test(t))score+=8;if(/ignore|hold|continue unchanged/.test(t))score-=3;}
-  const evidenceText=evidence.join(" ").toLowerCase();
-  if(/runway|cash|spend|budget/.test(evidenceText)&&/cash|budget|cost|fund|delay|freeze/.test(t))score+=5;
-  if(/stress|retention|staff|hire|morale/.test(evidenceText)&&/hire|people|support|coach|contractor/.test(t))score+=5;
-  if(/quality|risk|defect|blocker|manufactur/.test(evidenceText)&&/quality|pause|support|validate|pilot/.test(t))score+=5;
-  return score;
-}
 function departmentEvidenceIds(dept){
   const map={
     engineering:["quality","project","people"],
@@ -144,20 +130,41 @@ function filterEvidenceForDepartment(evidence,dept,choice=null){
     return ids.some(id=>allowed.includes(id)||choiceIds.includes(id));
   }).slice(0,3);
 }
+function institutionalLessonsForChoice(choice,dept){
+  const text=String(`${choice?.title||""} ${choice?.detail||""} ${choice?.strategy||""} ${choice?.directive||""}`).toLowerCase();
+  const signals=[];
+  if(/quality|verify|test|pilot|defect|scope|delay/.test(text))signals.push("testing","earlyQA","documentation","planning");
+  if(/hire|staff|people|coach|mentor|support|contractor/.test(text))signals.push("hiringTiming","mentoring","collaboration","retention","workloadBalancing");
+  if(/cash|budget|freeze|cut|spend|runway|fund/.test(text))signals.push("planning","hiringTiming","riskTaking","escalation");
+  if(/customer|market|launch|growth|revenue|feature/.test(text))signals.push("marketTiming","riskTaking","planning","quality");
+  if(/report|escalat|memo|board|disclose|transparency/.test(text))signals.push("escalation","documentation","planning");
+  const lessons=(company.lessons||[]).filter(l=>(l.department==="company"||String(l.department||"").toLowerCase()===String(dept||"").toLowerCase())&&Object.entries(l.vector||{}).some(([k,v])=>signals.includes(k)&&Math.abs(Number(v)||0)>.25));
+  return lessons.slice(0,3).map(l=>{
+    const vectorScore=Object.entries(l.vector||{}).reduce((s,[k,v])=>s+(signals.includes(k)?Number(v)||0:0),0);
+    const stateWeight=typeof lessonStateWeight==="function"?lessonStateWeight(l):(l.state==="validated"?1:(l.state==="provisional"? .18 : .22));
+    const influence=clamp(vectorScore*stateWeight*(Number(l.confidence)||50)/100,-8,8);
+    return {key:l.key,title:l.title,state:l.state||"prior",confidence:Math.round(l.confidence||0),influence:Number(influence.toFixed(2))};
+  });
+}
 function evaluateChoiceForDepartment(choice,department,context={}){
   const evidence=Array.isArray(context.evidence)?context.evidence:[],ev=context.event||{},ctx=context.snapshot||decisionContextSnapshot();
   const dept=department||"company";
   const deptEvidence=filterEvidenceForDepartment(evidence,dept,choice);
-  const base=choiceDepartmentScore(choice,dept,deptEvidence);
-  const strategic=decisionOptionScore(choice,ctx,dept);
-  const score=clamp(base*.62+strategic*.38,0,100);
+  const strategyScore=decisionOptionScore(choice,ctx,dept);
+  const lessonsUsed=institutionalLessonsForChoice(choice,dept);
+  const lessonAdjustment=lessonsUsed.reduce((s,l)=>s+l.influence,0);
+  const evidenceAdjustment=deptEvidence.reduce((s,line)=>{
+    const ids=evidenceSignalIds(line),choiceIds=choiceEvidenceIds(choice);
+    return s+(ids.some(id=>choiceIds.includes(id))?3:1);
+  },0);
+  const score=clamp(strategyScore+lessonAdjustment+Math.min(8,evidenceAdjustment),0,100);
   const evidenceText=deptEvidence.join(" ");
   const selectedEvidence=deptEvidence.filter(line=>evidenceSignalIds(line).some(id=>choiceEvidenceIds(choice).includes(id))).slice(0,2);
   const reasons=[departmentViewpointReason(dept,ev,choice)];
   if(!selectedEvidence.length&&evidenceText)selectedEvidence.push(deptEvidence[0]);
   const confidence=clamp((Number(choice.estimatedConfidence)||55)*.45+score*.35+(selectedEvidence.length?12:0),20,95);
   const uncertainty=confidence>72?"Low":confidence>55?"Material":"High";
-  return {score,position:score>=66?"support":score<=42?"oppose":"cautious",reasons,selectedEvidence,lessonsUsed:[],confidence,uncertainty};
+  return {score,position:score>=66?"support":score<=42?"oppose":"cautious",reasons,selectedEvidence,lessonsUsed,confidence,uncertainty};
 }
 function memoRecommendedChoice(ev,dept,evidence=[]){
   const choices=Array.isArray(ev.choices)?ev.choices:[];
@@ -927,7 +934,7 @@ function applyExecutiveIntelligenceLearning(snapshot=buildExecutiveIntelligenceS
   const seriousSuppression=(snapshot.suppressedReportFindings||[]).find(s=>(s.severeCount||0)>0||s.protectedCount>0);
   if(seriousSuppression){
     recordHistory(`${seriousSuppression.department} suppression pattern became strategically visible.`,"communication",3);
-    createOrReinforceLesson({key:"suppression-hides-risk",title:"Suppressed reports can hide strategic risk until later evidence forces attention.",department:seriousSuppression.departmentKey||"company",vector:{escalation:.7,documentation:.45,planning:.25},outcome:"negative",confidence:68,evidence:`${seriousSuppression.count} filtered report(s), ${seriousSuppression.severeCount} severe`,importance:4});
+    createOrReinforceLesson({key:"suppression-hides-risk",title:"Suppressed reports can hide strategic risk until later evidence forces attention.",department:seriousSuppression.departmentKey||"company",vector:{escalation:.7,documentation:.45,planning:.25},outcome:"negative",confidence:68,evidence:`${seriousSuppression.count} filtered report(s), ${seriousSuppression.severeCount} severe`,importance:4,episodeKey:`suppression-${company.day}-${seriousSuppression.departmentKey||"company"}`,attributionQuality:62,reviewWindow:"long"});
   }
   const risk=(snapshot.topRisks||[]).find(r=>(r.priority||0)>=75);
   if(risk)recordLearningEvidence({domain:"company",eventType:"executive-intelligence-risk",action:"observe",outcome:"mixed",magnitude:clamp((risk.priority||0)/100,0,1),confidence:risk.confidence||65,department:risk.department||"company",evidence:risk.title,contributors:[{type:risk.sourceType||"signal",id:(risk.sourceIds||[])[0]||risk.id,weight:1}]});
@@ -1113,6 +1120,7 @@ function contextualChoicePool(ev){
 }
 function decisionOptionScore(choice,ctx,department="company"){
   const strategy=inferDecisionStrategy(choice);
+  const deptKey=String(department||"company").toLowerCase();
   let score=50;
   if(strategy==="quality"||strategy==="pilot"){
     score+=(70-ctx.quality)*.35+(65-ctx.integration)*.18+(ctx.supplyRisk-50)*.12;
@@ -1134,13 +1142,16 @@ function decisionOptionScore(choice,ctx,department="company"){
     score-=Math.max(0,8-ctx.cash)*2.5+Math.max(0,ctx.stress-65)*.2;
   }
   const objectives={
-    Engineering:{quality:12,speed:-4,pilot:10,people:4,innovation:5},
-    Product:{revenue:10,speed:7,pilot:8,quality:3,innovation:6},
-    Finance:{finance:12,"cost-control":10,revenue:7,people:-2,innovation:-2},
-    Board:{speed:6,revenue:8,finance:6,quality:2,people:-1},
-    People:{people:14,quality:4,"cost-control":-7,speed:-4}
+    engineering:{quality:12,speed:-4,pilot:10,people:4,innovation:5},
+    hardware:{quality:12,speed:-4,pilot:10,people:4,innovation:5},
+    software:{quality:11,speed:-3,pilot:9,people:4,innovation:6},
+    quality:{quality:14,speed:-7,pilot:10,people:3,innovation:3},
+    product:{revenue:10,speed:7,pilot:8,quality:3,innovation:6},
+    finance:{finance:12,"cost-control":10,revenue:7,people:-2,innovation:-2},
+    board:{speed:6,revenue:8,finance:6,quality:2,people:-1},
+    people:{people:14,quality:4,"cost-control":-7,speed:-4}
   };
-  score+=(objectives[department]?.[strategy]||0);
+  score+=(objectives[deptKey]?.[strategy]||0);
   return clamp(score,5,95);
 }
 function decisionProjectSubject(ev,choice={}){
@@ -1545,7 +1556,7 @@ function processDelayedDecisionEffects(){
     clampCompany();
     if(x.type==="project-cancel"){
       if((x.effect?.board||0)<0)addBoardStrike?.(`Board questioned cancellation of ${x.projectTitle}`);
-      createOrReinforceLesson({key:"project-cancel-aftershock",title:"Canceled projects can release capacity but still create delayed morale, customer, and board consequences.",department:"company",vector:{planning:.45,cancellationTiming:.65,sunkCostDiscipline:.55,retention:.25},outcome:"mixed",confidence:62,evidence:x.projectTitle,importance:4});
+      createOrReinforceLesson({key:"project-cancel-aftershock",title:"Canceled projects can release capacity but still create delayed morale, customer, and board consequences.",department:"company",vector:{planning:.45,cancellationTiming:.65,sunkCostDiscipline:.55,retention:.25},outcome:"mixed",confidence:62,evidence:x.projectTitle,importance:4,episodeKey:`cancel-${x.projectId||x.projectTitle}-${x.dueDay}`,attributionQuality:64,reviewWindow:"long"});
       recordHistory(`Delayed consequences emerged from canceling ${x.projectTitle}.`,"project",4);
     }
     applyDelayedProjectOutcome(x);
@@ -1574,7 +1585,10 @@ function processDelayedDecisionEffects(){
         outcome:x.tone,
         confidence:clamp(55+Math.abs(x.realizedScore-x.expectedScore),45,88),
         evidence:`CEO chose ${x.choiceTitle}; delayed result observed on day ${company.day}`,
-        importance:x.tone==="negative"?4:3
+        importance:x.tone==="negative"?4:3,
+        episodeKey:`delayed-decision-${x.eventId}-${x.choiceTitle}-${x.dueDay}`,
+        attributionQuality:70,
+        reviewWindow:"long"
       });
     }
   });

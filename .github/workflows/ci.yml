@@ -1,0 +1,47 @@
+name: Office Aquarium CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: JavaScript syntax check
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path src,tests -Recurse -Filter *.js | ForEach-Object {
+            node --check $_.FullName
+          }
+
+      - name: Static structure checks
+        run: npm run test:static
+
+      - name: Browser smoke test
+        run: npm run test:smoke
+
+      - name: Simulation regression test
+        run: npm run test:regression
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Tauri Rust check
+        run: cargo check --manifest-path src-tauri/Cargo.toml

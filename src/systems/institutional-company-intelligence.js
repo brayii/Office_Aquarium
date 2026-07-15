@@ -129,14 +129,31 @@ function calculateEpisodeAttributionQuality(ep,current=learningCurrentState()){
   if(ep.domain==="decision"&&!ep.decisionId&&!ep.sourceId)score-=10;
   return clamp(Number.isFinite(ep.attributionQuality)?Math.max(ep.attributionQuality,score):score,0,100);
 }
-function scoreDecisionLearningEpisode(episode,current=learningCurrentState()){
-  return Object.keys(episode.expectedChannels||{}).reduce((s,ch)=>s+scoreEpisodeChannel(ch,episode,current),0);
+function weightedEpisodeScore(episode,current,weights={},fallback=.05){
+  return Object.keys(episode.expectedChannels||{}).reduce((s,ch)=>{
+    const cfg=episode.expectedChannels[ch]||{};
+    const domainWeight=weights[ch]??(Number.isFinite(Number(cfg.weight))?Number(cfg.weight):fallback);
+    return s+scoreEpisodeChannel(ch,{...episode,expectedChannels:{[ch]:{...cfg,weight:domainWeight}}},current);
+  },0);
 }
-function scoreCommunicationLearningEpisode(episode,current=learningCurrentState()){return scoreDecisionLearningEpisode(episode,current)*.85;}
-function scoreCustomerLearningEpisode(episode,current=learningCurrentState()){return scoreDecisionLearningEpisode(episode,current);}
-function scoreWorkforceLearningEpisode(episode,current=learningCurrentState()){return scoreDecisionLearningEpisode(episode,current);}
-function scoreBoardLearningEpisode(episode,current=learningCurrentState()){return scoreDecisionLearningEpisode(episode,current);}
-function scoreInvestorRelationsEpisode(episode,current=learningCurrentState()){return scoreDecisionLearningEpisode(episode,current);}
+function scoreDecisionLearningEpisode(episode,current=learningCurrentState()){
+  return weightedEpisodeScore(episode,current,{quality:.20,integration:.16,projectRisk:.22,portfolioHealth:.20,cash:.10,trust:.12,risk:.15,board:.12},.08);
+}
+function scoreCommunicationLearningEpisode(episode,current=learningCurrentState()){
+  return weightedEpisodeScore(episode,current,{trust:.18,risk:.16,morale:.12,portfolioHealth:.10,quality:.10,customerSentiment:.10},.06)+((episode.messageId||episode.protectedChannel)? .25 : -.10);
+}
+function scoreCustomerLearningEpisode(episode,current=learningCurrentState()){
+  return weightedEpisodeScore(episode,current,{customers:.28,customerSentiment:.30,dailyRevenue:.20,trust:.14,cash:.08,quality:.08},.06);
+}
+function scoreWorkforceLearningEpisode(episode,current=learningCurrentState()){
+  return weightedEpisodeScore(episode,current,{morale:.22,stress:.28,portfolioHealth:.18,risk:.12,cash:.12,quality:.08,integration:.08},.06);
+}
+function scoreBoardLearningEpisode(episode,current=learningCurrentState()){
+  return weightedEpisodeScore(episode,current,{board:.25,valuationQuality:.24,valuation:.14,risk:.18,trust:.14,cash:.08},.06);
+}
+function scoreInvestorRelationsEpisode(episode,current=learningCurrentState()){
+  return weightedEpisodeScore(episode,current,{valuationQuality:.25,valuation:.22,board:.16,cash:.12,risk:.14,trust:.10,dailyRevenue:.10},.06);
+}
 function scoreLearningEpisodeOutcome(ep,current=learningCurrentState()){
   if(ep.domain==="communication")return scoreCommunicationLearningEpisode(ep,current);
   if(ep.domain==="customer")return scoreCustomerLearningEpisode(ep,current);
@@ -156,6 +173,10 @@ function classifyLearningFailure(ep,score,attributionQuality){
 function lessonVectorForEpisode(ep,positive=true){
   const s=String(ep.strategy||ep.choiceTitle||"").toLowerCase();
   const v={planning:.35,documentation:.2};
+  if(s.includes("quality")){v.testing=1.05;v.documentation=.55;v.planning=.55;v.earlyQA=.5;v.riskTaking=positive?-.18:-.35;}
+  if(s.includes("sustainability")){v.recovery=1.1;v.burnoutRecovery=.85;v.planning=.55;v.escalation=.4;v.riskTaking=positive?-.2:-.4;}
+  if(s.includes("collaboration")){v.collaboration=1.1;v.mentoring=.8;v.documentation=.35;v.crossDepartmentCoordination=.45;}
+  if(s.includes("runway")){v.planning=1.05;v.documentation=.45;v.riskTaking=positive?-.15:-.3;v.escalation=.35;v.hiringTiming=.25;}
   if(s.includes("quality")||s.includes("delay")||s.includes("test")){v.testing=.8;v.riskTaking=positive?-.15:-.45;v.planning=.7;}
   if(s.includes("hire")||s.includes("people")||s.includes("coach")){v.mentoring=.65;v.recovery=.35;v.collaboration=.45;v.hiringTiming=.35;}
   if(s.includes("cut")||s.includes("freeze")||s.includes("cash")||s.includes("delay")){v.planning=.85;v.escalation=.45;v.riskTaking=positive?-.15:-.25;}
@@ -180,7 +201,7 @@ function evaluateLearningEpisode(ep,reviewDay=company.day){
   if(reviewIndex===0){ep.status="observing";return;}
   if(abs>=1.4||ep.observations.length>=ep.reviewSchedule.length){
     const positive=score>=0,confidence=clamp(36+abs*7+ep.observations.length*5+attributionQuality*.18,25,88);
-    const state=reviewIndex>=2&&attributionQuality>=75&&abs>=2.2?"validated":attributionQuality>=60?"provisional":attributionQuality>=40?"prior":"prior";
+    const state=reviewIndex>=2&&attributionQuality>=75&&abs>=2.2?"validated":reviewIndex>=2&&attributionQuality>=60?"provisional":attributionQuality>=40?"prior":"prior";
     if(attributionQuality>=40){
       const key=`${ep.subtype||learningEpisodeSubtype(ep.domain,ep.strategy,ep.choiceTitle)}-${ep.projectId||ep.department||"company"}`.toLowerCase().replace(/[^a-z0-9.]+/g,"-").slice(0,82);
       createOrReinforceLesson({key,title:`${ep.domain==="communication"?"Communication":"Decision"} learning: ${ep.choiceTitle||ep.decisionTitle||ep.strategy||"company action"}`,department:ep.department||"company",vector:lessonVectorForEpisode(ep,positive),outcome,confidence,evidence:`${state} review after ${company.day-(ep.createdDay||company.day)} day(s): ${outcome}${ep.failureCause?"; cause "+ep.failureCause:""}`,importance:ep.domain==="decision"?4:3,state,episodeKey:`episode-${ep.id}`,attributionQuality,reviewWindow:reviewIndex===1?"medium":"long"});
@@ -269,7 +290,7 @@ function lessonStateWeight(lesson){
   const state=lesson?.state||((lesson?.confidence||0)>=72?"validated":"provisional");
   if(state==="validated")return 1;
   if(state==="prior")return .22;
-  if(state==="provisional")return .45;
+  if(state==="provisional")return .18;
   if(state==="contradicted")return -.25;
   if(state==="obsolete")return 0;
   return .45;
@@ -340,6 +361,28 @@ function createOrReinforceLesson({key,title,department="company",vector={},outco
   employees.filter(e=>e.active).forEach(e=>applyInstitutionalLessonToEmployee(e,lesson,existing?0.55:1));
   if(!existing||lesson.state==="validated"&&company.day-(lesson.lastHistoryDay||-999)>90){recordHistory(`Institutional lesson: ${lesson.title}`,"learning",Math.max(3,importance));lesson.lastHistoryDay=company.day;}
   return lesson;
+}
+function createPatternLearningEpisode({key,title,department="company",domain="institutional",evidence="",expectedChannels=null,importance=3}={}){
+  ensureBibleSystems();
+  const sourceId=`pattern-${key}`;
+  const existing=(company.learningEpisodes||[]).find(ep=>ep.sourceId===sourceId&&ep.status!=="resolved"&&company.day-(ep.createdDay||0)<95);
+  if(existing)return existing;
+  return createLearningEpisode({
+    domain,
+    subtype:`pattern.${key}`,
+    sourceId,
+    decisionTitle:title,
+    choiceTitle:title,
+    strategy:key,
+    department,
+    baseline:companyLearningBaseline(),
+    expectedChannels:expectedChannels||expectedChannelsForEpisode(domain,key,title),
+    attributionSources:[sourceId],
+    attributionQuality:48,
+    reviewSchedule:[company.day+10,company.day+30,company.day+75],
+    hypotheses:[{strategy:key,expected:evidence||"Pattern will be reviewed before becoming an institutional lesson."}],
+    protectedChannel:false
+  });
 }
 function inheritInstitutionalLearning(e){
   ensureInstitutionalLearning();
@@ -445,10 +488,10 @@ function reviewInstitutionalPatterns(){
   company.lastLessonReviewDay=company.day;
   decayInstitutionalLessons();
   const recent=(company.learningEvidence||[]).filter(e=>company.day-(e.day||0)<=120),byType=t=>recent.filter(e=>e.domain===t||e.eventType===t||String(e.eventType||"").includes(t)).length;
-  if(byType("quality")>=3||byType("earlyQA")>=2)createOrReinforceLesson({key:"pattern-quality",title:"Repeated quality evidence shows that early verification prevents expensive rework.",department:"quality",vector:{testing:1.2,documentation:.55,planning:.55,earlyQA:.5,riskTaking:-.25},outcome:"positive",confidence:70,evidence:"Structured quality evidence",importance:5});
-  if(byType("burnout")>=2||byType("retention")>=2)createOrReinforceLesson({key:"pattern-sustainability",title:"Sustained pressure increases absence, burnout, and talent loss.",department:"people",vector:{recovery:1.25,burnoutRecovery:.9,planning:.55,escalation:.45,riskTaking:-.35},outcome:"negative",confidence:72,evidence:"Structured people-risk evidence",importance:5});
-  if(byType("collaboration")>=3||byType("crossDepartmentCoordination")>=2)createOrReinforceLesson({key:"pattern-collaboration",title:"Useful collaboration reduces blockers and spreads expertise.",department:"company",vector:{collaboration:1.15,mentoring:.85,documentation:.35,crossDepartmentCoordination:.4},outcome:"positive",confidence:70,evidence:"Structured collaboration evidence",importance:4});
-  if(byType("runway")>=2||byType("hiringTiming")>=2)createOrReinforceLesson({key:"pattern-runway",title:"Healthy reserves preserve strategic options during uncertain periods.",department:"finance",vector:{planning:1.2,documentation:.45,riskTaking:-.25,escalation:.4,hiringTiming:.25},outcome:"positive",confidence:68,evidence:"Structured finance evidence",importance:5});
+  if(byType("quality")>=3||byType("earlyQA")>=2)createPatternLearningEpisode({key:"quality",title:"Repeated quality evidence suggests early verification may prevent expensive rework.",department:"quality",evidence:"Structured quality evidence requires delayed review.",importance:5,expectedChannels:{quality:{direction:1,weight:.28},portfolioHealth:{direction:1,weight:.20},risk:{direction:-1,weight:.18},cash:{direction:-1,weight:.08}}});
+  if(byType("burnout")>=2||byType("retention")>=2)createPatternLearningEpisode({key:"sustainability",title:"Sustained pressure may increase absence, burnout, and talent loss.",department:"people",domain:"workforce",evidence:"Structured people-risk evidence requires delayed review.",importance:5,expectedChannels:{stress:{direction:-1,weight:.30},morale:{direction:1,weight:.22},risk:{direction:-1,weight:.18},portfolioHealth:{direction:1,weight:.12}}});
+  if(byType("collaboration")>=3||byType("crossDepartmentCoordination")>=2)createPatternLearningEpisode({key:"collaboration",title:"Useful collaboration may reduce blockers and spread expertise.",department:"company",domain:"communication",evidence:"Structured collaboration evidence requires delayed review.",importance:4,expectedChannels:{integration:{direction:1,weight:.22},portfolioHealth:{direction:1,weight:.18},quality:{direction:1,weight:.12},stress:{direction:-1,weight:.10}}});
+  if(byType("runway")>=2||byType("hiringTiming")>=2)createPatternLearningEpisode({key:"runway",title:"Healthy reserves may preserve strategic options during uncertain periods.",department:"finance",domain:"investor-relations",evidence:"Structured finance evidence requires delayed review.",importance:5,expectedChannels:{cash:{direction:1,weight:.30},risk:{direction:-1,weight:.18},board:{direction:1,weight:.12},portfolioHealth:{direction:1,weight:.10}}});
 }
 function institutionalLessonsHtml(){
   ensureInstitutionalLearning();

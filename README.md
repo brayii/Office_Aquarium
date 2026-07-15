@@ -26,6 +26,24 @@ powershell -ExecutionPolicy Bypass -File tests\run-browser-smoke-test.ps1
 
 The check opens `Office_Aquarium.html` in a local Chrome or Edge browser, starts a new company, and confirms the main screen renders without browser errors.
 
+## Test Suite
+
+Run the full local validation suite:
+
+```powershell
+npm test
+```
+
+The suite checks:
+
+- duplicate HTML IDs and duplicate named JavaScript functions
+- browser launch/startup
+- day rollover through daily close
+- save/load continuation
+- absence of recorded simulation errors during the regression run
+
+GitHub Actions also runs these checks on push and pull request through `.github/workflows/ci.yml`.
+
 ## Packaging
 
 When moving the game to another PC or mobile device, keep the folder structure intact. The HTML file expects the JavaScript and audio files to remain in their current relative paths.
