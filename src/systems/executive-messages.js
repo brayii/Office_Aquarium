@@ -265,15 +265,29 @@ function memoInterpretationFor(ev,dept,evidence,cred,recommended=null){
   const title=recommended?.choice?.title||"the recommended option";
   return `${teamDisplayName(dept)} reads the evidence through ${bias.focus}. Based on its own priorities, the sender currently favors "${title}", but the advice may be shaped by ${bias.caution>65?"caution":bias.overconfidence>22?"optimism":"department priorities"} and incomplete information.`;
 }
+function operatingSignalPhrase(value,{low=45,high=70,lowText="weak",midText="mixed",highText="strong"}={}){
+  const n=Number(value)||0;
+  if(n>=high)return highText;
+  if(n<low)return lowText;
+  return midText;
+}
+function runwayPhrase(days){
+  const n=Number(days)||0;
+  if(n>=999)return "cash-positive";
+  if(n<60)return "very tight";
+  if(n<120)return "tight";
+  if(n<240)return "workable";
+  return "comfortable";
+}
 function memoNoActionForecast(ev,dept,evidence){
   const cat=eventCategory(ev), blocked=(company.workItems||[]).filter(w=>w.status==="open"&&(w.blockedBy||[]).length).length, atRisk=company.portfolioHealth?.atRiskProjects||0, runway=company.finance?.runwayDays||999, stress=Math.round(avgStress()), gaps=Object.values(company.staffingModel||{}).filter(s=>s.understaffed).length;
-  if(cat==="people"||dept==="people")return `If no action is taken, ${gaps} understaffed area(s) and ${stress} average stress may keep pushing morale, retention, and execution risk.`;
-  if(cat==="finance"||dept==="finance")return `If no action is taken, runway remains ${runway>=999?"positive":runway+" day(s)"} and net cash flow stays near $${Number(company.finance?.netCashFlowDaily||0).toFixed(3)}M/day.`;
+  if(cat==="people"||dept==="people")return `If no action is taken, ${gaps} understaffed area(s) and ${operatingSignalPhrase(stress,{low:55,high:75,lowText:"manageable",midText:"elevated",highText:"high"})} stress may keep pushing morale, retention, and execution risk.`;
+  if(cat==="finance"||dept==="finance")return `If no action is taken, runway remains ${runwayPhrase(runway)} and cash flow stays ${Number(company.finance?.netCashFlowDaily||0)<0?"negative":"positive"}.`;
   if(cat==="project"||String(ev.id||"").includes("project"))return `If no action is taken, ${atRisk} at-risk project(s), ${blocked} blocked work item(s), and current portfolio spend may continue without a strategic reset.`;
-  if(cat==="customer"||ev.customerSegmentId){const seg=company.customerSegments?.[ev.customerSegmentId],label=CUSTOMER_SEGMENT_DEFS[ev.customerSegmentId]?.label||"Customer";return `If no action is taken, ${label} churn risk stays near ${Math.round(seg?.churnRisk||0)} with ${Math.round(seg?.activeCustomers||0)} active customer(s) and sentiment around ${Math.round(seg?.sentiment||company.customerSentiment||0)}.`;}
-  if(cat==="product"||dept==="product")return `If no action is taken, customer timing continues against quality ${Math.round(company.quality)} and trust ${Math.round(company.trust)}.`;
-  if(cat==="operations"||dept==="quality")return `If no action is taken, quality stays near ${Math.round(company.quality)} with ${Math.round(company.simulationMetrics?.counters?.qualityMistakes||0)} unresolved mistake(s) and manufacturing risk ${Math.round(company.manufacturing?.supplyRisk||0)}.`;
-  if(cat==="board"||dept==="board")return `If no action is taken, board confidence stays near ${Math.round(company.board)} while crisis and capital-pressure signals continue to accumulate.`;
+  if(cat==="customer"||ev.customerSegmentId){const seg=company.customerSegments?.[ev.customerSegmentId],label=CUSTOMER_SEGMENT_DEFS[ev.customerSegmentId]?.label||"Customer";return `If no action is taken, ${label} churn risk remains ${operatingSignalPhrase(seg?.churnRisk,{low:35,high:65,lowText:"contained",midText:"visible",highText:"elevated"})} while sentiment looks ${operatingSignalPhrase(seg?.sentiment||company.customerSentiment,{low:45,high:70,lowText:"weak",midText:"mixed",highText:"healthy"})}.`;}
+  if(cat==="product"||dept==="product")return `If no action is taken, customer timing continues to compete with ${operatingSignalPhrase(company.quality,{low:55,high:72,lowText:"thin",midText:"acceptable",highText:"strong"})} quality and ${operatingSignalPhrase(company.trust,{low:50,high:72,lowText:"fragile",midText:"mixed",highText:"strong"})} trust.`;
+  if(cat==="operations"||dept==="quality")return `If no action is taken, quality remains ${operatingSignalPhrase(company.quality,{low:55,high:72,lowText:"fragile",midText:"mixed",highText:"healthy"})} while rework and manufacturing reliability continue to shape delivery risk.`;
+  if(cat==="board"||dept==="board")return `If no action is taken, board confidence remains ${operatingSignalPhrase(company.board,{low:50,high:72,lowText:"fragile",midText:"watchful",highText:"supportive"})} while crisis and capital-pressure signals continue to accumulate.`;
   return `If no action is taken, the underlying condition is likely to keep developing without CEO direction.`;
 }
 function memoEscalationReason(ev,comm,dept,msg=null){
@@ -356,12 +370,12 @@ function naturalizeObservation(text){
   const t=String(text||"").replace(/\s+/g," ").trim();
   if(!t)return "";
   if(/^Internal intelligence/i.test(t))return naturalizeObservation(t.replace(/^Internal intelligence[^:]*:\s*/i,""));
-  let cm=t.match(/Customer base\s+(\d+),\s+weighted sentiment\s+(\d+),\s+daily segment revenue\s+\$?([\d.]+)M/i);if(cm)return `The customer base is ${cm[1]} organization${Number(cm[1])===1?"":"s"}, with sentiment near ${cm[2]} and daily revenue around $${Number(cm[3]).toFixed(3)}M.`;
-  cm=t.match(/(.+):\s+(\d+)\s+active customer\(s\), sentiment\s+(\d+), churn risk\s+(\d+)/i);if(cm)return `${cm[1]} has ${cm[2]} active customer${Number(cm[2])===1?"":"s"}, sentiment near ${cm[3]}, and churn risk around ${cm[4]}.`;
-  cm=t.match(/Market context:\s+competitor pressure\s+(\d+), demand\s+(\d+)/i);if(cm)return `Market pressure is visible: competitor pressure is around ${cm[1]} and demand is around ${cm[2]}.`;
-  let m=t.match(/Runway\s+(\d+)\s+day/i);if(m)return Number(m[1])<90?`Cash runway is becoming tight at roughly ${m[1]} days.`:`Cash runway remains around ${m[1]} days.`;
-  m=t.match(/net cash flow\s+\$?(-?[\d.]+)M\/day/i);if(m)return Number(m[1])<0?`The company is still burning about $${Math.abs(Number(m[1])).toFixed(3)}M per day.`:`Daily cash flow is positive at about $${Number(m[1]).toFixed(3)}M.`;
-  m=t.match(/Average stress\s+(\d+)/i);if(m)return Number(m[1])>=80?"The team is showing sustained burnout risk.":Number(m[1])>=65?"Workload pressure is elevated across the team.":`Average workload pressure is manageable at about ${m[1]}.`;
+  let cm=t.match(/Customer base\s+(\d+),\s+weighted sentiment\s+(\d+),\s+daily segment revenue\s+\$?([\d.]+)M/i);if(cm)return `The customer base is ${Number(cm[1])>=100?"broad":Number(cm[1])>=25?"growing":"still developing"}, sentiment looks ${operatingSignalPhrase(cm[2],{low:45,high:70,lowText:"weak",midText:"mixed",highText:"healthy"})}, and segment revenue is ${Number(cm[3])>=.08?"material":Number(cm[3])>.02?"emerging":"early"}.`;
+  cm=t.match(/(.+):\s+(\d+)\s+active customer\(s\), sentiment\s+(\d+), churn risk\s+(\d+)/i);if(cm)return `${cm[1]} has a ${Number(cm[2])>=50?"meaningful":Number(cm[2])>=10?"developing":"small"} active customer base, ${operatingSignalPhrase(cm[3],{low:45,high:70,lowText:"weak",midText:"mixed",highText:"healthy"})} sentiment, and ${operatingSignalPhrase(cm[4],{low:35,high:65,lowText:"contained",midText:"visible",highText:"elevated"})} churn risk.`;
+  cm=t.match(/Market context:\s+competitor pressure\s+(\d+), demand\s+(\d+)/i);if(cm)return `Market pressure is visible: competition is ${operatingSignalPhrase(cm[1],{low:40,high:70,lowText:"quiet",midText:"active",highText:"intense"})} and demand looks ${operatingSignalPhrase(cm[2],{low:40,high:70,lowText:"soft",midText:"mixed",highText:"strong"})}.`;
+  let m=t.match(/Runway\s+(\d+)\s+day/i);if(m)return `Cash runway looks ${runwayPhrase(Number(m[1]))}.`;
+  m=t.match(/net cash flow\s+\$?(-?[\d.]+)M\/day/i);if(m)return Number(m[1])<0?`The company is still burning cash each day.`:`Daily cash flow is positive.`;
+  m=t.match(/Average stress\s+(\d+)/i);if(m)return Number(m[1])>=80?"The team is showing sustained burnout risk.":Number(m[1])>=65?"Workload pressure is elevated across the team.":"Average workload pressure is manageable.";
   m=t.match(/Need score\s+(\d+)/i);if(m)return Number(m[1])>=80?"The department is describing this as a sustained staffing need, not a one-day spike.":"The department sees a staffing need, but the case is still developing.";
   m=t.match(/workload\s+(\d+)/i);if(m)return Number(m[1])>=85?"Current workload is above what the department can comfortably absorb.":Number(m[1])>=65?"Department workload is elevated enough to affect planning.":"Department workload is not the main reason for the memo.";
   m=t.match(/blocked work\s+(\d+)/i);if(m)return Number(m[1])>0?`${m[1]} ${Number(m[1])===1?"piece of work is":"pieces of work are"} blocked or waiting on another team.`:"The work is not formally blocked, but capacity or timing is still a concern.";
@@ -369,7 +383,7 @@ function naturalizeObservation(text){
   m=t.match(/^(\d+) blocked work item\(s\)$/i);if(m)return Number(m[1])>0?`${m[1]} ${Number(m[1])===1?"work item is":"work items are"} blocked or waiting on another team.`:"No work items are formally blocked.";
   m=t.match(/active employees\s+(\d+)/i);if(m)return `The company currently has ${m[1]} active employee${Number(m[1])===1?"":"s"}.`;
   m=t.match(/retention cases\s+(\d+)/i);if(m)return Number(m[1])>0?`${m[1]} employee${Number(m[1])===1?" is":"s are"} now showing elevated retention risk.`:"No major retention case is visible yet.";
-  m=t.match(/Quality\s+(\d+)/i);if(m)return Number(m[1])<55?`Product quality is below the level the team would like before broad exposure.`:`Product quality is around ${m[1]}, but related execution risks still matter.`;
+  m=t.match(/Quality\s+(\d+)/i);if(m)return Number(m[1])<55?`Product quality is below the level the team would like before broad exposure.`:`Product quality is ${operatingSignalPhrase(m[1],{low:55,high:72,lowText:"fragile",midText:"acceptable",highText:"healthy"})}, but related execution risks still matter.`;
   m=t.match(/unresolved mistakes\s+(\d+)/i);if(m)return Number(m[1])>0?`Rework and verification issues remain visible in the operating record.`:"Recent quality mistakes are not the main pressure point.";
   m=t.match(/manufacturing risk\s+(\d+)/i);if(m)return Number(m[1])>65?"Manufacturing and supply reliability are becoming a delivery risk.":"Manufacturing risk is present but not yet the dominant concern.";
   m=t.match(/progress\s+(\d+)%/i);if(m)return `The related work is about ${m[1]}% complete.`;
