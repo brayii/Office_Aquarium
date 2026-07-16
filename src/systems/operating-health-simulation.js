@@ -18,20 +18,66 @@ function derivedStaffingCoverage(project){
   return ratios.reduce((s,v)=>s+v,0)/Math.max(1,ratios.length);
 }
 function projectScheduleHealth(project){return clamp(100-Math.abs(project.performance?.scheduleVariance??project.scheduleVariance??0),0,100);}
-function projectVisibleHealth(project){
+function projectIntrinsicHealth(project){
   const progressScore=clamp(Number(project.progress)||0,0,100);
   const qualityScore=clamp(Number(project.performance?.quality??project.quality??company.quality)||0,0,100);
   const scheduleScore=projectScheduleHealth(project);
-  const staffingScore=clamp(Number(project.performance?.staffingCoverage??derivedStaffingCoverage(project)),0,100);
+  const staffingScore=clamp(Number(derivedStaffingCoverage(project)),0,100);
   const riskScore=clamp(100-Number(project.performance?.riskTrend??project.visibleRisk??50),0,100);
   const confidenceScore=clamp(Number(project.performance?.strategicConfidence??project.visibleConfidence??50),0,100);
   return Math.round(progressScore*.30+qualityScore*.20+scheduleScore*.15+staffingScore*.15+riskScore*.10+confidenceScore*.10);
+}
+function projectDependencyProfile(project){
+  const text=String(`${project.family||""} ${project.title||""} ${project.proposingDepartment||""} ${(project.requiredDepartments||[]).join(" ")}`).toLowerCase();
+  const profile={hardware:0,software:0,manufacturing:0,quality:0,customer:0,people:0,finance:0,trust:0,innovation:0};
+  if(/university|research|partnership|talent|training/.test(text))Object.assign(profile,{people:.28,trust:.22,innovation:.22,finance:.10,software:.06,hardware:.04,customer:.08});
+  else if(/firmware|telemetry|integration|driver|embedded/.test(text))Object.assign(profile,{hardware:.24,software:.28,manufacturing:.08,people:.14,trust:.10,innovation:.08,finance:.08});
+  else if(/hardware|chip|accelerator|sensor|processor|memory|architecture/.test(text)||project.requiredDepartments?.includes("hardware"))Object.assign(profile,{hardware:.34,manufacturing:.18,people:.14,software:.10,trust:.10,innovation:.08,finance:.06});
+  else if(/software|sdk|portal|cloud|data|security|platform/.test(text)||project.requiredDepartments?.includes("software"))Object.assign(profile,{software:.36,people:.16,customer:.14,trust:.12,innovation:.10,finance:.08,hardware:.04});
+  else if(/manufacturing|supplier|yield|capacity|factory/.test(text))Object.assign(profile,{manufacturing:.38,hardware:.18,quality:.18,finance:.12,trust:.08,people:.06});
+  else if(/customer|market|sales|support|launch|commercial/.test(text))Object.assign(profile,{customer:.32,trust:.22,software:.12,hardware:.08,people:.10,finance:.10,innovation:.06});
+  else Object.assign(profile,{people:.18,finance:.16,trust:.16,software:.14,hardware:.12,customer:.10,innovation:.08,manufacturing:.06});
+  if(project.requiredHeadcount?.quality)profile.quality=(profile.quality||0)+.08;
+  return profile;
+}
+function projectCompanyConditionScore(project){
+  const morale=typeof weightedEmployeeMorale==="function"?(weightedEmployeeMorale()??50):50;
+  const cohesion=typeof derivedCohesion==="function"?(derivedCohesion()??55):(typeof averageTeamCohesion==="function"?(averageTeamCohesion()??55):55);
+  const customerSentiment=typeof derivedCustomerSentiment==="function"?derivedCustomerSentiment():null;
+  const financeHealth=typeof derivedFinanceHealth==="function"?derivedFinanceHealth():50;
+  const p=projectDependencyProfile(project);
+  const signals={
+    hardware:clamp((company.chip||0)*.35+(company.quality||0)*.28+(company.integration||0)*.20+(100-(company.manufacturing?.supplyRisk||35))*.17,0,100),
+    software:clamp((company.software||0)*.38+(company.integration||0)*.28+(company.quality||0)*.18+(company.culture?.communication||50)*.16,0,100),
+    manufacturing:clamp((company.manufacturing?.readiness||0)*.30+(company.manufacturing?.yield||50)*.25+(100-(company.manufacturing?.supplyRisk||35))*.25+(company.quality||0)*.20,0,100),
+    quality:clamp((company.quality||50)*.55+(100-(company.simulationMetrics?.counters?.qualityMistakes||0)*2)*.20+(company.culture?.qualityDiscipline||50)*.15+(100-(company.manufacturing?.supplyRisk||35))*.10,0,100),
+    customer:clamp((company.customerSentiment??customerSentiment??company.trust??50)*.50+(company.trust||50)*.25+(company.market?.hardwareDemand||50)*.12+(company.market?.aiDemand||50)*.13,0,100),
+    people:clamp(morale*.35+cohesion*.25+(100-avgStress())*.25+(company.culture?.workLife||50)*.15,0,100),
+    finance:financeHealth,
+    trust:clamp((company.trust||50)*.65+(company.board||50)*.20+(company.leadership?.transparency||55)*.15,0,100),
+    innovation:clamp((company.culture?.innovation||50)*.55+(company.market?.aiDemand||50)*.18+(company.market?.hardwareDemand||50)*.12+(company.leadership?.longTermThinking||55)*.15,0,100)
+  };
+  const entries=Object.entries(p).filter(([,w])=>Number(w)>0),total=entries.reduce((s,[,w])=>s+w,0)||1;
+  const score=entries.reduce((s,[k,w])=>s+(signals[k]??50)*w,0)/total;
+  return {score:Math.round(clamp(score,0,100)),profile:p,signals};
+}
+function projectExecutionHealthBreakdown(project){
+  const overloadValue=typeof projectOverloadPressure==="function"?projectOverloadPressure(project):0;
+  const base=projectIntrinsicHealth(project),condition=projectCompanyConditionScore(project),staffing=clamp(Number(derivedStaffingCoverage(project)),0,100),overload=clamp(Number(project.performance?.workloadOverload??overloadValue),0,100),blockers=Number(project.performance?.blockerCount??0),risk=Number(project.performance?.riskTrend??project.visibleRisk??50);
+  const companyModifier=Math.round((condition.score-60)*.35);
+  const staffingModifier=Math.round((staffing-75)*.16-overload*.08);
+  const riskModifier=Math.round(-Math.max(0,risk-65)*.12-blockers*2.2);
+  const current=Math.round(clamp(base+companyModifier+staffingModifier+riskModifier,0,100));
+  return {base,companyCondition:condition.score,companyModifier,staffingModifier,riskModifier,current,profile:condition.profile,signals:condition.signals};
+}
+function projectVisibleHealth(project){
+  return projectExecutionHealthBreakdown(project).current;
 }
 function projectTimingForecast(project){
   if(!project)return {summary:"Timing estimate unavailable.",short:"timing unknown",range:"unknown",target:"unknown"};
   const progress=clamp(Number(project.progress)||0,0,99.5),elapsed=Math.max(1,company.day-(project.createdDay??company.day));
   const baseDuration=Math.max(10,Number(project.estimatedDuration)||90),confidence=clamp(Number(project.performance?.strategicConfidence??project.visibleConfidence??55),15,95);
-  const risk=clamp(Number(project.performance?.riskTrend??project.visibleRisk??50),0,100),blockers=Number(project.performance?.blockerCount??0),staffing=clamp(Number(project.performance?.staffingCoverage??derivedStaffingCoverage(project)),0,120),schedulePressure=Number(project.performance?.scheduleVariance??0);
+  const risk=clamp(Number(project.performance?.riskTrend??project.visibleRisk??50),0,100),blockers=Number(project.performance?.blockerCount??0),staffing=clamp(Number(derivedStaffingCoverage(project)),0,120),schedulePressure=Number(project.performance?.scheduleVariance??0);
   let midpoint=progress>5?Math.round((100-progress)/Math.max(.35,progress/elapsed)):Math.round(baseDuration*Math.max(.25,(100-progress)/100));
   midpoint=Math.round(midpoint*(1+Math.max(0,risk-55)*.006+Math.max(0,70-staffing)*.008+blockers*.08+Math.max(0,schedulePressure)*.004));
   midpoint=clamp(midpoint,3,420);

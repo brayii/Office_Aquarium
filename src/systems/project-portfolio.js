@@ -418,20 +418,26 @@ function projectPerformanceUpdate(){
     const mod=projectExecutionModifiers(p),pace=projectPaceProfile(p),lateDrag=projectLateStageDrag(p,p.progress);
     const avgProgress=items.length?items.reduce((s,w)=>s+(w.progress||0),0)/items.length:(done.length?100:p.progress||0);
     const coverage=derivedStaffingCoverage(p),blockers=items.reduce((s,w)=>s+(w.blockedBy?.length||0),0),overload=projectOverloadPressure(p);
+    const condition=typeof projectCompanyConditionScore==="function"?projectCompanyConditionScore(p):{score:60};
+    const conditionDelta=(condition.score-60);
     const spendDaily=(p.estimatedCost/Math.max(30,p.estimatedDuration))*(p.status==="paused" ? .12 : 1)*(p.scope||1)*mod.budget;
     p.budgetSpent=Number(((p.budgetSpent||0)+spendDaily).toFixed(3));
     p.closeoutReadyDays=Number(p.closeoutReadyDays)||0;
     const beforeProgress=p.progress||0;
     const staffingContribution=(coverage-50)*.012*pace.progressMultiplier-overload*.006;
-    p.progress=clamp((p.progress||0)*.86+avgProgress*.14*mod.progress*pace.progressMultiplier*lateDrag*(1-overload*.003)+staffingContribution,0,100);
+    const conditionProgress=conditionDelta*.006*pace.progressMultiplier;
+    p.progress=clamp((p.progress||0)*.86+avgProgress*.14*mod.progress*pace.progressMultiplier*lateDrag*(1-overload*.003)+staffingContribution+conditionProgress,0,100);
     if(Math.abs(p.progress-beforeProgress)>.25)recordProjectLedger(p.id,"project-performance","progress",p.progress-beforeProgress,"Aggregated paced work-item progress and staffing coverage");
-    p.quality=clamp((p.quality||55)+(company.quality-55)*.015-blockers*.08*mod.defectRisk+(coverage-50)*.01-overload*.018,0,100);
+    p.quality=clamp((p.quality||55)+(company.quality-55)*.015+conditionDelta*.018-blockers*.08*mod.defectRisk+(coverage-50)*.01-overload*.018,0,100);
     p.integration=clamp((p.integration||35)+(company.integration-45)*.012+done.length*.08,0,100);
     p.customerInterest=clamp((p.customerInterest||45)+((company.market.aiDemand-50)*.01+(company.trust-55)*.01-p.hiddenReality.hiddenObsolescenceRate*.002)*mod.customer,0,100);
     const scheduleVariance=Math.round(((company.day-(p.createdDay||company.day))/(p.estimatedDuration||90)*100-(p.progress||0))*mod.schedule);
     const budgetVariance=Math.round(((p.budgetSpent||0)/Math.max(.1,p.estimatedCost)-((p.progress||1)/100))*100);
-    const riskTrend=clamp((p.visibleRisk||50)+blockers*5+Math.max(0,scheduleVariance)*.25+Math.max(0,budgetVariance)*.3+overload*.22-coverage*.08,0,100);
-    p.performance={progress:Math.round(p.progress),scheduleVariance,budgetVariance,quality:Math.round(p.quality),integration:Math.round(p.integration),teamHealth:Math.round(clamp(100-avgStress()+coverage*.2-overload*.25,0,100)),staffingCoverage:Math.round(coverage),workloadOverload:Math.round(overload),blockerCount:blockers,customerInterest:Math.round(p.customerInterest),strategicConfidence:Math.round(clamp((p.visibleConfidence||55)+(p.quality-55)*.08+(p.customerInterest-50)*.1-overload*.04,0,100)),riskTrend:Math.round(riskTrend),benefitRealization:Math.round(clamp((p.progress||0)*p.hiddenReality.trueStrategicValue/100,0,100)),forecastAtCompletion:Math.round(clamp(100-riskTrend*.45+(p.customerInterest||50)*.25,0,100))};
+    const riskTrend=clamp((p.visibleRisk||50)+blockers*5+Math.max(0,scheduleVariance)*.25+Math.max(0,budgetVariance)*.3+overload*.22-coverage*.08-Math.max(-18,conditionDelta)*.10,0,100);
+    const fallbackProjectHealth=typeof projectVisibleHealth==="function"?projectVisibleHealth(p):50;
+    const executionHealth=typeof projectExecutionHealthBreakdown==="function"?projectExecutionHealthBreakdown(p):{current:fallbackProjectHealth,base:50,companyCondition:condition.score,companyModifier:0,staffingModifier:0,riskModifier:0,profile:condition.profile};
+    p.performance={progress:Math.round(p.progress),scheduleVariance,budgetVariance,quality:Math.round(p.quality),integration:Math.round(p.integration),teamHealth:Math.round(clamp(100-avgStress()+coverage*.2-overload*.25+conditionDelta*.05,0,100)),staffingCoverage:Math.round(coverage),workloadOverload:Math.round(overload),blockerCount:blockers,customerInterest:Math.round(p.customerInterest),strategicConfidence:Math.round(clamp((p.visibleConfidence||55)+(p.quality-55)*.08+(p.customerInterest-50)*.1-overload*.04+conditionDelta*.08,0,100)),riskTrend:Math.round(riskTrend),benefitRealization:Math.round(clamp((p.progress||0)*p.hiddenReality.trueStrategicValue/100,0,100)),forecastAtCompletion:Math.round(clamp(100-riskTrend*.45+(p.customerInterest||50)*.25,0,100)),executionHealth:executionHealth.current,baseHealth:executionHealth.base,companyCondition:executionHealth.companyCondition,companyModifier:executionHealth.companyModifier,staffingModifier:executionHealth.staffingModifier,riskModifier:executionHealth.riskModifier,dependencyProfile:executionHealth.profile};
+    if(Math.abs(conditionDelta)>18&&company.day%7===0)recordProjectLedger(p.id,"company-conditions","executionHealth",conditionDelta*.08,`Relevant company conditions ${conditionDelta>0?"supported":"weighed on"} execution`);
     if(overload>20&&items.length&&simulationRandom()<clamp((overload-15)*.0015,0,.08)){
       const target=items.slice().sort((a,b)=>(b.qualityRisk||0)-(a.qualityRisk||0))[0];
       if(target&&!target.blockedBy?.length){target.blockedBy=[...(target.blockedBy||[]),contentPick(v23Content.blockers,overload)];target.qualityRisk=clamp((target.qualityRisk||40)+6,0,100);recordProjectLedger(p.id,"capacity","blocker",1,"Overloaded project staffing created a blocker");}

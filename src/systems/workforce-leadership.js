@@ -133,11 +133,16 @@ function projectStaffingDetails(){
   activeProjects().forEach(p=>{
     Object.entries(p.requiredHeadcount||{}).forEach(([dept,need])=>{
       if(!need)return;
-      const current=employees.filter(e=>e.active&&roleDepartment(e.role)===dept).length;
       const assigned=projectAllocatedFte(p,dept);
-      const visibleCoverage=assigned||Math.min(current*.6,need);
-      const missing=Math.max(0,Math.ceil(need-visibleCoverage));
-      if(missing>0)rows.push({project:p,dept,missing,role:roleForDepartmentHire(dept),reason:`${p.codename} ${teamDisplayName(dept)} milestone`});
+      const missingFte=Math.max(0,(Number(need)||0)-assigned);
+      if(missingFte>.05){
+        const role=roleForDepartmentHire(dept);
+        const recruiting=(company.recruitingPipeline||[]).find(r=>r.department===dept&&["requisition","searching","interviewing","offer","exception","paused-policy"].includes(r.status));
+        const queued=(company.escalationQueue||[]).some(ev=>String(ev.id||"").includes("hiring-request")&&(String(ev.id||"").includes(dept)||String(ev.title||"").includes(role)))||String(company.pendingEvent?.id||"").includes(`hiring-request-${dept}`);
+        const review=(company.hiringRequests||[]).find(r=>r.department===dept&&r.role===role&&company.day-(r.day||0)<35);
+        const status=recruiting?`recruiting: ${recruiting.status}`:queued?"CEO memo queued":review?.status==="suppressed-policy"?"suppressed by policy":review?.status==="delayed"?"delayed by CEO":review?.status==="rejected"?"rejected by CEO":"uncovered";
+        rows.push({project:p,dept,required:Number(need)||0,allocated:Number(assigned.toFixed(2)),missingFte:Number(missingFte.toFixed(2)),missing:Math.ceil(missingFte),role,status,reason:`${p.codename} ${teamDisplayName(dept)} milestone`});
+      }
     });
   });
   return rows;
