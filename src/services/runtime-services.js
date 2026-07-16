@@ -16,7 +16,7 @@ class SaveRepository{
 }
 
 class SoundController{
-  constructor({musicSrc,alertSrc}){this.music=this.create(musicSrc,{loop:true,volume:.28,kind:"music"});this.alert=this.create(alertSrc,{volume:.7,kind:"alerts"});}
+  constructor({musicSrc,alertSrc}){this.music=this.create(musicSrc,{loop:true,volume:.28,kind:"music"});this.alert=this.create(alertSrc,{volume:.78,kind:"alerts"});}
   create(src,{loop=false,volume=1,kind="audio"}={}){
     try{
       if(typeof Audio==="undefined")return null;
@@ -49,7 +49,7 @@ class SoundController{
   stopMusic(){try{if(this.music){this.music.pause();this.music.currentTime=0;}}catch(e){musicUnavailable=true;}}
   playAlert(){
     if(!this.alert||!this.wantsAlerts()||alertsUnavailable)return;
-    try{this.alert.currentTime=0;const promise=this.alert.play();if(promise&&typeof promise.catch==="function")promise.catch(()=>{});}
+    try{this.alert.volume=this.wantsMusic()?.95:.78;this.alert.currentTime=0;const promise=this.alert.play();if(promise&&typeof promise.catch==="function")promise.catch(()=>{});}
     catch(e){alertsUnavailable=true;this.syncUi();}
   }
   applyMode(value){

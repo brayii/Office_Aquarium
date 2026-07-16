@@ -1180,7 +1180,7 @@ function processInternalEscalations(){
   for(const item of candidates){
     const route=routeForEscalationScore(item.score);
     if(route==="local"){recordMetricEvent("localIssues");continue;}
-    if(route==="executive-info"&&infoCount<1){archiveInformationalEscalation(item.msg);seen.add(item.msg.id);infoCount++;}
+    if(route==="executive-info"&&infoCount<1&&company.day>0){archiveInformationalEscalation(item.msg);seen.add(item.msg.id);infoCount++;}
     else if(route==="ceo-decision"&&decisionCount<1&&canQueueExecutiveDecision?.(item)){reviewSuppressionAccountability(item.msg);item.msg.status="queued-for-ceo";updateCommunicationLearning(employees.find(e=>e.id===item.msg.fromId),"report","ceo-decision",item.msg);recordMetricEvent("queuedEscalations");company.escalationQueue.push(makeEscalatedEvent(item.msg));seen.add(item.msg.id);decisionCount++;}
   }
   company.escalatedMessageIds=[...seen].slice(-160);

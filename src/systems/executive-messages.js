@@ -806,7 +806,7 @@ function archiveCommunication(ev,choice,comm){
   company.communications=Array.isArray(company.communications)?company.communications:[];
   ensureExecutiveMessageModel(ev,comm);
   const intel=ev.memoIntelligence||buildMemoIntelligence(ev,comm);
-  const archived={id:nextSimulationId(ev.id||"communication"),eventId:ev.id,title:comm.subject,type:comm.type,priority:comm.priority,from:comm.from,role:comm.role,date:comm.date,message:comm.message,structuredMessage:comm.structuredMessage,recs:comm.recs,impacts:comm.impacts,signature:comm.signature,decision:choice.title,decisionDetail:choice.detail,decisionStrategy:choice.strategy||inferDecisionStrategy(choice),uncertainty:choice.uncertainty||"Material",estimatedConfidence:choice.estimatedConfidence||50,benefits:choice.benefits||[],risks:choice.risks||[],day:company.day,memoIntelligence:intel,memoAudit:intel.audit,laterOutcome:null,forecastAccuracy:null,credibilityUpdated:false,decisionThreadId:null};
+  const archived={id:nextSimulationId(ev.id||"communication"),eventId:ev.id,title:comm.subject,type:comm.type,priority:comm.priority,from:comm.from,role:comm.role,date:comm.date,message:comm.message,structuredMessage:comm.structuredMessage,recs:comm.recs,impacts:comm.impacts,signature:comm.signature,decision:choice.title,decisionDetail:choice.detail,decisionStrategy:choice.strategy||inferDecisionStrategy(choice),uncertainty:choice.uncertainty||"Material",estimatedConfidence:choice.estimatedConfidence||50,benefits:choice.benefits||[],risks:choice.risks||[],day:company.day,read:true,deleted:false,memoIntelligence:intel,memoAudit:intel.audit,laterOutcome:null,forecastAccuracy:null,credibilityUpdated:false,decisionThreadId:null};
   if(ev.messageThreadId){const thread=(company.messageThreads||[]).find(t=>t.threadId===ev.messageThreadId);if(thread){thread.relatedDecisions=[...new Set([...(thread.relatedDecisions||[]),archived.id])];thread.currentStatus="decision-recorded";thread.nextReviewDay=company.day+21;}}
   company.messageQualityHistory=Array.isArray(company.messageQualityHistory)?company.messageQualityHistory:[];
   company.messageQualityHistory.unshift({day:company.day,messageId:archived.id,threadId:ev.messageThreadId||null,relevance:intel.audit?.relevanceScore||0,evidenceQuality:intel.audit?.evidenceCoverage||0,escalationPrecision:intel.audit?.chainOfCommandValid?1:0,usefulness:null});
@@ -1181,10 +1181,48 @@ function memoEvidenceHtml(ev,comm){
 }
 function renderCommunicationArchive(){
   const list=document.getElementById("memoArchiveList"),detail=document.getElementById("memoArchiveDetail");
-  const items=Array.isArray(company.communications)?company.communications:[];
-  document.getElementById("commArchiveCount").textContent=items.length;
-  if(!items.length){list.innerHTML='<div class="paper-empty">No archived CEO communications yet.</div>';detail.innerHTML="";return;}
-  list.innerHTML=items.map((m,i)=>`<div class="archive-item" onclick="showArchivedMemo(${i})"><strong>${m.title}</strong><small>${m.type} - ${m.date} - Decision: ${m.decision}</small></div>`).join("");
+  const all=Array.isArray(company.communications)?company.communications:[];
+  const mode=company.communicationArchiveMode==="deleted"?"deleted":"saved";
+  const items=all.map((m,i)=>({m,i})).filter(x=>mode==="deleted"?!!x.m.deleted:!x.m.deleted);
+  document.getElementById("commArchiveCount").textContent=all.filter(m=>!m.deleted).length;
+  const savedBtn=document.getElementById("archiveActiveFilter"),deletedBtn=document.getElementById("archiveDeletedFilter");
+  if(savedBtn)savedBtn.classList.toggle("active",mode==="saved");
+  if(deletedBtn)deletedBtn.classList.toggle("active",mode==="deleted");
+  if(!items.length){list.innerHTML=`<div class="paper-empty">No ${mode==="deleted"?"deleted old messages":"saved old messages"} yet.</div>`;detail.innerHTML="";return;}
+  list.innerHTML=items.map(({m,i})=>`<div class="archive-item ${m.deleted?"deleted":""} ${company.selectedArchiveMessageIndex===i?"selected":""}" onclick="showArchivedMemo(${i})"><strong>${m.title}</strong><small>${m.type} - ${m.date} - Decision: ${m.decision}</small><small>${m.deleted?"Deleted, recoverable":"Saved"} - ${m.read===false?"Unread":"Read"}</small></div>`).join("");
+}
+function updateCommunicationArchiveCount(){
+  const count=document.getElementById("commArchiveCount");
+  if(count)count.textContent=(Array.isArray(company.communications)?company.communications:[]).filter(m=>!m.deleted).length;
+}
+function communicationListSender(ev){
+  const sender=ev?.generatedCommunication?.sender||ev?.sender||{};
+  if(sender.name)return `${sender.name}${sender.role?`, ${sender.role}`:""}`;
+  const comm=ev?.generatedCommunication;
+  if(comm?.sender?.name)return `${comm.sender.name}${comm.sender.role?`, ${comm.sender.role}`:""}`;
+  return ev?.category?titleCase(String(ev.category)):"Executive Staff";
+}
+function communicationListPreview(ev){
+  const context=decisionContextSummary(ev);
+  const copy=String(ev?.copy||ev?.generatedCommunication?.message||"").replace(/\s+/g," ").trim();
+  return [context?`Context: ${context}`:"",copy].filter(Boolean).join(" - ").slice(0,180);
+}
+function renderCommunicationInboxList(){
+  const list=document.getElementById("commInboxList");
+  if(!list||!company)return;
+  const queued=Array.isArray(company.escalationQueue)?company.escalationQueue:[];
+  const rows=[];
+  if(company.pendingEvent){
+    const ev=company.pendingEvent,comm=company.pendingCommunication||ev.generatedCommunication||{};
+    ev.read=true;
+    rows.push(`<button type="button" class="ceo-mail-item active read"><strong>${htmlEscape(comm.subject||ev.title||"CEO decision needed")}</strong><small>${htmlEscape(comm.type||"Decision memo")} - ${htmlEscape(communicationListSender(ev))} - Active now</small><small>${htmlEscape(communicationListPreview(ev)||"Awaiting CEO decision.")}</small></button>`);
+  }
+  queued.forEach((ev,i)=>{
+    const comm=ev.generatedCommunication||{};
+    const canOpen=!company.pendingEvent;
+    rows.push(`<button type="button" class="ceo-mail-item waiting ${canOpen?"openable":""} ${ev.read?"read":"unread"}" ${canOpen?`onclick="openQueuedMemoAt(${i})"`:""}><strong>${htmlEscape(comm.subject||ev.title||"Queued memo")}</strong><small>${htmlEscape(comm.type||"Memo")} - ${htmlEscape(communicationListSender(ev))} - ${canOpen?"Ready to open":"Waiting behind active memo"}</small><small>${htmlEscape(communicationListPreview(ev)||"Queued for CEO review.")}</small></button>`);
+  });
+  list.innerHTML=rows.length?rows.join(""):`<div class="ceo-mail-empty"><strong>Inbox clear</strong><br>The company is operating on its own. A memo or email will appear when leadership is needed.</div>`;
 }
 function decisionThreadArchiveHtml(m){
   const thread=(company.decisionThreads||[]).find(t=>t.id===m.decisionThreadId)||(company.decisionThreads||[]).find(t=>t.memoId===m.id);
@@ -1192,27 +1230,79 @@ function decisionThreadArchiveHtml(m){
   const updates=(thread.followUps||[]).slice().reverse().map(u=>`<li><strong>Day ${u.day+1} - ${String(u.phase).replace(/\b\w/g,c=>c.toUpperCase())}:</strong> ${u.text}</li>`).join("");
   return `<div class="memo-block"><h4>Decision thread</h4><ul class="impact-list"><li>Status: ${thread.state}</li><li>Original decision: ${thread.decision}</li><li>Executive owner: ${thread.from}, ${thread.role}</li>${updates||"<li>No follow-up has matured yet. The company is still absorbing the decision.</li>"}</ul></div>`;
 }
-function showArchivedMemo(i){const m=company.communications[i];if(!m)return;const intel=m.memoIntelligence||{},audit=m.memoAudit||intel.audit||{},model=m.structuredMessage||null;const archivedDebug=debugMode?`<div class="memo-audit">Archived memo debug: relevance ${audit.relevanceScore??"n/a"}%, evidence ${audit.evidenceCoverage??"n/a"}, chain ${audit.chainOfCommandValid?"valid":"unknown"}. ${(intel.evidence||m.impacts||[]).slice(0,6).join(" | ")}</div>`:"";document.getElementById("memoArchiveDetail").innerHTML=`<div class="memo-card"><div class="memo-header"><div><div class="memo-type">${m.type}</div><h3>${m.title}</h3></div><span class="memo-priority">${m.priority}</span></div><div class="memo-meta"><div><strong>From:</strong> ${m.from}, ${m.role}</div><div><strong>Date:</strong> ${m.date}</div><div><strong>To:</strong> CEO</div><div><strong>Status:</strong> Archived</div></div><div class="memo-message">${m.message}</div>${model?`<div class="memo-block"><h4>Original recommendation</h4><ul class="impact-list"><li>${model.recommendation}</li><li>${model.uncertaintyNote}</li></ul></div>`:`<div class="memo-block"><h4>Original recommendation</h4><ul class="impact-list"><li>${intel.recommendation||"Recommendation not recorded"}</li></ul></div>`}${decisionThreadArchiveHtml(m)}${m.laterOutcome?`<div class="memo-block"><h4>Later outcome</h4><ul class="impact-list"><li>${m.laterOutcome}</li><li>Forecast accuracy: ${m.forecastAccuracy||"not rated"}</li></ul></div>`:""}<div class="decision-result"><strong>CEO Decision:</strong> ${m.decision}<br><small>${m.decisionDetail||""}</small></div>${archivedDebug}<div class="memo-signature">${String(m.signature||"").replace(/\n/g,"<br>")}</div></div>`;}
+function setCommunicationArchiveMode(mode){
+  company.communicationArchiveMode=mode==="deleted"?"deleted":"saved";
+  company.selectedArchiveMessageIndex=null;
+  document.body?.classList.remove("old-message-review-active");
+  renderCommunicationArchive();
+  if(!validationMode)saveGame();
+}
+function setArchivedMemoDeleted(i,deleted=true){
+  const m=company.communications?.[i];
+  if(!m)return;
+  m.deleted=!!deleted;
+  m.deletedDay=deleted?company.day:null;
+  company.communicationArchiveMode=deleted?"deleted":"saved";
+  renderCommunicationArchive();
+  if(!validationMode)saveGame();
+}
+function showArchivedMemo(i){
+  const m=company.communications[i];
+  if(!m)return;
+  company.selectedArchiveMessageIndex=i;
+  m.read=true;
+  document.body?.classList.add("old-message-review-active");
+  const titleEl=document.getElementById("eventTitle"),copyEl=document.getElementById("eventCopy"),badgeEl=document.getElementById("inboxBadge");
+  if(titleEl)titleEl.textContent=m.title||"Old Message";
+  if(copyEl)copyEl.textContent="Reviewing a past CEO communication and the choice you recorded.";
+  if(badgeEl){badgeEl.textContent="Old message";badgeEl.className="inbox-badge quiet";}
+  const intel=m.memoIntelligence||{},audit=m.memoAudit||intel.audit||{};
+  const archivedDebug=debugMode?`<div class="memo-audit">Archived memo debug: relevance ${audit.relevanceScore??"n/a"}%, evidence ${audit.evidenceCoverage??"n/a"}, chain ${audit.chainOfCommandValid?"valid":"unknown"}. ${(intel.evidence||m.impacts||[]).slice(0,6).join(" | ")}</div>`:"";
+  document.getElementById("memoArchiveDetail").innerHTML=`<div class="memo-card"><div class="memo-header"><div><div class="memo-type">${m.type}</div><h3>${m.title}</h3></div><span class="memo-priority">${m.priority}</span></div><div class="memo-meta"><div><strong>From:</strong> ${m.from}, ${m.role}</div><div><strong>Date:</strong> ${m.date}</div><div><strong>To:</strong> CEO</div><div><strong>Status:</strong> ${m.deleted?"Deleted old message, recoverable":"Old message"}</div></div><div class="memo-message">${m.message}</div><div class="decision-result"><strong>Your recorded choice:</strong> ${m.decision}<br><small>${m.decisionDetail||""}</small></div>${m.laterOutcome?`<div class="memo-block"><h4>Later outcome</h4><ul class="impact-list"><li>${m.laterOutcome}</li><li>Forecast accuracy: ${m.forecastAccuracy||"not rated"}</li></ul></div>`:""}<div class="archive-actions"><button type="button" class="small-btn" onclick="setArchivedMemoDeleted(${i},${m.deleted?"false":"true"})">${m.deleted?"Restore to Saved Old Messages":"Delete from Old Messages"}</button></div>${archivedDebug}<div class="memo-signature">${String(m.signature||"").replace(/\n/g,"<br>")}</div></div>`;
+  renderCommunicationArchive();
+  if(!validationMode)saveGame();
+}
 function openNextQueuedMemo(){
   if(company.pendingEvent||!(company.escalationQueue||[]).length)return false;
   company.pendingEvent=prepareStrategicDecision(company.escalationQueue.shift());
+  company.pendingEvent.read=true;
   company.selected=validationMode?chooseValidationDecisionIndex(company.pendingEvent):0;
   company.eventCooldown=0;
   if(validationMode){applyDecision();return true;}
   company.paused=true;
   const pauseBtn=document.getElementById("pauseBtn");
-  if(pauseBtn)pauseBtn.textContent="Resume";
+  if(pauseBtn)updatePauseButton();
   company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);
+  return true;
+}
+function openQueuedMemoAt(index){
+  if(company.pendingEvent)return false;
+  const queue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];
+  if(index<0||index>=queue.length)return false;
+  company.pendingEvent=prepareStrategicDecision(queue.splice(index,1)[0]);
+  company.pendingEvent.read=true;
+  company.selected=validationMode?chooseValidationDecisionIndex(company.pendingEvent):0;
+  company.eventCooldown=0;
+  if(validationMode){applyDecision();return true;}
+  company.paused=true;
+  const pauseBtn=document.getElementById("pauseBtn");
+  if(pauseBtn)updatePauseButton();
+  company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);
+  renderDecisionEvent();
+  render();
   return true;
 }
 function setCommunicationView(view){
   company.communicationView=view;
   const inbox=view==="inbox";
+  if(inbox){
+    company.selectedArchiveMessageIndex=null;
+    document.body?.classList.remove("old-message-review-active");
+  }
   document.getElementById("commInboxView").classList.toggle("hidden",!inbox);
   document.getElementById("commArchiveView").classList.toggle("hidden",inbox);
   document.getElementById("commInboxTab").classList.toggle("active",inbox);
   document.getElementById("commArchiveTab").classList.toggle("active",!inbox);
-  if(inbox)openNextQueuedMemo();
   if(!inbox)renderCommunicationArchive();
   renderDecisionEvent();
 }
@@ -1777,11 +1867,26 @@ function renderDecisionEvent(){
   const inboxCount=(company.pendingEvent?1:0)+queuedCount;
   if(!validationMode&&lastInboxSoundCount!==null&&inboxCount>lastInboxSoundCount)playMessageAlert();
   lastInboxSoundCount=inboxCount;
+  document.body?.classList.toggle("ceo-review-active",!!company.pendingEvent);
+  if(company.pendingEvent)document.body?.classList.remove("old-message-review-active");
   document.getElementById("commInboxCount").textContent=inboxCount;
-  renderCommunicationArchive();
-  if(!company.pendingEvent){document.getElementById("eventTitle").textContent=queuedCount?`${queuedCount} memo${queuedCount===1?"":"s"} queued`:"No urgent decisions";document.getElementById("eventCopy").textContent=queuedCount?"The organization has queued CEO memo(s). They will open as soon as the current simulation tick processes.":"The company is operating on its own. A memo or email will appear when leadership is needed.";memo.classList.add("hidden");grid.classList.add("hidden");button.classList.add("hidden");badge.textContent=queuedCount?"Queued":"Watching";badge.className=queuedCount?"inbox-badge alert":"inbox-badge quiet";alert.classList.add("hidden");return;}
+  if(company.communicationView==="archive")renderCommunicationArchive();
+  else updateCommunicationArchiveCount();
+  renderCommunicationInboxList();
+  if(!company.pendingEvent){
+    const readingOld=company.communicationView==="archive"&&document.body?.classList.contains("old-message-review-active");
+    const oldMessage=readingOld?company.communications?.[company.selectedArchiveMessageIndex]:null;
+    document.getElementById("eventTitle").textContent=readingOld?(oldMessage?.title||"Old Message"):queuedCount?`${queuedCount} memo${queuedCount===1?"":"s"} queued`:"No urgent decisions";
+    document.getElementById("eventCopy").textContent=readingOld?"Reviewing a past CEO communication and the choice you recorded.":queuedCount?"A memo or email is waiting in your inbox. Click a message when you want to review it.":"The company is operating on its own. A memo or email will appear when leadership is needed.";
+    memo.classList.add("hidden");grid.classList.add("hidden");button.classList.add("hidden");
+    badge.textContent=readingOld?"Old message":queuedCount?"Queued":"Watching";
+    badge.className=queuedCount?"inbox-badge alert":"inbox-badge quiet";
+    alert.classList.add("hidden");
+    return;
+  }
   const stale=validateMessageContext(company.pendingEvent);if(!stale.valid){const old=company.pendingEvent;recordHistory(`CEO memo superseded: ${old.title||old.id} (${stale.reason}).`,"communication",2);company.pendingEvent=null;company.pendingCommunication=null;renderDecisionEvent();return;}
   const ev=prepareStrategicDecision(company.pendingEvent),comm=eventCommunication(ev);company.pendingCommunication=comm;
+  renderCommunicationInboxList();
   const contextText=decisionContextSummary(ev);
   document.getElementById("eventTitle").textContent=comm.subject;document.getElementById("eventCopy").textContent=contextText?`Decision context: ${contextText}. Review the communication and record a CEO decision.`:"Review the communication and record a CEO decision.";badge.textContent="Action needed";badge.className="inbox-badge alert";grid.classList.remove("hidden");button.classList.remove("hidden");memo.classList.remove("hidden");
   const priorityClass=comm.priority==="Urgent"?"urgent":comm.priority==="FYI"?"fyi":"";
@@ -1936,11 +2041,11 @@ function openDecisionEvent(ev){
   company.selected=validationMode?chooseValidationDecisionIndex(company.pendingEvent):0;
   if(validationMode){applyDecision();return;}
   company.paused=true;
-  document.getElementById("pauseBtn").textContent="Resume";
+  updatePauseButton();
   company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);
   switchMobileTab("inbox");
 }
-function maybeCreateDecisionEvent(){if(company.pendingEvent)return;ensureBibleSystems?.();if(Array.isArray(company.escalationQueue)&&company.escalationQueue.length){const queued=nextEligibleQueuedMemo();if(queued){markQueuedMemoOpened(queued);openDecisionEvent(queued);return;}}if(company.eventCooldown>0)return;if(simulationRandom()>.004)return;const selected=chooseCEOEvent();if(!selected)return;const ev=prepareStrategicDecision({...selected,choices:(selected.choices||[]).map(c=>({...c}))});recordEventShown(ev);markQueuedMemoOpened(ev);openDecisionEvent(ev);}
+function maybeCreateDecisionEvent(){if(company.pendingEvent)return;ensureBibleSystems?.();company.escalationQueue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];if(company.escalationQueue.length>=4)return;if(company.eventCooldown>0)return;if(simulationRandom()>.004)return;const selected=chooseCEOEvent();if(!selected)return;const ev=prepareStrategicDecision({...selected,choices:(selected.choices||[]).map(c=>({...c}))});recordEventShown(ev);company.escalationQueue.push(ev);company.eventCooldown=360;if(!validationMode){renderDecisionEvent();}}
 function applyDecision(){if(!company.pendingEvent)return;recordMetricEvent("ceoDecisions");const ev=prepareStrategicDecision(company.pendingEvent),d=ev.choices[company.selected],comm=company.pendingCommunication||eventCommunication(ev),archivedMemo=archiveCommunication(ev,d,comm);applyLeadershipFootprint(ev,d);const delayedOutcome=evaluateStrategicOutcome(ev,d),thread=createDecisionThread(ev,d,comm,delayedOutcome,archivedMemo);if(ev.storyId)addStoryBeat(ev.storyId,`CEO chose: ${d.title}.`,"decision");startPolicyTransition(d.directive,d.days||0,d.title);Object.entries(d.effect||{}).forEach(([k,v])=>{if(k==="valuation"){addValuationShock(v*.35,`Market reaction to CEO decision: ${d.title}`,ev.id,20);return;}if(k==="customers"){applyCustomerDelta(v*.35,d.title,ev.id);return;}const systemic=["board","trust","quality","integration"].includes(k);company[k]=(company[k]||0)+v*(systemic?.35:1);});adjustCulture(d.culture||{});employees.forEach(e=>{
     if(d.directive==="cuts")addMemory(e,"CEO_CUTS","Leadership cut costs and increased pressure.","negative",14,"CEO");
     else if(d.directive==="people")addMemory(e,"CEO_SUPPORT","Leadership invested in employees.","positive",12,"CEO");
@@ -1948,7 +2053,7 @@ function applyDecision(){if(!company.pendingEvent)return;recordMetricEvent("ceoD
     else if(d.directive==="speed")addMemory(e,"OVERTIME","Leadership accelerated the schedule.","negative",10,"CEO");
     adjustCEOOpinion(e,d.opinion||{});
     e.stress=clamp(e.stress+(d.people?.stress||0),0,100);e.morale=clamp(e.morale+(d.people?.morale||0),0,100);if(d.people?.relationship)Object.keys(e.relationship).forEach(id=>e.relationship[id]=clamp(e.relationship[id]+d.people.relationship,-100,100));});if(d.launch==="full"){company.phase="launched";company.pilotDays=0;company.log.push("The product launched to the full market.");recordWeeklyEvent("The product launched to the full market.","product",6);addValuationShock(company.quality>65&&company.integration>65?2.4:-1.8,"Full launch changed outside expectations","launch",35);}else if(d.launch==="pilot"){company.phase="pilot";company.pilotDays=0;company.log.push("A limited customer pilot began.");recordWeeklyEvent("A limited customer pilot began.","product",5);addValuationShock(.8,"Limited pilot created market learning","pilot",25);}else if(d.launch==="extend"){company.phase="pilot";company.pilotDays=0;company.log.push("The customer pilot was extended for more learning.");}else if(d.launch==="repair"){company.phase="customer trial";company.pilotDays=0;company.log.push("Commercial expansion paused while the team repairs the product.");addValuationShock(-.6,"Commercial expansion paused for repair","pilot-repair",18);}if(d.projectDecision){applyProjectDecision(d.projectDecision);if(d.projectDecision.action==="cancel"||d.projectDecision.action==="reject")addValuationShock(-1.2,`Project ${d.projectDecision.action} changed portfolio expectations`,d.projectDecision.id,28);else if(["expand","validate","continue"].includes(d.projectDecision.action))addValuationShock(.45,`Project ${d.projectDecision.action} signaled portfolio commitment`,d.projectDecision.id,18);}if(d.portfolioAction){applyPortfolioAction(d.portfolioAction);}if(d.customerStrategy){applyCustomerStrategyDecision(d.customerStrategy);}if(d.hiringException){applyHiringExceptionDecision(d.hiringException);}if(d.hiringPolicy){applyHiringPolicyDecision(d.hiringPolicy);}if(d.fundraising){applyFundraisingDecision(d.fundraising);}if(d.performance){resolvePerformance(d.performance);}if(d.hire){if(d.hire==="specialist")startRecruiting(d.hireRole,d.hire,d.hireDept||roleDepartment(d.hireRole));else resolveHiring(d.hire,d.hireRole);}if(d.deferHiring){company.hiringRequests.unshift({day:company.day,department:d.deferHiring.dept,role:d.deferHiring.role,status:"delayed"});employees.filter(e=>e.active&&roleDepartment(e.role)===d.deferHiring.dept).forEach(e=>adjustCEOOpinion(e,{support:-1,fairness:-1}));}if(d.rejectHiring){company.hiringRequests.unshift({day:company.day,department:d.rejectHiring.dept,role:d.rejectHiring.role,status:"rejected"});employees.filter(e=>e.active&&roleDepartment(e.role)===d.rejectHiring.dept).forEach(e=>{e.stress=clamp(e.stress+3,0,100);adjustCEOOpinion(e,{support:-3,trust:-1});});}if(d.layoff){executeLayoffPlan(d.layoff.count||1,!!d.layoff.voluntary);addValuationShock(-1.2,"Layoffs increased perceived execution risk","layoff",30);company.leadershipReputation=clamp((company.leadershipReputation??50)-2,0,100);}if(d.rejectLayoff){addBoardStrike("CEO rejected restructuring during financial pressure");}ensureBibleSystems?.();if(d.supply&&company.manufacturing){company.manufacturing.supplyRisk=clamp(company.manufacturing.supplyRisk+(d.supply.risk||0),0,100);company.manufacturing.readiness=clamp(company.manufacturing.readiness+(d.supply.readiness||0),0,100);company.manufacturing.yield=clamp(company.manufacturing.yield+(d.supply.yield||0),0,100);}if(d.shareholders)applyInvestorEffect(d.shareholders);if(ev.sourceMessageId){const msg=(company.employeeMessages||[]).find(m=>m.id===ev.sourceMessageId);if(msg)msg.status="resolved-by-ceo";}if(d.supply||d.shareholders||ev.sourceMessageId||d.layoff||d.rejectLayoff||d.deferHiring||d.rejectHiring||d.hire||d.hiringException||d.hiringPolicy||d.fundraising||d.projectDecision||d.portfolioAction)recordHistory(`CEO decision resolved ${ev.title}: ${d.title}.`,"leadership",4);
-learnFromDecision(ev,d);if(!ev.repeatable&&!company.completedEvents.includes(ev.id))company.completedEvents.push(ev.id);company.log.push(`CEO decision: ${d.title}. A longer-term outcome is expected around day ${delayedOutcome.dueDay+1}.`);recordWeeklyEvent(`CEO decision: ${d.title}.`,"leadership",4,{eventId:ev.id,choiceTitle:d.title,decisionTitle:d.title,projectId:d.projectDecision?.id||delayedOutcome?.projectImpact?.projectId||null,workItemId:delayedOutcome?.workImpact?.workItemId||null,subject:ev.title,strategy:d.strategy||inferDecisionStrategy(d)});recordHistory(`CEO decision: ${d.title}.`,"leadership",4);if(thread)recordHistory(`Decision thread opened for "${d.title}" from ${comm.from}.`,"leadership",3);company.pendingEvent=null;company.pendingCommunication=null;company.eventCooldown=720;company.paused=false;if(!validationMode){document.getElementById("pauseBtn").textContent="Pause";saveGame();renderDecisionEvent();render();}}
+learnFromDecision(ev,d);if(!ev.repeatable&&!company.completedEvents.includes(ev.id))company.completedEvents.push(ev.id);company.log.push(`CEO decision: ${d.title}. A longer-term outcome is expected around day ${delayedOutcome.dueDay+1}.`);recordWeeklyEvent(`CEO decision: ${d.title}.`,"leadership",4,{eventId:ev.id,choiceTitle:d.title,decisionTitle:d.title,projectId:d.projectDecision?.id||delayedOutcome?.projectImpact?.projectId||null,workItemId:delayedOutcome?.workImpact?.workItemId||null,subject:ev.title,strategy:d.strategy||inferDecisionStrategy(d)});recordHistory(`CEO decision: ${d.title}.`,"leadership",4);if(thread)recordHistory(`Decision thread opened for "${d.title}" from ${comm.from}.`,"leadership",3);company.pendingEvent=null;company.pendingCommunication=null;company.eventCooldown=720;company.paused=false;if(!validationMode){updatePauseButton();saveGame();renderDecisionEvent();render();}}
 
 
 function resolvePerformance(mode){

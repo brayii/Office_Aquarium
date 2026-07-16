@@ -39,6 +39,8 @@ async function main() {
   await page.click("#closeEmployee");
   await page.waitForTimeout(200);
   const modalClosed = await page.locator("#employeeModal.hidden").count();
+  await page.click("#settingsBtn");
+  await page.waitForTimeout(120);
   await page.click("#guideBtn");
   await page.waitForTimeout(120);
   const guideOpened = await page.locator("#guideModal:not(.hidden)").count();

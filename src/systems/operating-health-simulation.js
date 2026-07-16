@@ -373,15 +373,10 @@ function queuePortfolioMemoOnce(ev,{front=false}={}){
     return true;
   }
   ev.forceImmediate=true;
-  company.eventCooldown=0;
-  company.pendingEvent=prepareStrategicDecision(ev);
-  company.selected=validationMode?chooseValidationDecisionIndex(company.pendingEvent):0;
-  if(validationMode){applyDecision();return true;}
-  company.paused=true;
-  const pauseBtn=document.getElementById("pauseBtn");
-  if(pauseBtn)pauseBtn.textContent="Resume";
-  company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);
-  switchMobileTab("inbox");
+  company.escalationQueue.unshift(ev);
+  company.escalationQueue=company.escalationQueue.slice(0,4);
+  if(validationMode){openNextQueuedMemo();return true;}
+  company.log.push(`CEO memo queued: ${ev.title}.`);
   return true;
 }
 function queueImmediatePortfolioMemo(ev){
@@ -394,15 +389,10 @@ function queueImmediateExecutiveMemo(ev){
     company.escalationQueue.unshift(ev);
     return;
   }
-  company.eventCooldown=0;
-  company.pendingEvent=prepareStrategicDecision(ev);
-  company.selected=validationMode?chooseValidationDecisionIndex(company.pendingEvent):0;
-  if(validationMode){applyDecision();return;}
-  company.paused=true;
-  const pauseBtn=document.getElementById("pauseBtn");
-  if(pauseBtn)pauseBtn.textContent="Resume";
-  company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);
-  switchMobileTab("inbox");
+  company.escalationQueue.unshift(ev);
+  company.escalationQueue=company.escalationQueue.slice(0,4);
+  if(validationMode){openNextQueuedMemo();return;}
+  company.log.push(`CEO memo queued: ${ev.title}.`);
 }
 function requestProjectDecision(id,action="review"){
   ensureProjectPortfolio();

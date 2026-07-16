@@ -343,6 +343,7 @@ function setCompanyView(view){
 }
 function render(){
   ensureBibleSystems?.();restoreCompactSections?.();
+  updatePauseButton?.();
   const days=["Mon","Tue","Wed","Thu","Fri"],hour=Math.floor(company.minute/60),mins=company.minute%60,h12=((hour+11)%12)+1;
   document.getElementById("timeLabel").textContent=`Day ${company.day+1} - ${days[company.day%5]} ${h12}:${String(mins).padStart(2,"0")} ${hour>=12?"PM":"AM"}`;
   document.getElementById("cashLabel").textContent=`$${company.cash.toFixed(1)}M`;
@@ -409,7 +410,13 @@ function switchMobileTab(tab,scroll=true){
   if(!target)return;
   document.querySelectorAll(".mobile-tabs button").forEach(x=>x.classList.toggle("active",x===target));
   document.querySelectorAll(".tab-section").forEach(s=>s.classList.toggle("active",s.dataset.section===tab));
-  if(tab==="inbox"&&company){openNextQueuedMemo();setCommunicationView("inbox");}
+  const workspace=document.querySelector(".workspace-tabs");
+  if(workspace){
+    workspace.classList.toggle("active",tab==="company"||tab==="newspaper");
+    if(tab==="company"&&typeof setWorkspaceTab==="function")setWorkspaceTab("reports");
+    if(tab==="newspaper"&&typeof setWorkspaceTab==="function")setWorkspaceTab("news");
+  }
+  if(tab==="inbox"&&company)setCommunicationView("inbox");
   if(scroll&&window.matchMedia("(max-width:720px)").matches)window.scrollTo({top:0,behavior:"smooth"});
 }
 function toggleCompactSection(button){
