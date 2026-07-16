@@ -171,6 +171,40 @@ async function main() {
     assert(html.includes("allocated"), "Portfolio should show allocated staffing");
     assert(!html.includes("covered or under review"), "Portfolio should not use the old ambiguous staffing label");
 
+    const sensitivityBase = makeControlledProject({
+      id: "sensitivity-base",
+      family: "AI accelerator",
+      title: "Project Sensitivity: Base",
+      requiredHeadcount: { hardware: 2 },
+      requiredDepartments: ["hardware"],
+      performance: { ...hardware.performance, riskTrend: 55, blockerCount: 0, workloadOverload: 0 }
+    });
+    const sensitivityShort = makeControlledProject({
+      ...sensitivityBase,
+      id: "sensitivity-short",
+      title: "Project Sensitivity: Short",
+      performance: { ...sensitivityBase.performance, riskTrend: 75, blockerCount: 1, workloadOverload: 10 }
+    });
+    sensitivityBase.staffAllocations = { [employees[0].id]: 2 };
+    sensitivityShort.staffAllocations = { [employees[0].id]: 1 };
+    const healthyScore = projectExecutionHealthBreakdown(sensitivityBase).current;
+    const strainedScore = projectExecutionHealthBreakdown(sensitivityShort).current;
+    const sensitivityDrop = healthyScore - strainedScore;
+    assert(sensitivityDrop >= 8 && sensitivityDrop <= 28, `Staffing/risk sensitivity should be material but bounded, got ${sensitivityDrop}`);
+
+    const completed = makeControlledProject({
+      id: "completed-regression",
+      title: "Project Complete: Regression",
+      status: "completed",
+      progress: 100,
+      completedDay: 156,
+      commercialStatus: "launched"
+    });
+    const completedTiming = projectTimingForecast(completed);
+    assert(completedTiming.status === "complete", `Completed project should have complete timing status, got ${completedTiming.status}`);
+    assert(completedTiming.short.includes("Completed on day 157"), `Completed project timing should show completion day, got ${completedTiming.short}`);
+    assert(!/\d+-\d+ day/.test(completedTiming.short), `Completed project should not show a future estimate, got ${completedTiming.short}`);
+
     validationMode = false;
     return {
       ok: failures.length === 0,
@@ -178,6 +212,8 @@ async function main() {
       partialCoverage,
       hardwareCondition,
       universityCondition,
+      sensitivityDrop,
+      completedTiming,
       htmlPreview: html.slice(0, 600)
     };
   });

@@ -65,8 +65,8 @@ function projectExecutionHealthBreakdown(project){
   const overloadValue=typeof projectOverloadPressure==="function"?projectOverloadPressure(project):0;
   const base=projectIntrinsicHealth(project),condition=projectCompanyConditionScore(project),staffing=clamp(Number(derivedStaffingCoverage(project)),0,100),overload=clamp(Number(project.performance?.workloadOverload??overloadValue),0,100),blockers=Number(project.performance?.blockerCount??0),risk=Number(project.performance?.riskTrend??project.visibleRisk??50);
   const companyModifier=Math.round((condition.score-60)*.35);
-  const staffingModifier=Math.round((staffing-75)*.16-overload*.08);
-  const riskModifier=Math.round(-Math.max(0,risk-65)*.12-blockers*2.2);
+  const staffingModifier=Math.round((staffing-75)*.11-overload*.06);
+  const riskModifier=Math.round(-Math.max(0,risk-65)*.08-blockers*1.6);
   const current=Math.round(clamp(base+companyModifier+staffingModifier+riskModifier,0,100));
   return {base,companyCondition:condition.score,companyModifier,staffingModifier,riskModifier,current,profile:condition.profile,signals:condition.signals};
 }
@@ -75,6 +75,12 @@ function projectVisibleHealth(project){
 }
 function projectTimingForecast(project){
   if(!project)return {summary:"Timing estimate unavailable.",short:"timing unknown",range:"unknown",target:"unknown"};
+  if(project.status==="completed"||Number(project.progress)>=100){
+    const day=Number(project.completedDay??project.closedDay);
+    const dayText=Number.isFinite(day)?`day ${day+1}`:"a previous review";
+    const commercial=project.commercialStatus==="launched"?"Commercial path active":project.commercialStatus==="pilot"?"Commercial pilot active":project.commercialStatus==="ready"||project.commercialStatus==="review queued"?"Commercial review underway":"Development complete";
+    return {summary:`Development completed on ${dayText}. ${commercial}.`,short:`Completed on ${dayText}`,range:"complete",target:dayText,status:"complete",confidenceLabel:"high",low:0,high:0,midpoint:0,targetDay:day,deadlineDelta:0};
+  }
   const progress=clamp(Number(project.progress)||0,0,99.5),elapsed=Math.max(1,company.day-(project.createdDay??company.day));
   const baseDuration=Math.max(10,Number(project.estimatedDuration)||90),confidence=clamp(Number(project.performance?.strategicConfidence??project.visibleConfidence??55),15,95);
   const risk=clamp(Number(project.performance?.riskTrend??project.visibleRisk??50),0,100),blockers=Number(project.performance?.blockerCount??0),staffing=clamp(Number(derivedStaffingCoverage(project)),0,120),schedulePressure=Number(project.performance?.scheduleVariance??0);
