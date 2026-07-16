@@ -311,7 +311,7 @@ function captureWeekSnapshot(){
     phase:company.phase,activeEmployees:active.length
   };
 }
-function recordWeeklyEvent(text,type="general",importance=1){
+function recordWeeklyEvent(text,type="general",importance=1,meta={}){
   company.weeklyEvents=Array.isArray(company.weeklyEvents)?company.weeklyEvents:[];
 company.communications=Array.isArray(company.communications)?company.communications:[];
 company.communicationView=company.communicationView||"inbox";
@@ -335,7 +335,7 @@ company.communicationStats={helpRequests:0,statusReports:0,riskReports:0,opportu
 company.simulationMetrics=normalizeSimulationMetrics(company.simulationMetrics);
 company.culture={...initialCompany.culture,...(company.culture||{})};
 company.market={...initialCompany.market,...(company.market||{})};
-  company.weeklyEvents.push({text,type,importance,day:company.day});
+  company.weeklyEvents.push({text,type,importance,day:company.day,meta:meta&&typeof meta==="object"?meta:{}});
   company.weeklyEvents=company.weeklyEvents.slice(-40);
 }
 function signed(value,digits=0){const n=Number(value)||0;return `${n>=0?"+":""}${n.toFixed(digits)}`;}
@@ -362,11 +362,29 @@ function plainDecisionTitle(text){
   if(/^cancel/i.test(t))return `${t.replace(/^cancel/i,"Canceled")} ${project?project.title:"the project"}.`;
   return t.endsWith(".")?t:`${t}.`;
 }
+function decisionSubjectFromMeta(meta={}){
+  if(meta.projectTitle)return meta.projectTitle;
+  if(meta.projectId){
+    const p=[...(company.projects||[]),...(company.projectArchive||[]),...(company.projectProposals||[])].find(project=>project.id===meta.projectId);
+    if(p)return p.title;
+  }
+  if(meta.workItemId){
+    const w=(company.workItems||[]).find(work=>work.id===meta.workItemId);
+    if(w)return w.title;
+  }
+  if(meta.subject)return meta.subject;
+  return null;
+}
 function explainWeeklyEvent(event){
   const text=String(event?.text||"").trim();
+  const meta=event?.meta||{};
   if(!text)return "";
-  if(/^CEO decision:/i.test(text))return plainDecisionTitle(text);
-  if(/^Decision outcome:/i.test(text))return explainDecisionOutcome(text);
+  if(/^CEO decision:/i.test(text)){
+    const subject=decisionSubjectFromMeta(meta);
+    const base=plainDecisionTitle(text);
+    return subject&&!base.includes(subject)?`${base.replace(/\.$/,"")} for ${subject}.`:base;
+  }
+  if(/^Decision outcome:/i.test(text))return explainDecisionOutcome(event);
   if(/Product phase advanced to/i.test(text)){
     const phase=text.replace(/.*Product phase advanced to\s*/i,"").replace(/\.$/,"");
     return `The product moved into ${phase}, which changes what evidence and execution risk matter next.`;
@@ -381,15 +399,20 @@ function explainWeeklyEvent(event){
   if(/completed/i.test(text)&&/Project/i.test(text))return text.replace(/\.$/,".")+" Completion moves attention from development risk toward commercial value.";
   return text.endsWith(".")?text:`${text}.`;
 }
-function explainDecisionOutcome(text){
+function explainDecisionOutcome(event){
+  const text=typeof event==="string"?event:String(event?.text||"");
+  const meta=typeof event==="string"?{}:(event?.meta||{});
   const clean=String(text||"").replace(/^Decision outcome:\s*/i,"").trim();
   const lower=clean.toLowerCase();
   const project=[...(company.projects||[]),...(company.projectArchive||[]),...(company.projectProposals||[])].find(p=>lower.includes(String(p.title||"").toLowerCase())||lower.includes(String(p.codename||"").toLowerCase()));
-  const subject=project?project.title:"the related issue";
+  const subject=decisionSubjectFromMeta(meta)||project?.title||"the decision";
+  const choice=meta.choiceTitle||meta.decisionTitle||null;
   const tone=/negative|worsen|delay|cost|risk|miss|pressure/.test(lower)?"worsened":/positive|improved|gained|reduced|resolved|success/.test(lower)?"improved":"remained mixed";
-  if(tone==="improved")return `The decision improved ${subject}, although the full long-term result is still being watched.`;
-  if(tone==="worsened")return `The decision created pressure around ${subject}; near-term risk or cost increased while the longer-term result remains uncertain.`;
-  return `The decision produced mixed early results for ${subject}; some evidence improved, but the long-term outcome remains uncertain.`;
+  const action=choice?String(choice).replace(/\.$/,"").replace(/^Approve/i,"approve").replace(/^Delay/i,"delay").replace(/^Continue/i,"continue").replace(/^Cancel/i,"cancel").replace(/^Reject/i,"reject").replace(/^Fund/i,"fund").replace(/^Move/i,"move").replace(/^Reassign/i,"reassign").replace(/^./,c=>c.toLowerCase()):null;
+  const lead=action?`The decision to ${action}`:"The decision";
+  if(tone==="improved")return `${lead} improved ${subject}, although the full long-term result is still being watched.`;
+  if(tone==="worsened")return `${lead} created pressure around ${subject}; near-term risk or cost increased while the longer-term result remains uncertain.`;
+  return `${lead} produced mixed early results for ${subject}; some evidence improved, but the long-term outcome remains uncertain.`;
 }
 function weeklyMetricExplanation(delta,now){
   const lines=[];
@@ -418,6 +441,13 @@ function weeklyExecutiveSummary({events,majorDecisions,notableEvents,metricExpla
   const improved=delta.customers>0?"customer activity improved":delta.board>0?"board confidence improved":delta.morale>0?"morale improved":notableEvents.find(e=>/completed|unblocked|hired|launched|raised|improved/i.test(e.text))?.text||"some internal work continued";
   const risk=intelligence?.topRisks?.[0]?.title||notableEvents.find(e=>/blocked|rework|risk|strike|resigned|layoff|pressure|fell|weakened/i.test(e.text))?.text||(delta.cash<0?"cash reserves tightened":"execution risk remains the main item to monitor");
   return `${changed} ${String(improved).replace(/\.$/,"").replace(/^./,c=>c.toUpperCase())}. The main concern for next week is ${String(risk).replace(/\.$/,"").toLowerCase()}.`;
+}
+function isWeakWeeklyEvent(event){
+  const text=String(event?.text||"");
+  if((event?.importance||0)<2&&/(is taking a break|is at home|at home|taking a break)/i.test(text))return true;
+  if((event?.importance||0)<2&&event?.type==="people")return true;
+  if(/^Simulation balance watch:/i.test(text))return true;
+  return false;
 }
 function meaningfulPeopleToWatch(){
   const active=employees.filter(e=>e.active);
@@ -463,6 +493,11 @@ function chooseHeadline(events,delta,current){
   const snapshot=buildExecutiveIntelligenceSnapshot();
   const topRisk=snapshot.topRisks?.[0],topOpportunity=snapshot.topOpportunities?.[0];
   const major=[...(events||[])].sort((a,b)=>(b.importance||0)-(a.importance||0))[0],majorText=String(major?.text||"");
+  const highIntensity=(events||[]).filter(e=>(e.importance||0)>=4).length>=3||(events||[]).length>=8;
+  const quiet=!(events||[]).length&&Math.abs(delta.cash)<.05&&Math.abs(delta.customers)<1&&Math.abs(delta.board)<1&&Math.abs(delta.morale)<1;
+  if(quiet)return "Quiet Week";
+  if(highIntensity&&/board|cash|runway|financial/i.test((events||[]).map(e=>e.text).join(" ")))return "Critical Week: Board and Cash Discipline Lead the Agenda";
+  if(highIntensity)return "Critical Week: Multiple Operating Signals Need Attention";
   if(/^CEO decision:/i.test(majorText)){
     const clean=majorText.replace(/^CEO decision:\s*/i,"").replace(/\.$/,"");
     if(/launch|market window|release/i.test(clean))return "Company Holds Release Plan While Execution Risk Remains";
@@ -492,11 +527,12 @@ function publishWeeklyNewspaper(){
     customers:now.customers-before.customers,morale:now.morale-before.morale,
     stress:now.stress-before.stress,phaseBefore:before.phase
   };
-  const events=[...(company.weeklyEvents||[])];
+  const events=[...(company.weeklyEvents||[])].filter(e=>!isWeakWeeklyEvent(e));
   const intelligence=buildExecutiveIntelligenceSnapshot();
   const headline=chooseHeadline(events,delta,now),topEvents=events.sort((a,b)=>(b.importance||0)-(a.importance||0)).slice(0,8);
+  const highIntensity=topEvents.filter(e=>(e.importance||0)>=4).length>=3||events.length>=8;
   const majorDecisions=topEvents.filter(e=>/^CEO decision:/i.test(e.text)).slice(0,3).map(e=>({...e,text:explainWeeklyEvent(e)}));
-  const notableEvents=topEvents.filter(e=>!/^CEO decision:/i.test(e.text)).slice(0,events.length>8?3:5).map(e=>({...e,text:explainWeeklyEvent(e)}));
+  const notableEvents=topEvents.filter(e=>!/^CEO decision:/i.test(e.text)).slice(0,highIntensity?3:5).map(e=>({...e,text:explainWeeklyEvent(e)}));
   const metricExplanations=weeklyMetricExplanation(delta,now);
   const summary=weeklyExecutiveSummary({events,majorDecisions,notableEvents,metricExplanations,delta,now,intelligence});
   const storyThread=storyChainForWeeklyIssue(intelligence);
