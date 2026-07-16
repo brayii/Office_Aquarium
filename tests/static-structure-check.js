@@ -101,6 +101,39 @@ function checkRandomAndTimers(files) {
   return { randomAllowedInRuntimeService: true, timerOwners: timerHits.length };
 }
 
+function checkCausalLearningIntegrity() {
+  const learning = read(path.join("src", "systems", "institutional-company-intelligence.js"));
+  const regressionPatterns = [
+    [/\(\s*episode\.messageId\s*\|\|\s*episode\.protectedChannel\s*\)\s*\?\s*\.25\s*:\s*-\s*\.10/, "communication message-existence reward"],
+    [/Math\.max\s*\(\s*ep\.attributionQuality\s*,\s*score\s*\)/, "sticky attribution quality"],
+    [/Number\s*\(\s*e\.recentOutput\s*\|\|\s*0\s*\)/, "legacy employee output field"],
+    [/if\s*\(\s*state\s*===\s*"prior"\s*\)\s*return\s*\.22/, "overweighted prior lesson state"],
+    [/return\s*\.45\s*;/, "unknown lesson fallback influence"]
+  ];
+  const found = regressionPatterns.filter(([pattern]) => pattern.test(learning)).map(([, label]) => label);
+  if (found.length) throw new Error(`Causal learning regression pattern(s): ${found.join(", ")}`);
+  const requiredSignals = [
+    [/communicationOutcomeScore\s*\(\s*episode\s*\)/, "communication outcome scoring"],
+    [/currentAttributionQuality/, "revisable attribution quality"],
+    [/segmentCustomers/, "segment-specific customer learning"],
+    [/staffingCoverage/, "workforce staffing coverage learning"],
+    [/departmentBacklog/, "department backlog learning"],
+    [/retentionRate/, "retention outcome learning"],
+    [/roleOutput/, "role output learning"],
+    [/low attribution from unrelated operating pressure/, "unrelated pressure attribution guard"]
+  ];
+  const missing = requiredSignals.filter(([pattern]) => !pattern.test(learning)).map(([, label]) => label);
+  if (missing.length) throw new Error(`Missing causal learning guard(s): ${missing.join(", ")}`);
+  const regression = read(path.join("tests", "simulation-regression-test.js"));
+  if (!/company:\s*canonicalize\s*\(\s*company\s*\)/.test(regression)) {
+    throw new Error("Regression test must canonicalize authoritative company state");
+  }
+  if (!/performance\?\.recentOutput\s*\?\?\s*e\.recentOutput/.test(regression)) {
+    throw new Error("Regression test must hash performance.recentOutput");
+  }
+  return requiredSignals.length;
+}
+
 const htmlIds = checkDuplicateHtmlIds();
 const jsFiles = collectJsFiles("src").concat(collectJsFiles("tests"));
 const syntaxFiles = checkJavaScriptSyntax(jsFiles);
@@ -109,4 +142,5 @@ const htmlScripts = checkMissingHtmlScripts();
 const topLevelDeclarations = checkDuplicateTopLevelDeclarations(collectJsFiles("src"));
 const forbiddenChecks = checkForbiddenPatterns(collectJsFiles("src"));
 const randomAndTimers = checkRandomAndTimers(collectJsFiles("src"));
-console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, topLevelDeclarations, forbiddenChecks, randomAndTimers }, null, 2));
+const causalLearningGuards = checkCausalLearningIntegrity();
+console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards }, null, 2));
