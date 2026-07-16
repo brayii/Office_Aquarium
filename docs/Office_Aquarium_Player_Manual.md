@@ -9,6 +9,23 @@ The current build uses a main `Office_Aquarium.html` file plus ordered JavaScrip
 
 ---
 
+# Current Build Notes
+
+The current build uses stricter staffing and crisis rules.
+
+If one active project is short on staff, that usually means the company has a project or workforce problem to watch. It should not automatically mean the whole company is in crisis. A true company crisis requires broader sustained evidence, such as several affected projects, failed recruiting, critical roles left open, worsening delivery, major financial stress, or repeated unresolved shortages.
+
+Project cards report the organization's current view of staffing, blockers, backlog, timing, health, risk, commercial status, and revenue potential. Some hidden details are imperfectly known by employees and managers. AI Debug may show deeper internal values, but normal play should read like executive reporting rather than raw engine output.
+
+Release files are created in:
+
+- `dist/` for web/mobile zip packages
+- `src-tauri/target/` for desktop builds and installers
+
+The `misc/` folder is your private scratch/archive folder and is not part of normal cleanup.
+
+---
+
 # 1. The Basic Idea
 
 You do not control individual employees.

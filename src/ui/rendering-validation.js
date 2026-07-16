@@ -13,7 +13,7 @@ function collectDailyMetrics(){
   const unresolvedQualityMistakes=active.reduce((s,e)=>s+(e.performance?.qualityMistakes||0),0);
   qualityTelemetry.averageDaysToResolve=Number((unresolvedQualityMistakes/Math.max(.1,qualityTelemetry.mistakesResolved||0)).toFixed(2));
   const derived=recordOperatingHealthSnapshot();
-  const snapshot={day:company.day,cash:Number(company.cash.toFixed(2)),phase:company.phase,activeEmployees:active.length,morale:Math.round(derived.morale??morale),stress:Math.round(stress),quality:Math.round(company.quality),integration:Math.round(company.integration),customers:Math.round(company.customers),grossRevenueDaily:Number((f.grossRevenueDaily||company.dailyRevenue||0).toFixed(3)),payrollDaily:Number((f.payrollDaily||0).toFixed(3)),manufacturingDaily:Number((f.manufacturingDaily||0).toFixed(3)),supportDaily:Number((f.supportDaily||0).toFixed(3)),growthOverhead:Number((f.growthOverhead||0).toFixed(3)),totalDailyCost:Number((f.totalDailyCost||0).toFixed(3)),qualityMistakes:Math.round(unresolvedQualityMistakes),qualityTelemetry,messages5d:msgs.length,routes,actionDiversity:actionDiversityScore(counters.actions),learningSpread:learningSpread(),learningMagnitude:averageLearningMagnitude(),memoDiversity:uniqueCategories.size,repeatedMemoRate,survivalRisk:Math.round(clamp(company.companyRiskComponents?.total??(100-Math.min(company.cash/3,company.board/10,company.trust/10,(100-stress)/10)*12),0,100)),netCashFlow:Number((f.netCashFlowDaily||0).toFixed(3)),runwayDays:f.runwayDays||999,boardStrikes:company.boardGovernance?.strikes||0,unpaidPayrollDays:company.unpaidPayrollDays||0,investorConfidence:derived.investorConfidence,operatingHealth:{hardwareHealth:derived.hardwareHealth,softwareHealth:derived.softwareHealth,manufacturingHealth:derived.manufacturingHealth,customerSentiment:derived.customerSentiment,investorConfidence:derived.investorConfidence,shareholderConfidence:derived.shareholderConfidence,teamCohesion:derived.teamCohesion,trust:derived.trust,portfolioHealth:derived.portfolioHealth,financeHealth:derived.financeHealth},counters:{...counters,actions:{...counters.actions},qualityTelemetry:{...qualityTelemetry}}};
+  const snapshot={day:company.day,cash:Number(company.cash.toFixed(2)),phase:company.phase,activeEmployees:active.length,morale:Math.round(derived.morale??morale),stress:Math.round(stress),quality:Math.round(company.quality),integration:Math.round(company.integration),customers:Math.round(company.customers),grossRevenueDaily:Number((f.grossRevenueDaily||company.dailyRevenue||0).toFixed(3)),payrollDaily:Number((f.payrollDaily||0).toFixed(3)),manufacturingDaily:Number((f.manufacturingDaily||0).toFixed(3)),supportDaily:Number((f.supportDaily||0).toFixed(3)),growthOverhead:Number((f.growthOverhead||0).toFixed(3)),totalDailyCost:Number((f.totalDailyCost||0).toFixed(3)),qualityMistakes:Math.round(unresolvedQualityMistakes),qualityTelemetry,messages5d:msgs.length,routes,actionDiversity:actionDiversityScore(counters.actions),learningSpread:learningSpread(),learningMagnitude:averageLearningMagnitude(),memoDiversity:uniqueCategories.size,repeatedMemoRate,survivalRisk:Math.round(clamp(company.companyRiskComponents?.total??35,0,100)),netCashFlow:Number((f.netCashFlowDaily||0).toFixed(3)),runwayDays:f.runwayDays||999,boardStrikes:company.boardGovernance?.strikes||0,unpaidPayrollDays:company.unpaidPayrollDays||0,investorConfidence:derived.investorConfidence,operatingHealth:{hardwareHealth:derived.hardwareHealth,softwareHealth:derived.softwareHealth,manufacturingHealth:derived.manufacturingHealth,customerSentiment:derived.customerSentiment,investorConfidence:derived.investorConfidence,shareholderConfidence:derived.shareholderConfidence,teamCohesion:derived.teamCohesion,trust:derived.trust,portfolioHealth:derived.portfolioHealth,financeHealth:derived.financeHealth},counters:{...counters,actions:{...counters.actions},qualityTelemetry:{...qualityTelemetry}}};
   const flags=[];
   if(snapshot.stress>70)flags.push("stress-high");
   if(snapshot.repeatedMemoRate>50&&recentMemos.length>=3)flags.push("memo-repetition");
@@ -45,40 +45,134 @@ function summarizeProjection(seed,days,daily,finalCompany,finalEmployees){
   const avgNum=(list,key)=>Number((list.reduce((s,d)=>s+(Number(d[key])||0),0)/Math.max(1,list.length)).toFixed(3));
   return {seed,daysRun:daily.length,endedEarly:daily.length<days,finalDay:last.day??0,phase:finalCompany.phase,cash:Number(finalCompany.cash.toFixed(2)),activeEmployees:finalEmployees.filter(e=>e.active).length,avgStress:avg("stress"),avgMorale:avg("morale"),avgSurvivalRisk:avg("survivalRisk"),finalStress:last.stress||0,finalMorale:last.morale||0,finalSurvivalRisk:last.survivalRisk||0,actionDiversity:last.actionDiversity||0,learningSpread:last.learningSpread||0,learningMagnitude:last.learningMagnitude||0,messages5d:last.messages5d||0,memoRepeat:last.repeatedMemoRate||0,avgNetCashFlow:avgNum(daily,"netCashFlow"),postLaunchNetCashFlow:avgNum(launched,"netCashFlow"),finalRunwayDays:last.runwayDays||999,finalTotalDailyCost:last.totalDailyCost||0,finalGrossRevenueDaily:last.grossRevenueDaily||0,qualityMistakes:Math.round(counters.qualityMistakes||0),unresolvedQualityMistakes:last.qualityMistakes||0,qualityTelemetry,sickness:Math.round(counters.sickness||0),resignations:Math.round(counters.resignations||0),firings:Math.round(counters.firings||0),coaching:Math.round(counters.coaching||0),ceoDecisions:Math.round(counters.ceoDecisions||0),executiveMemos:Math.round(counters.executiveMemos||0),queuedEscalations:Math.round(counters.queuedEscalations||0),flags};
 }
-function runBalanceProjection(days=120,seed=nextSimulationId("seed")){
-  validationSession.begin();
-  try{
-    reset(true,true,seedToRandomState(seed));
-    simulationTimer.stop();
-    company.paused=false;company.speed=1;company.pendingEvent=null;company.pendingCommunication=null;
-    const targetDays=company.day+days;
-    while(company.day<targetDays&&!company.gameOver){simulateMinute();}
-    collectDailyMetrics();
-    lastValidationReport=summarizeProjection(seed,days,company.simulationMetrics?.daily||[],company,employees);
-  }finally{
-    validationSession.restore();
-  }
-  return lastValidationReport;
+function createRuntimeIdService(start=1){
+  let nextId=Math.max(1,Number(start)||1);
+  return {next:()=>nextId++,peek:()=>nextId};
 }
-function runDeterministicContinuationCheck(seed=nextSimulationId("determinism"),midDays=50,totalDays=100){
-  const clone=value=>saveRepository.clone(value);
-  validationSession.begin();
+function createSeededRng(seed){return seededRandom(seed);}
+function createIsolatedServices(){return {validation:true};}
+function cloneForValidation(value){return typeof structuredClone==="function"?structuredClone(value):JSON.parse(JSON.stringify(value));}
+function createFreshCompanyState(seed){
+  const state=cloneForValidation(initialCompany);
+  state.randomState=seedToRandomState(seed);
+  state.nextRuntimeId=1;
+  state.paused=false;
+  state.speed=1;
+  state.pendingEvent=null;
+  state.pendingCommunication=null;
+  state.simulationMetrics=normalizeSimulationMetrics(state.simulationMetrics);
+  return state;
+}
+function withSimulationContext(context,fn){
+  assertIsolatedValidationEnvironment(context);
+  const live={company,employees,validationMode,currentSimulationContext,selectedEmployeeId,debugMode};
   try{
-    reset(true,true,seedToRandomState(seed));
-    simulationTimer.stop();
-    company.paused=false;company.speed=1;company.pendingEvent=null;company.pendingCommunication=null;
-    const midTarget=company.day+midDays;
-    while(company.day<midTarget&&!company.gameOver)simulateMinute();
-    const midCompany=clone(company),midEmployees=clone(employees);
-    while(company.day<totalDays&&!company.gameOver)simulateMinute();
-    const hashA=stateHash();
-    company=clone(midCompany);employees=clone(midEmployees);
-    while(company.day<totalDays&&!company.gameOver)simulateMinute();
-    const hashB=stateHash();
-    return {seed,midDays,totalDays,hashA,hashB,passed:hashA===hashB};
+    company=context.company;
+    employees=context.employees;
+    validationMode=true;
+    currentSimulationContext=context;
+    return fn();
   }finally{
-    validationSession.restore();
+    context.company=company;
+    context.employees=employees;
+    company=live.company;
+    employees=live.employees;
+    validationMode=live.validationMode;
+    currentSimulationContext=live.currentSimulationContext;
+    selectedEmployeeId=live.selectedEmployeeId;
+    debugMode=live.debugMode;
   }
+}
+function initializeIsolatedEmployees(){
+  employees=names.map((_,i)=>makeEmployee(i));
+  const shuffled=traits.map(x=>[...x]).sort(()=>simulationRandom()-.5);
+  employees.forEach((e,i)=>{e.traits=shuffled[i];e.energy=clamp(e.energy+rand(-8,8),55,95);e.morale=clamp(e.morale+rand(-8,8),52,90);e.focus=clamp(e.focus+rand(-8,8),45,92);});
+  employees.forEach(a=>employees.forEach(b=>{if(a!==b)a.relationship[b.id]=Math.round(simulationRandom()*55-18)}));
+}
+function createIsolatedValidationContext({seed,scenario="fresh-company",saveSnapshot=null}={}){
+  const repository=new InMemorySaveRepository();
+  const runtimeIds=createRuntimeIdService(1);
+  const context=new SimulationContext({company:createFreshCompanyState(seed||"isolated-validation"),employees:[],rng:createSeededRng(seed||"isolated-validation"),runtimeIds,repository,timer:new ManualSimulationTimer(),eventBus:new IsolatedEventBus(),services:createIsolatedServices(),mode:"isolated-validation"});
+  withSimulationContext(context,()=>{
+    if(saveSnapshot?.company){
+      company={...createFreshCompanyState(seed||"snapshot"),...cloneForValidation(saveSnapshot.company),randomState:seedToRandomState(seed||"snapshot"),nextRuntimeId:1};
+      employees=Array.isArray(saveSnapshot.employees)?cloneForValidation(saveSnapshot.employees):[];
+    }else{
+      const climates=[{name:"Cautious market",cash:-1.5,board:4,trust:3},{name:"Investor optimism",cash:2,board:6,trust:-2},{name:"Competitive pressure",cash:0,board:-3,trust:1},{name:"Stable opening",cash:0,board:0,trust:0}];
+      const climate=climates[Math.floor(simulationRandom()*climates.length)];
+      company.cash=clamp(company.cash+climate.cash,14,21);
+      company.board=clamp(company.board+climate.board,58,82);
+      company.trust=clamp(company.trust+climate.trust,55,78);
+      company.valuation=clamp(company.valuation+rand(-4,4),34,50);
+      company.log=[`Isolated validation started during a ${climate.name.toLowerCase()}.`];
+      initializeIsolatedEmployees();
+    }
+    company.weekStartSnapshot=captureWeekSnapshot();
+    ensureBibleSystems?.();
+    rebuildRuntimeIndexes?.();
+    ensureProjectAllocations?.();
+    updateManufacturingAndStakeholders?.();
+    updateCompanyInformationSystem?.();
+    collectDailyMetrics?.();
+  });
+  return context;
+}
+function simulateMinutesInContext(context,minutes=5){
+  assertIsolatedValidationEnvironment(context);
+  return withSimulationContext(context,()=>{
+    const ticks=Math.max(1,Math.floor(minutes/5));
+    for(let i=0;i<ticks&&!company.gameOver&&!company.lastSimulationError;i++)simulateMinute(false);
+    return {day:company.day,minute:company.minute,gameOver:company.gameOver,error:company.lastSimulationError||null};
+  });
+}
+function runProjectionInContext(context,{days=120,seed="isolated-validation",failureHook=null}={}){
+  assertIsolatedValidationEnvironment(context);
+  return withSimulationContext(context,()=>{
+    const targetDays=company.day+days;
+    while(company.day<targetDays&&!company.gameOver&&!company.lastSimulationError){
+      if(typeof failureHook==="function")failureHook({day:company.day,minute:company.minute,company,employees});
+      simulateMinute(false);
+    }
+    collectDailyMetrics();
+    const report=summarizeProjection(seed,days,company.simulationMetrics?.daily||[],company,employees);
+    report.survival=!report.endedEarly&&!company.gameOver&&company.cash>0;
+    report.ceoRemoval=company.failureType==="ceo-fired";
+    report.companyFailure=company.failureType==="company-failure";
+    report.crisisCount=(company.history||[]).filter(h=>String(h.type||"").includes("crisis")||String(h.text||"").toLowerCase().includes("crisis")).length;
+    report.projectCompletion=(company.projectArchive||[]).length;
+    report.customerChurn=company.customerTelemetry?.churned||0;
+    report.investorConfidence=derivedOperatingHealth?.().investorConfidence??company.shareholders?.confidence??0;
+    report.companyRisk=company.companyRiskComponents?.total??0;
+    report.deterministicHash=typeof hashAuthoritativeState==="function"?hashAuthoritativeState(company,employees):stateHash();
+    report.storageWrites=context.repository.writeCount;
+    context.report=report;
+    lastValidationReport=report;
+    return report;
+  });
+}
+function runBalanceProjection(contextOrDays=120,options={}){
+  if(typeof options==="string")options={seed:options};
+  const hasContext=contextOrDays instanceof SimulationContext;
+  const days=hasContext?(options.days||120):contextOrDays;
+  const seed=options.seed||`isolated-seed-${days}`;
+  const context=hasContext?contextOrDays:createIsolatedValidationContext({seed});
+  assertIsolatedValidationEnvironment(context);
+  return runProjectionInContext(context,{days,seed,failureHook:options.failureHook});
+}
+function runDeterministicContinuationCheck(seed="determinism-isolated",midDays=50,totalDays=100){
+  const context=createIsolatedValidationContext({seed});
+  assertIsolatedValidationEnvironment(context);
+  return withSimulationContext(context,()=>{
+    const midTarget=company.day+midDays;
+    while(company.day<midTarget&&!company.gameOver&&!company.lastSimulationError)simulateMinute(false);
+    const midCompany=cloneForValidation(company),midEmployees=cloneForValidation(employees);
+    while(company.day<totalDays&&!company.gameOver&&!company.lastSimulationError)simulateMinute(false);
+    const hashA=typeof hashAuthoritativeState==="function"?hashAuthoritativeState(company,employees):stateHash();
+    company=cloneForValidation(midCompany);employees=cloneForValidation(midEmployees);
+    while(company.day<totalDays&&!company.gameOver&&!company.lastSimulationError)simulateMinute(false);
+    const hashB=typeof hashAuthoritativeState==="function"?hashAuthoritativeState(company,employees):stateHash();
+    return {seed,midDays,totalDays,hashA,hashB,passed:hashA===hashB,isolated:true};
+  });
 }
 function summarizeProjectionMatrix(reports){
   const avg=key=>Math.round(reports.reduce((s,r)=>s+(Number(r[key])||0),0)/Math.max(1,reports.length));
@@ -94,9 +188,13 @@ function summarizeProjectionMatrix(reports){
   return {runs:reports.length,survivalRate:Math.round(survival/Math.max(1,reports.length)*100),endedEarly,minCash,maxStress,medianFinalCash:median(reports.map(r=>r.cash)),cashP10:percentile(reports.map(r=>r.cash),.1),cashP90:percentile(reports.map(r=>r.cash),.9),medianNetCashFlow:median(reports.map(r=>r.avgNetCashFlow)),medianPostLaunchNetCashFlow:median(reports.map(r=>r.postLaunchNetCashFlow)),avgStress:avg("avgStress"),avgMorale:avg("avgMorale"),avgSurvivalRisk:avg("avgSurvivalRisk"),avgActionDiversity:avg("actionDiversity"),avgLearningSpread:avg("learningSpread"),avgMemoRepeat:avg("memoRepeat"),avgCeoDecisions:avg("ceoDecisions"),avgEscalations:avg("queuedEscalations"),avgMistakes:avg("qualityMistakes"),avgUnresolvedMistakes:avg("unresolvedQualityMistakes"),qualityTelemetry,avgSickness:avg("sickness"),avgTurnover:Math.round(reports.reduce((s,r)=>s+(r.resignations||0)+(r.firings||0),0)/Math.max(1,reports.length)),flags};
 }
 function runBalanceMatrix(seedCount=8,days=120){
-  const baseSeed=nextSimulationId("matrix");
+  const baseSeed=`isolated-matrix-${seedCount}-${days}`;
   const reports=[];
-  for(let i=0;i<seedCount;i++)reports.push(runBalanceProjection(days,`${baseSeed}-${i+1}`));
+  for(let i=0;i<seedCount;i++){
+    const seed=`${baseSeed}-${i+1}`;
+    const context=createIsolatedValidationContext({seed});
+    reports.push(runBalanceProjection(context,{days,seed}));
+  }
   lastValidationReport={...summarizeProjectionMatrix(reports),matrix:true,seed:baseSeed,daysRun:days,reports};
   return lastValidationReport;
 }
@@ -105,8 +203,8 @@ function runBalanceMatrixFromUi(){
   if(btn){btn.disabled=true;btn.textContent="Running...";}
   setTimeout(()=>{
     runBalanceMatrix(8,120);
-    if(btn){btn.disabled=false;btn.textContent="Balance Matrix";}
-    if(selectedEmployeeId!==null)showEmployee(selectedEmployeeId);
+    if(btn){btn.disabled=false;btn.textContent="Run Isolated 8-Seed Balance Matrix";}
+    renderDeveloperTools?.();
   },20);
 }
 function validationReportHtml(){
@@ -121,10 +219,20 @@ function runBalanceProjectionFromUi(){
   const btn=document.getElementById("balanceProjectionBtn");
   if(btn){btn.disabled=true;btn.textContent="Running...";}
   setTimeout(()=>{
-    runBalanceProjection(120,nextSimulationId("office-aquarium"));
-    if(btn){btn.disabled=false;btn.textContent="Balance Run";}
-    if(selectedEmployeeId!==null)showEmployee(selectedEmployeeId);
+    runBalanceProjection(120,{seed:"office-aquarium-isolated-ui"});
+    if(btn){btn.disabled=false;btn.textContent="Run Isolated 120-Day Projection";}
+    renderDeveloperTools?.();
   },20);
+}
+function isDeveloperModeEnabled(){
+  try{
+    return new URLSearchParams(window.location.search).get("dev")==="1"||localStorage.getItem("officeAquariumDeveloperMode")==="true";
+  }catch(e){return false;}
+}
+function renderDeveloperTools(){
+  const panel=document.getElementById("developerToolsPanel"),report=document.getElementById("developerValidationReport");
+  if(panel)panel.classList.toggle("hidden",!isDeveloperModeEnabled());
+  if(report)report.innerHTML=validationReportHtml();
 }
 function playtestChecklistHtml(){
   const latest=company.simulationMetrics?.lastBalance||{};
@@ -143,7 +251,8 @@ function metricsSummaryHtml(){
   if(!m)return "No metrics collected yet.";
   const h=derivedOperatingHealth(),trace=Object.entries(h.trace||{}).map(([k,v])=>`${k}: ${fmtHealth(v.value)} from ${(v.contributors||[]).map(c=>`${c.name} ${c.value}w${c.weight}`).join("; ")||"no contributors"}`).join("<br>");
   const snapshot=buildExecutiveIntelligenceSnapshot(),snap=`Executive Intelligence Snapshot<br>Top risks: ${(snapshot.topRisks||[]).slice(0,2).map(x=>x.title).join("; ")||"none"}<br>Top opportunities: ${(snapshot.topOpportunities||[]).slice(0,2).map(x=>x.title).join("; ")||"none"}<br>Department beliefs: ${(snapshot.departmentBeliefs||[]).slice(0,2).map(x=>x.title).join("; ")||"none"}<br>Suppression findings: ${(snapshot.suppressedReportFindings||[]).map(x=>`${x.count} filtered / ${x.severeCount} severe`).join("; ")||"none"}<br>Trend priorities: ${(snapshot.majorTrends||[]).slice(0,2).map(x=>x.title).join("; ")||"none"}<br>Source IDs: ${(snapshot.sourceIds||[]).slice(0,8).join(", ")||"none"}`;
-  return `Day ${m.day}<br>Stress ${m.stress}, morale ${m.morale}, survival risk ${m.survivalRisk}<br>Net cash flow $${Number(m.netCashFlow||0).toFixed(3)}M/day, runway ${m.runwayDays>=999?"positive":m.runwayDays+" day(s)"}<br>Revenue $${Number(m.grossRevenueDaily||0).toFixed(3)}M, cost $${Number(m.totalDailyCost||0).toFixed(3)}M, payroll $${Number(m.payrollDaily||0).toFixed(3)}M<br>Operating health: portfolio ${fmtHealth(h.portfolioHealth)}, finance ${fmtHealth(h.financeHealth)}, manufacturing ${fmtHealth(h.manufacturingHealth)}, customer ${fmtHealth(h.customerSentiment)}<br>Trace<br>${trace}<br>${snap}<br>Messages 5d ${m.messages5d}: local ${m.routes.local}, info ${m.routes.info}, CEO ${m.routes.queued+m.routes.resolved}, suppressed ${m.routes.suppressed}<br>Action diversity ${m.actionDiversity}, learning spread ${m.learningSpread}, learning magnitude ${m.learningMagnitude}<br>Memo repeat ${m.repeatedMemoRate}%${m.flags?.length?`<br>Flags: ${m.flags.join(", ")}`:""}`;
+  const runwayLabel=m.runwayDays>=999?"positive":`${m.runwayDays} ${m.runwayDays===1?"day":"days"}`;
+  return `Day ${m.day}<br>Stress ${m.stress}, morale ${m.morale}, survival risk ${m.survivalRisk}<br>Net cash flow $${Number(m.netCashFlow||0).toFixed(3)}M/day, runway ${runwayLabel}<br>Revenue $${Number(m.grossRevenueDaily||0).toFixed(3)}M, cost $${Number(m.totalDailyCost||0).toFixed(3)}M, payroll $${Number(m.payrollDaily||0).toFixed(3)}M<br>Operating health: portfolio ${fmtHealth(h.portfolioHealth)}, finance ${fmtHealth(h.financeHealth)}, manufacturing ${fmtHealth(h.manufacturingHealth)}, customer ${fmtHealth(h.customerSentiment)}<br>Trace<br>${trace}<br>${snap}<br>Messages 5d ${m.messages5d}: local ${m.routes.local}, info ${m.routes.info}, CEO ${m.routes.queued+m.routes.resolved}, suppressed ${m.routes.suppressed}<br>Action diversity ${m.actionDiversity}, learning spread ${m.learningSpread}, learning magnitude ${m.learningMagnitude}<br>Memo repeat ${m.repeatedMemoRate}%${m.flags?.length?`<br>Flags: ${m.flags.join(", ")}`:""}`;
 }
 function avgStress(){
   const active=employees.filter(e=>e.active);
@@ -166,12 +275,16 @@ function developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo){
   const memoAudit=(company.communications||[]).find(m=>m.memoAudit)?.memoAudit;
   const pt=company.policyTransition;
   const policyDebug=company.directive?`Policy ${policyLabel(company.directive)}<br>Affected departments ${(pt?.affectedDepartments||policyAffectedDepartments(company.directive)).map(teamDisplayName).join(", ")}<br>Adoption progress ${pt?.totalDays?Math.round((1-(company.directiveDays||0)/pt.totalDays)*100):"n/a"}%<br>Days remaining ${company.directiveDays||0}<br>Temporary modifiers ${pt?.temporaryModifiers||policyTemporaryModifiers(company.directive)}`:"No active policy transition.";
+  const crisisDebug=typeof crisisDebugHtml==="function"?crisisDebugHtml():"Crisis debug unavailable.";
+  const observationDebug=`Authoritative State Hash ${typeof hashAuthoritativeState==="function"?hashAuthoritativeState():"n/a"}<br>CEO observation ${typeof buildCEOObservation==="function"?"available":"missing"}<br>Employee observation ${typeof buildEmployeeObservation==="function"?"available":"missing"}<br>Manager observation ${typeof buildManagerObservation==="function"?"available":"missing"}<br>Customer Success observation ${typeof buildCustomerSuccessObservation==="function"?"available":"missing"}<br>IR observation ${typeof buildInvestorRelationsObservation==="function"?"available":"missing"}<br>Board observation ${typeof buildBoardObservation==="function"?"available":"missing"}`;
   return `<div class="debug-panel"><h3>AI Debug</h3>
     <details class="debug-section"><summary>Employee AI</summary><div class="debug-section-content"><strong>Utility Scores</strong><br><code>${scoreLines||"No scores yet"}</code><br><br><strong>Cooldowns</strong><br>${cooldowns}<br><br><strong>Memory Bias</strong><br>${strongestMemory?`${strongestMemory.type}: ${Math.round(strongestMemory.strength)}`:"None"}<br><br><strong>Collaborator Candidate</strong><br>${availableCollaborator(e)?.name||"None"}<br><br><strong>Repetition</strong><br>${e.lastAction||"None"} x ${e.repeatCount||0}<br><br><strong>Duration</strong><br>${Math.round(e.actionMinutes||0)} minutes<br><br><strong>CEO Opinion</strong><br>Trust ${Math.round(ceo.trust||0)}, Fairness ${Math.round(ceo.fairness||0)}, Competence ${Math.round(ceo.competence||0)}, Support ${Math.round(ceo.support||0)}, Fear ${Math.round(ceo.fear||0)}</div></details>
     <details class="debug-section"><summary>Policy Transition</summary><div class="debug-section-content">${policyDebug}</div></details>
     <details class="debug-section"><summary>Institutional Learning</summary><div class="debug-section-content">${learning}</div></details>
     <details class="debug-section"><summary>Executive Communications</summary><div class="debug-section-content">Decision threads ${(company.decisionThreads||[]).length}; message threads ${(company.messageThreads||[]).length}; archived memos ${(company.communications||[]).length}; queued escalations ${(company.escalationQueue||[]).length}.<br>${memoAudit?`Latest memo audit: relevance ${memoAudit.relevanceScore??"n/a"}%, evidence ${memoAudit.evidenceCoverage??"n/a"}, chain ${memoAudit.chainOfCommandValid?"valid":"review"}.`:"No memo audit available yet."}<br>Fingerprints ${Object.keys(company.messageFingerprints||{}).length}; quality history ${(company.messageQualityHistory||[]).length}.</div></details>
     <details class="debug-section"><summary>Customer Market Intelligence</summary><div class="debug-section-content">${customerMarketDebugHtml()}</div></details>
+    <details class="debug-section"><summary>Loss Paths and Crisis</summary><div class="debug-section-content">${crisisDebug}</div></details>
+    <details class="debug-section"><summary>Hidden-State Observations</summary><div class="debug-section-content">${observationDebug}</div></details>
     <details class="debug-section"><summary>Market, Board, and Valuation</summary><div class="debug-section-content">${marketValuationDebugHtml()}</div></details>
     <details class="debug-section"><summary>Operating Health Trace</summary><div class="debug-section-content">${metricsSummaryHtml()}</div></details>
     <details class="debug-section"><summary>Release Validation</summary><div class="debug-section-content">${release}</div></details>
@@ -182,8 +295,6 @@ function developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo){
 function showEmployee(id){
   const e=employees.find(x=>x.id===id);
   document.getElementById("aiDebugToggle")?.classList.toggle("active",debugMode);
-  document.getElementById("balanceProjectionBtn")?.classList.toggle("hidden",!debugMode);
-  document.getElementById("balanceMatrixBtn")?.classList.toggle("hidden",!debugMode);
   document.getElementById("detailName").textContent=e.name;
   document.getElementById("detailRole").textContent=`${e.role} - ${e.traits.join(" - ")}`;
   const best=employees.filter(x=>x.id!==e.id).sort((a,b)=>socialScore(e,b.id)-socialScore(e,a.id))[0];
@@ -212,15 +323,34 @@ function showEmployee(id){
     <ul>${memories}</ul>${debugHtml}`;
   document.getElementById("employeeModal").classList.remove("hidden");
 }
+function normalizeCompanyView(view){
+  return ["overview","projects","workforce","story","all"].includes(view)?view:"all";
+}
+function applyCompanyView(){
+  const view=normalizeCompanyView(company?.companyView);
+  document.querySelectorAll("[data-company-view]").forEach(el=>{
+    const groups=String(el.dataset.companyView||"").split(/\s+/).filter(Boolean);
+    el.classList.toggle("view-hidden",view!=="all"&&!groups.includes(view));
+  });
+  const select=document.getElementById("companyViewSelect");
+  if(select&&select.value!==view)select.value=view;
+}
+function setCompanyView(view){
+  if(!company)return;
+  company.companyView=normalizeCompanyView(view);
+  applyCompanyView();
+  if(!validationMode)saveGame();
+}
 function render(){
   ensureBibleSystems?.();restoreCompactSections?.();
   const days=["Mon","Tue","Wed","Thu","Fri"],hour=Math.floor(company.minute/60),mins=company.minute%60,h12=((hour+11)%12)+1;
   document.getElementById("timeLabel").textContent=`Day ${company.day+1} - ${days[company.day%5]} ${h12}:${String(mins).padStart(2,"0")} ${hour>=12?"PM":"AM"}`;
   document.getElementById("cashLabel").textContent=`$${company.cash.toFixed(1)}M`;
   document.getElementById("boardLabel").textContent=Math.round(company.board);
-  const risk=Math.min(company.cash/3,company.board/10,company.trust/10,(100-avgStress())/10),r=document.getElementById("riskLabel");
-  r.textContent=company.crisis?`CRISIS - ${company.crisisDays} days`:risk<2?"Critical":risk<4?"High":risk<6?"Watch":"Stable";
-  r.className=(company.crisis||risk<2)?"danger":"";
+  updateCompanyRiskComponents?.();
+  const r=document.getElementById("riskLabel"),riskLabel=company.companyRiskComponents?.label||"Watch",riskTotal=company.companyRiskComponents?.total||0;
+  r.textContent=company.crisis?`CRISIS - ${company.crisisDays} days`:riskLabel;
+  r.className=(company.crisis||riskLabel==="Critical"||riskTotal>=85)?"danger":"";
   document.getElementById("valuationLabel").textContent=`$${company.valuation.toFixed(1)}M valuation - ${valuationTrendLabel()}`;
   document.getElementById("phaseLabel").textContent=companyIdentityLabel();
   renderValuationChart();
@@ -243,9 +373,21 @@ function render(){
   document.getElementById("officeHeadline").textContent="The company is running.";
   document.getElementById("log").innerHTML=company.log.slice(-10).reverse().map(x=>`<li>${x}</li>`).join("");
   const cb=document.getElementById("crisisBox");
-  if(company.crisis){cb.classList.remove("hidden");document.getElementById("crisisText").textContent=`${company.crisis} Restore the company before ${company.crisisDays} days expire.`;}else cb.classList.add("hidden");
+  if(company.crisis){
+    cb.classList.remove("hidden");
+    document.getElementById("crisisText").textContent=typeof crisisPlayerMessage==="function"?crisisPlayerMessage(company.crisis):String(company.crisis);
+  }else cb.classList.add("hidden");
   document.getElementById("employeeList").innerHTML=[...employees.filter(e=>e.active),...employees.filter(e=>!e.active)].map(e=>`<div class="employee-card clickable" onclick="showEmployee(${e.id})"><div class="employee-head"><strong>${e.name} - ${e.role}</strong><span>${e.active?e.action:"Resigned"}</span></div><div class="mini-bars"><div class="mini">Morale ${Math.round(e.morale)}<div class="bar"><span style="width:${e.morale}%"></span></div></div><div class="mini">Stress ${Math.round(e.stress)}<div class="bar stress"><span style="width:${e.stress}%"></span></div></div></div></div>`).join("");
-  employees.forEach(e=>{const n=document.getElementById(`agent-${e.id}`);if(n){n.classList.toggle("offsite",e.offsite);n.classList.toggle("resigned",!e.active);n.classList.toggle("busy",e.active&&(e.action==="working"||e.action==="testing hardware"||e.action==="leading a meeting"));n.querySelector(".thought").textContent=e.thought;n.querySelector("small").textContent=`${e.name}: ${e.active?e.action:"resigned"}`;}});
+  employees.forEach(e=>{
+    const n=document.getElementById(`agent-${e.id}`);
+    if(!e.active){if(n)n.remove();return;}
+    if(!n){buildOffice(true);return;}
+    n.classList.toggle("offsite",e.offsite);
+    n.classList.remove("resigned");
+    n.classList.toggle("busy",e.action==="working"||e.action==="testing hardware"||e.action==="leading a meeting");
+    n.querySelector(".thought").textContent=e.thought;
+    n.querySelector("small").textContent=`${e.name}: ${e.action}`;
+  });
   document.getElementById("applyDecision").disabled=company.cash<=0;
   setTrack("manufacturing",health.labels.manufacturing,health.manufacturingHealth,"%");
   setTrack("shareholder","Investor Confidence",health.investorConfidence??health.shareholderConfidence);
@@ -258,7 +400,9 @@ function render(){
   const hist=document.getElementById("companyHistory");if(hist){const html=companyHistoryHtml();hist.innerHTML=html;setContentSectionVisibility("companyHistoryWrap",!!html);}
   const dash=document.getElementById("operationalDashboard");if(dash)dash.innerHTML=operationalDashboardHtml();
   const reports=document.getElementById("internalReports");if(reports){const html=internalReportsHtml();reports.innerHTML=html;setContentSectionVisibility("internalReportsWrap",!!html);}
+  renderDeveloperTools();
   renderOrganizationalDynamics();renderWorkforcePressure();renderNewspapers();
+  applyCompanyView();
 }
 function switchMobileTab(tab,scroll=true){
   const target=document.querySelector(`.mobile-tabs button[data-tab="${tab}"]`);
@@ -317,9 +461,9 @@ class UserInterfaceSystem{
 }
 
 class ValidationToolsSystem{
-  balanceRun(days=120,seed=nextSimulationId("seed")){return runBalanceProjection(days,seed);}
+  balanceRun(days=120,seed=`isolated-balance-${days}`){return runBalanceProjection(days,{seed});}
   balanceMatrix(seedCount=8,days=120){return runBalanceMatrix(seedCount,days);}
-  deterministicContinuation(seed=nextSimulationId("determinism"),midDays=50,totalDays=100){return runDeterministicContinuationCheck(seed,midDays,totalDays);}
+  deterministicContinuation(seed="determinism-isolated",midDays=50,totalDays=100){return runDeterministicContinuationCheck(seed,midDays,totalDays);}
   reportHtml(){return validationReportHtml();}
 }
 

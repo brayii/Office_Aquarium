@@ -33,6 +33,22 @@ async function main() {
   await page.waitForTimeout(300);
   await page.click("#newCompany");
   await page.waitForTimeout(1200);
+  await page.click("#employeeList .employee-card");
+  await page.waitForTimeout(200);
+  const modalOpened = await page.locator("#employeeModal:not(.hidden)").count();
+  await page.click("#closeEmployee");
+  await page.waitForTimeout(200);
+  const modalClosed = await page.locator("#employeeModal.hidden").count();
+  await page.click("#guideBtn");
+  await page.waitForTimeout(120);
+  const guideOpened = await page.locator("#guideModal:not(.hidden)").count();
+  await page.click("#closeGuide");
+  await page.waitForTimeout(120);
+  const guideClosed = await page.locator("#guideModal.hidden").count();
+  await page.selectOption("#companyViewSelect", "projects");
+  await page.waitForTimeout(120);
+  const projectViewVisible = await page.locator("#projectPortfolioWrap:not(.view-hidden)").count();
+  const workforceViewHidden = await page.locator("#workforcePressure.view-hidden").count();
 
   const status = await page.evaluate(() => ({
     title: document.title,
@@ -42,6 +58,12 @@ async function main() {
     inboxText: document.querySelector("#commInboxTab")?.textContent || "",
     bodyPreview: document.body.innerText.slice(0, 160)
   }));
+  status.modalOpened = modalOpened;
+  status.modalClosed = modalClosed;
+  status.guideOpened = guideOpened;
+  status.guideClosed = guideClosed;
+  status.projectViewVisible = projectViewVisible;
+  status.workforceViewHidden = workforceViewHidden;
 
   await browser.close();
 
@@ -49,7 +71,13 @@ async function main() {
     errors.length === 0 &&
     status.heading.includes("Office Aquarium") &&
     status.timeText.includes("Day 1") &&
-    status.employeeCards >= 6;
+    status.employeeCards >= 6 &&
+    status.modalOpened === 1 &&
+    status.modalClosed === 1 &&
+    status.guideOpened === 1 &&
+    status.guideClosed === 1 &&
+    status.projectViewVisible === 1 &&
+    status.workforceViewHidden === 1;
 
   console.log(JSON.stringify({ ok, status, errors: errors.slice(0, 8) }, null, 2));
   if (!ok) process.exit(1);

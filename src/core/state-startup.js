@@ -6,7 +6,7 @@ const roles=["Chip Architect","Firmware Engineer","Software Lead","Verification 
 const colors=["#4a78c2","#ef6f6c","#2ab7a9","#d9972b","#7a5af8","#5f9f64","#d65b9e","#52606d"];
 const traits=[["perfectionist","ambitious"],["social","creative"],["focused","introverted"],["cautious","loyal"],["ambitious","social"],["skeptical","focused"],["creative","independent"],["cautious","analytical"]];
 const initialCompany={day:0,minute:480,randomState:2463534242,nextRuntimeId:1,cash:18,board:72,trust:68,chip:22,software:31,quality:38,integration:15,customers:0,dailyRevenue:0,valuation:42,phase:"prototype",marketSentiment:50,marketConfidence:50,leadershipReputation:50,valuationQuality:50,investorAppetite:50,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-999,lastValuationMemoDay:-999,lastFundraisingMemoDay:-999,lastValuationStoryDay:-999,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:"muted",soundEnabled:false,pendingEvent:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-999,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-999},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
-let company,employees,timer=null,debugMode=false,selectedEmployeeId=null,validationMode=false,lastValidationReport=null,lastInboxSoundCount=null,musicUnavailable=false,alertsUnavailable=false;
+let company,employees,timer=null,debugMode=false,selectedEmployeeId=null,validationMode=false,currentSimulationContext=null,lastValidationReport=null,lastInboxSoundCount=null,musicUnavailable=false,alertsUnavailable=false;
 const saveRepository=new SaveRepository(SAVE_KEY,SAVE_VERSION);
 const soundController=new SoundController({musicSrc:"assets/audio/game_music_loop.mp3",alertSrc:"assets/audio/new_message_alert.mp3"});
 const simulationTimer=new SimulationTimer();
@@ -62,7 +62,7 @@ function makeEmployee(i){
   };
 }
 function reset(skipSave=false,randomize=false,seedState=null){document.getElementById("gameOverOverlay")?.classList.add("hidden");company=typeof structuredClone==="function"?structuredClone(initialCompany):JSON.parse(JSON.stringify(initialCompany));if(Number.isFinite(seedState))company.randomState=seedState>>>0;if(randomize){const climates=[{name:"Cautious market",cash:-1.5,board:4,trust:3},{name:"Investor optimism",cash:2,board:6,trust:-2},{name:"Competitive pressure",cash:0,board:-3,trust:1},{name:"Stable opening",cash:0,board:0,trust:0}];const climate=climates[Math.floor(simulationRandom()*climates.length)];company.cash=clamp(company.cash+climate.cash,14,21);company.board=clamp(company.board+climate.board,58,82);company.trust=clamp(company.trust+climate.trust,55,78);company.valuation=clamp(company.valuation+rand(-4,4),34,50);company.log=[`You became CEO during a ${climate.name.toLowerCase()}. The office is running without direct employee control.`];}employees=names.map((_,i)=>makeEmployee(i));if(randomize){const shuffled=traits.map(x=>[...x]).sort(()=>simulationRandom()-.5);employees.forEach((e,i)=>{e.traits=shuffled[i];e.energy=clamp(e.energy+rand(-8,8),55,95);e.morale=clamp(e.morale+rand(-8,8),52,90);e.focus=clamp(e.focus+rand(-8,8),45,92);});}employees.forEach(a=>employees.forEach(b=>{if(a!==b)a.relationship[b.id]=Math.round(simulationRandom()*55-18)}));company.weekStartSnapshot=captureWeekSnapshot();ensureBibleSystems?.();updateManufacturingAndStakeholders?.();updateCompanyInformationSystem?.();collectDailyMetrics?.();buildOffice();renderDecisionEvent();render();if(!validationMode)restartTimer();if(!skipSave&&!validationMode)saveGame();}
-function saveGame(){try{saveRepository.write(company,employees);document.getElementById("saveNote").textContent="Saved on this device";}catch(e){document.getElementById("saveNote").textContent="Autosave unavailable";}}
+function saveGame(){try{if(currentSimulationContext?.mode==="isolated-validation")throw new Error("Production save blocked during isolated validation.");saveRepository.write(company,employees);document.getElementById("saveNote").textContent="Saved on this device";}catch(e){document.getElementById("saveNote").textContent="Autosave unavailable";}}
 function loadGame(){try{const data=saveRepository.read();if(!data)return false;company={...saveRepository.clone(initialCompany),...(data.company||{})};const loadedRandomState=Number.isFinite(company.randomState)?(company.randomState>>>0):2463534242;const loadedNextRuntimeId=Math.max(1,Number(company.nextRuntimeId)||1);company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;const migrationEmployeeDefaults=i=>{const savedRandom=company.randomState;company.randomState=(0x9e3779b9+Math.imul(i+1,0x85ebca6b))>>>0;const fresh=makeEmployee(i);company.randomState=savedRandom;return fresh;};const savedEmployees=Array.isArray(data.employees)?data.employees:[];const employeeSlots=Math.max(names.length,...savedEmployees.map(e=>Number(e.id)).filter(Number.isFinite).map(id=>id+1));employees=Array.from({length:employeeSlots},(_,i)=>{const fresh=migrationEmployeeDefaults(i),saved=savedEmployees.find(e=>e.id===i)||{};return{
       ...fresh,...saved,
       relationship:{...fresh.relationship,...(saved.relationship||{})},
@@ -107,7 +107,10 @@ company.lastAnnualReviewDay=Number(company.lastAnnualReviewDay)||0;
 company.crisisRiskDays={burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0,...(company.crisisRiskDays||{})};
 company.crisisType=company.crisisType||null;
 company.crisisStage=company.crisisStage||null;
+if(company.crisis&&typeof company.crisis==="object")company.crisis.currentProgressDetail=company.crisis.currentProgressDetail||null;
 company.workItems=Array.isArray(company.workItems)?company.workItems:[];
+company.workItems.forEach(w=>{if(w.blockerAwareness&&typeof w.blockerAwareness==="object")w.blockerAwareness={observed:Number(w.blockerAwareness.observed)||0,lastActualCount:Number(w.blockerAwareness.lastActualCount)||0,detectionProbability:Number(w.blockerAwareness.detectionProbability)||0,lastObservedDay:w.blockerAwareness.lastObservedDay,observedBy:w.blockerAwareness.observedBy};else if((w.blockedBy||[]).length)w.blockerAwareness={observed:0,lastActualCount:(w.blockedBy||[]).length,detectionProbability:0};});
+company.workforceAllocationSnapshot=company.workforceAllocationSnapshot&&typeof company.workforceAllocationSnapshot==="object"?company.workforceAllocationSnapshot:null;
 company.issueRecords=Array.isArray(company.issueRecords)?company.issueRecords:[];
 company.suppressionRecords=Array.isArray(company.suppressionRecords)?company.suppressionRecords:[];
 company.operatingHealthHistory=Array.isArray(company.operatingHealthHistory)?company.operatingHealthHistory:[];
@@ -484,10 +487,15 @@ function storyChainForWeeklyIssue(intelligence){
   return {subject:storyThread.subject,beats};
 }
 function riskDeskNarrative(issue){
-  const trust=qualitativeLevel(issue.metrics.trust,{low:45,high:75,lowText:"weak",midText:"mixed",highText:"strong"});
-  const stress=qualitativeLevel(issue.metrics.stress,{low:42,high:68,lowText:"manageable",midText:"elevated",highText:"high"});
-  const primary=issue.intelligence?.risk||((issue.metrics.stress>68)?"workload pressure":"normal execution risk");
-  return `The primary company risk is ${String(primary).replace(/\.$/,"").toLowerCase()}. Leadership trust is ${trust}, and workload pressure is ${stress}.`;
+  const pillars=issue.riskPillars||company.riskPillars||{};
+  const top=Object.entries(pillars).map(([key,value])=>({key,value:Number(value)||0,label:typeof riskPillarName==="function"?riskPillarName(key):key})).sort((a,b)=>b.value-a.value);
+  const label=issue.riskLabel||company.companyRiskComponents?.label||"Watch";
+  const primary=top[0],secondary=top[1];
+  if(primary&&primary.value>24){
+    return `Overall company risk is ${String(label).toLowerCase()}. The main contributor is ${primary.label}${secondary&&secondary.value>35?`, followed by ${secondary.label}`:""}. The weekly signal is about pressure building through the organization, not a single isolated metric.`;
+  }
+  const observation=issue.executiveObservation||company.executiveObservations?.[0]?.text;
+  return observation||"Overall company risk remains manageable. The item to watch is whether current workload remains sustainable as projects advance.";
 }
 function chooseHeadline(events,delta,current){
   const snapshot=buildExecutiveIntelligenceSnapshot();
@@ -547,6 +555,11 @@ function publishWeeklyNewspaper(){
     metricExplanations,
     glanceInterpretation:weeklyMetricInterpretation(delta,now,intelligence),
     people,
+    riskPillars:{...(company.riskPillars||{})},
+    riskLabel:company.companyRiskComponents?.label||null,
+    executiveObservation:company.executiveObservations?.[0]?.text||null,
+    detectedFriction:company.managerDetections?.[0]?.text||null,
+    localResponse:company.localFrictionResponses?.[0]?.action||null,
     intelligence:{risk:intelligence.topRisks?.[0]?.title||null,opportunity:intelligence.topOpportunities?.[0]?.title||null,tension:intelligence.departmentBeliefs?.[0]?.title||null,trend:intelligence.majorTrends?.[0]?.title||null}
   };
   company.newspapers=Array.isArray(company.newspapers)?company.newspapers:[];
@@ -555,7 +568,7 @@ function publishWeeklyNewspaper(){
   company.weeklyEvents=[];
   company.weekStartSnapshot=captureWeekSnapshot();
   company.log.push(`Office Aquarium Weekly published: ${headline}`);
-  saveGame();
+  if(!validationMode)saveGame();
 }
 function renderNewspapers(){
   ensureBibleSystems?.();
@@ -598,8 +611,10 @@ function renderNewspapers(){
         <section class="paper-section"><h4>People to Watch</h4><ul>${people.length?people.map(p=>`<li>${htmlEscape(p)}</li>`).join(""):"<li>No employee required executive attention this week.</li>"}</ul></section>
         <section class="paper-section"><h4>Story Chain</h4><ul>${issue.storyThread&&storyBeats.length?`<li>${htmlEscape(issue.storyThread.subject)}</li>${storyBeats.map(b=>`<li>Day ${(b.day??0)+1}: ${htmlEscape(b.text)}</li>`).join("")}`:"<li>No connected chain dominated the week.</li>"}</ul></section>
         <section class="paper-section"><h4>Risk Desk</h4><p>${htmlEscape(riskNarrative)}</p><ul>
-          <li>Trust: ${htmlEscape(qualitativeLevel(issue.metrics.trust,{low:45,high:75,lowText:"Weak",midText:"Mixed",highText:"Strong"}))}</li>
-          <li>Stress: ${htmlEscape(qualitativeLevel(issue.metrics.stress,{low:42,high:68,lowText:"Manageable",midText:"Elevated",highText:"High"}))}</li>
+          <li>Overall Company Risk: ${htmlEscape(issue.riskLabel||company.companyRiskComponents?.label||"Watch")}</li>
+          ${Object.entries(issue.riskPillars||{}).sort((a,b)=>(b[1]||0)-(a[1]||0)).slice(0,2).map(([k,v])=>`<li>${htmlEscape(typeof riskPillarName==="function"?riskPillarName(k):k)}: ${Math.round(v)>=70?"High":Math.round(v)>=45?"Elevated":Math.round(v)>=25?"Watch":"Low"}</li>`).join("")}
+          ${issue.detectedFriction?`<li>Detected friction: ${htmlEscape(issue.detectedFriction)}</li>`:""}
+          ${issue.localResponse?`<li>Improving area: ${htmlEscape(issue.localResponse)}</li>`:""}
           ${issue.intelligence?.risk?`<li>Primary risk: ${htmlEscape(issue.intelligence.risk)}</li>`:""}
           ${issue.intelligence?.trend?`<li>Trend: ${htmlEscape(issue.intelligence.trend)}</li>`:""}
           ${issue.intelligence?.opportunity?`<li>Opportunity: ${htmlEscape(issue.intelligence.opportunity)}</li>`:""}
@@ -609,7 +624,7 @@ function renderNewspapers(){
     </article>`;
 }
 
-function buildOffice(preservePositions=false){const office=document.getElementById("office");office.querySelectorAll(".agent").forEach(n=>n.remove());employees.forEach(e=>{const n=document.createElement("div");n.className="agent";n.id=`agent-${e.id}`;const color=colors[e.id%colors.length]||"#2ab7a9";n.innerHTML=`<div class="thought"></div><div class="avatar" style="background:${color}">${(e.name||"?")[0]}<span class="activity-dot"></span></div><small>${e.name}</small>`;n.onclick=()=>showEmployee(e.id);office.appendChild(n);if(preservePositions&&Number.isFinite(e.x)&&Number.isFinite(e.y)){n.style.transition="none";n.style.left=e.x+"%";n.style.top=e.y+"%";setTimeout(()=>n.style.transition="",20);}else moveToZone(e,e.zone,true);});}
+function buildOffice(preservePositions=false){const office=document.getElementById("office");office.querySelectorAll(".agent").forEach(n=>n.remove());employees.filter(e=>e.active).forEach(e=>{const n=document.createElement("div");n.className="agent";n.id=`agent-${e.id}`;const color=colors[e.id%colors.length]||"#2ab7a9";n.innerHTML=`<div class="thought"></div><div class="avatar" style="background:${color}">${(e.name||"?")[0]}<span class="activity-dot"></span></div><small>${e.name}</small>`;n.onclick=()=>showEmployee(e.id);office.appendChild(n);if(preservePositions&&Number.isFinite(e.x)&&Number.isFinite(e.y)){n.style.transition="none";n.style.left=e.x+"%";n.style.top=e.y+"%";setTimeout(()=>n.style.transition="",20);}else moveToZone(e,e.zone,true);});}
 function simulationRandom(){
   if(company){
     company.randomState=Number(company.randomState)||((company.day+1)*1103515245+12345);

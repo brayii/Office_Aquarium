@@ -42,6 +42,27 @@ The HTML file and ordered JavaScript source files are the runtime source of trut
 
 ---
 
+# Current Build Notes
+
+- Save version remains `38`.
+- The player-facing runtime is `Office_Aquarium.html` plus ordered source files under `src/`.
+- Browser/mobile release packages are generated under `dist/`.
+- Desktop release packages are generated under `src-tauri/target/`.
+- `misc/` is user-managed and must not be cleaned, moved, or committed automatically.
+- The canonical documentation set lives in `docs/`, with convenience copies restored in the project home directory.
+- Private implementation prompts matching `OFFICE_AQUARIUM_CODEX_*.md` and `OFFICE_AQUARIUM_V*_*.md` remain ignored unless explicitly tracked as a canonical project document.
+
+Current simulation integrity rules:
+
+- Project health must use actual project allocation, not only department headcount.
+- Required staffing, missing staffing, uncovered assignments, blockers, backlog, and timing risk must be connected to simulation producers, not static display values.
+- One short-staffed project should create project/workforce pressure, not automatically a company crisis.
+- Company staffing crisis should require broader, sustained evidence across staffing shortage, recruiting failure, critical roles, project delivery damage, or multiple affected projects.
+- Normal player UI should describe known/reported conditions. Hidden actual state belongs in AI Debug.
+- Derived reporting fields such as `staffingModel`, `riskPillars`, and `workforceAllocationSnapshot` are display or audit helpers and must not become authoritative save/hash state.
+
+---
+
 # 2. One-Sentence Product Pitch
 
 > Lead a living hardware and software company as CEO while autonomous employees think, work, collaborate, remember, burn out, resign, recover, and react to your leadership.

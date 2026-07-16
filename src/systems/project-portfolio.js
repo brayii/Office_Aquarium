@@ -401,6 +401,18 @@ function projectAllocatedFte(project,dept){
     return e&&roleDepartment(e.role)===dept?s+(Number(v)||0):s;
   },0);
 }
+function projectQualifiedAllocatedFte(project,dept){
+  const allocations=project?.staffAllocations||{};
+  const workType=typeof projectWorkType==="function"?projectWorkType(project,dept):dept;
+  const requiredSkills=typeof requiredSkillsForWork==="function"?requiredSkillsForWork(dept,workType):(project?.requiredSkills||{});
+  return Object.entries(allocations).reduce((sum,[id,value])=>{
+    const e=employees.find(x=>x.active&&x.id===Number(id));
+    if(!e||roleDepartment(e.role)!==dept)return sum;
+    const fit=typeof workSkillFit==="function"?workSkillFit(e,{requiredSkills}):1;
+    const usable=clamp((Number(value)||0)*clamp((fit-.48)/.52,0,1.05),0,Number(value)||0);
+    return sum+usable;
+  },0);
+}
 function recordProjectLedger(projectId,source,metric,delta,reason){
   const p=(company.projects||[]).find(x=>x.id===projectId);
   if(!p)return;
@@ -479,6 +491,18 @@ function applyProjectDevelopmentFriction(project,allItems,items,metrics){
   }
   if((schedulePressure||qualityPressure||staffingPressure||pace.major)&&items.length)maybeAddProjectBlocker(project,items,metrics);
   maybeResolveProjectBlocker(project,items,metrics);
+  const severeDeliveryPressure=(metrics.riskTrend||0)>86&&(metrics.scheduleVariance||0)>35&&(metrics.coverage||100)<55;
+  if(((schedulePressure&&qualityPressure&&staffingPressure)||severeDeliveryPressure)&&items.length&&!items.some(w=>(w.blockedBy||[]).length)){
+    const target=items.slice().sort((a,b)=>(b.qualityRisk||0)+(b.priority||0)*.35-((a.qualityRisk||0)+(a.priority||0)*.35))[0];
+    if(target){
+      const blocker=contentPick(v23Content.blockers,(target.priority||0)+(metrics.riskTrend||0));
+      target.blockedBy=[...(target.blockedBy||[]),blocker];
+      target.qualityRisk=clamp((target.qualityRisk||40)+5,0,100);
+      addStoryBeat(target.storyId,`${target.title} became blocked by ${blocker}.`,"blocker");
+      recordProjectLedger(project.id,"development-friction","blocker",1,`Sustained staffing, schedule, and quality pressure created blocker: ${blocker}`);
+      recordWeeklyEvent(`${project.title} hit a development blocker: ${blocker}.`,"project",3);
+    }
+  }
   const blockers=items.reduce((s,w)=>s+(w.blockedBy?.length||0),0);
   return {items,blockers,backlog:items.length};
 }
@@ -513,6 +537,17 @@ function projectPerformanceUpdate(){
     const friction=applyProjectDevelopmentFriction(p,allItems,items,{coverage,overload,scheduleVariance,budgetVariance,riskTrend,conditionDelta});
     items=friction.items;blockers=friction.blockers;
     riskTrend=clamp((p.visibleRisk||50)+blockers*5+Math.max(0,scheduleVariance)*.25+Math.max(0,budgetVariance)*.3+overload*.22-coverage*.08-Math.max(-18,conditionDelta)*.10,0,100);
+    if(blockers===0&&items.length&&riskTrend>86&&scheduleVariance>35&&coverage<55){
+      const target=items.slice().sort((a,b)=>(b.qualityRisk||0)+(b.priority||0)*.35-((a.qualityRisk||0)+(a.priority||0)*.35))[0];
+      if(target){
+        const blocker=contentPick(v23Content.blockers,(target.priority||0)+riskTrend);
+        target.blockedBy=[...(target.blockedBy||[]),blocker];
+        target.qualityRisk=clamp((target.qualityRisk||40)+5,0,100);
+        blockers=items.reduce((s,w)=>s+(w.blockedBy?.length||0),0);
+        recordProjectLedger(p.id,"development-friction","blocker",1,`Severe delivery pressure surfaced blocker: ${blocker}`);
+        recordWeeklyEvent(`${p.title} hit a development blocker: ${blocker}.`,"project",3);
+      }
+    }
     const fallbackProjectHealth=typeof projectVisibleHealth==="function"?projectVisibleHealth(p):50;
     const executionHealth=typeof projectExecutionHealthBreakdown==="function"?projectExecutionHealthBreakdown(p):{current:fallbackProjectHealth,base:50,companyCondition:condition.score,companyModifier:0,staffingModifier:0,riskModifier:0,profile:condition.profile};
     p.performance={progress:Math.round(p.progress),scheduleVariance,budgetVariance,quality:Math.round(p.quality),integration:Math.round(p.integration),teamHealth:Math.round(clamp(100-avgStress()+coverage*.2-overload*.25+conditionDelta*.05,0,100)),staffingCoverage:Math.round(coverage),workloadOverload:Math.round(overload),blockerCount:blockers,backlogCount:friction.backlog,customerInterest:Math.round(p.customerInterest),strategicConfidence:Math.round(clamp((p.visibleConfidence||55)+(p.quality-55)*.08+(p.customerInterest-50)*.1-overload*.04+conditionDelta*.08,0,100)),riskTrend:Math.round(riskTrend),benefitRealization:Math.round(clamp((p.progress||0)*p.hiddenReality.trueStrategicValue/100,0,100)),forecastAtCompletion:Math.round(clamp(100-riskTrend*.45+(p.customerInterest||50)*.25,0,100)),executionHealth:executionHealth.current,baseHealth:executionHealth.base,companyCondition:executionHealth.companyCondition,companyModifier:executionHealth.companyModifier,staffingModifier:executionHealth.staffingModifier,riskModifier:executionHealth.riskModifier,dependencyProfile:executionHealth.profile};
@@ -529,6 +564,7 @@ function projectPerformanceUpdate(){
     if(riskTrend>72&&p.status!=="blocked")p.status="at risk";
     if(p.progress>=100){p.status="completed";p.completedDay=company.day;archiveProjectOnce(p,"completed");updateProjectCommercialStats(p);recordWeeklyEvent(`${p.title} completed.`,"project",6);recordMajorHistory(`${p.title} completed and shaped the company portfolio.`,"project",6);if(p.commercialStatus==="ready")recordHistory(`${p.title} is ready for commercial review after completion.`,"product",4);reinforceProjectLesson("estimateAccuracy",budgetVariance<20?.8:-.5,p.title,8,budgetVariance<20?"positive":"contradiction");reinforceProjectLesson("crossDepartmentCoordination",blockers<2?.7:-.4,p.title,7,blockers<2?"positive":"mixed");reinforceProjectLesson("knowledgeValue",(p.hiddenReality?.trueKnowledgeValue||50)>60?.6:.2,p.title,5,"positive");createOrReinforceLesson({key:"project-completion-learning",title:"Completed projects improve future project estimation and coordination.",department:p.proposingDepartment,vector:{planning:.8,documentation:.5,collaboration:.5,estimateAccuracy:.5,crossDepartmentCoordination:.6},outcome:"positive",confidence:70,evidence:p.title,importance:5});}
   });
+  if(typeof buildWorkforceAllocationSnapshot==="function")buildWorkforceAllocationSnapshot({updateAwareness:true});
   deriveLegacyProgressFromProjects();
 }
 function deriveLegacyProgressFromProjects(){

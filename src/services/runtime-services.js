@@ -67,6 +67,57 @@ class SimulationTimer{
   start(callback,delay){this.stop();this.id=setInterval(callback,delay);timer=this.id;}
 }
 
+class InMemorySaveRepository{
+  constructor(){this.data=null;this.writeCount=0;}
+  clone(value){return typeof structuredClone==="function"?structuredClone(value):JSON.parse(JSON.stringify(value));}
+  read(){return this.clone(this.data);}
+  exists(){return !!this.data;}
+  remove(){this.data=null;}
+  write(companyState,employeeState){
+    this.writeCount+=1;
+    this.data=this.clone({company:companyState,employees:employeeState});
+  }
+}
+
+class ManualSimulationTimer{
+  constructor(){this.ticks=0;this.running=false;}
+  start(){this.running=true;}
+  stop(){this.running=false;}
+  tick(context,minutes=5){
+    assertIsolatedValidationEnvironment(context);
+    this.ticks+=Math.max(1,Math.floor(minutes/5));
+    simulateMinutesInContext(context,minutes);
+  }
+}
+
+class IsolatedEventBus{
+  constructor(){this.events=[];}
+  emit(type,payload={}){this.events.push({type,payload});}
+}
+
+class SimulationContext{
+  constructor({company,employees,rng,runtimeIds,repository,timer,eventBus,services,mode}){
+    this.company=company;
+    this.employees=employees;
+    this.rng=rng;
+    this.runtimeIds=runtimeIds;
+    this.repository=repository;
+    this.timer=timer;
+    this.eventBus=eventBus;
+    this.services=services||{};
+    this.mode=mode||"live";
+    this.isIsolatedValidation=this.mode==="isolated-validation";
+    this.report=null;
+    this.id=`${this.mode}-${this.runtimeIds?.next?.()||"context"}`;
+  }
+}
+
+function assertIsolatedValidationEnvironment(context){
+  if(!context?.isIsolatedValidation||context.mode!=="isolated-validation"){
+    throw new Error("Balance validation cannot run inside the active company session.");
+  }
+}
+
 class ValidationSession{
   constructor(repository,timerService){this.repository=repository;this.timerService=timerService;this.snapshot=null;}
   begin(){

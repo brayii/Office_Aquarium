@@ -7,9 +7,11 @@ const CUSTOMER_SEGMENT_DEFS={
 };
 function defaultCustomerSegmentState(id,count=0,sentiment=null){
   const d=CUSTOMER_SEGMENT_DEFS[id]||CUSTOMER_SEGMENT_DEFS.enterprise,base=Number.isFinite(sentiment)?sentiment:(company.customerSentiment??company.trust??55);
-  return {activeCustomers:Math.max(0,Math.round(count)),prospects:Math.round(12+d.weight*55),sentiment:clamp(base,0,100),trust:clamp(company.trust??base,0,100),productFit:clamp(48+(company.integration||20)*.25+(company.quality||40)*.15,0,100),switchingCost:d.switching,priceSensitivity:Math.round(42+d.price*24),supportSatisfaction:clamp(base-2,0,100),reliabilitySatisfaction:clamp(company.quality??base,0,100),roadmapConfidence:clamp(company.trust??base,0,100),churnRisk:0,expansionPotential:0,contractValue:d.contractValue,recentExperiences:[],currentIssues:[],lastUpdatedDay:company.day||0};
+  return {activeCustomers:Math.max(0,Math.round(count)),prospects:Math.round(12+d.weight*55),sentiment:clamp(base,0,100),retentionOutlook:clamp(base+(d.switching-50)*.22,0,100),trust:clamp(company.trust??base,0,100),productFit:clamp(48+(company.integration||20)*.25+(company.quality||40)*.15,0,100),switchingCost:d.switching,priceSensitivity:Math.round(42+d.price*24),supportSatisfaction:clamp(base-2,0,100),reliabilitySatisfaction:clamp(company.quality??base,0,100),roadmapConfidence:clamp(company.trust??base,0,100),churnRisk:0,expansionPotential:0,contractValue:d.contractValue,productExposure:{},recentExperiences:[],currentIssues:[],lastUpdatedDay:company.day||0};
 }
 function ensureCustomerMarketSystems(){
+  company.customerProductExposure=company.customerProductExposure&&typeof company.customerProductExposure==="object"?company.customerProductExposure:{};
+  company.departmentCapabilities={customerSuccess:0,support:0,technicalSupport:0,onboardingSupport:0,accountManagement:0,...(company.departmentCapabilities||{})};
   company.customerExperiences=Array.isArray(company.customerExperiences)?company.customerExperiences:[];
   company.customerLearningEpisodes=Array.isArray(company.customerLearningEpisodes)?company.customerLearningEpisodes:[];
   company.nextCustomerExperienceId=Math.max(1,Number(company.nextCustomerExperienceId)||1);
@@ -28,24 +30,78 @@ function ensureCustomerMarketSystems(){
       company.customerSegments[id]={...defaultCustomerSegmentState(id,0,company.customerSentiment),...company.customerSegments[id]};
       company.customerSegments[id].recentExperiences=Array.isArray(company.customerSegments[id].recentExperiences)?company.customerSegments[id].recentExperiences:[];
       company.customerSegments[id].currentIssues=Array.isArray(company.customerSegments[id].currentIssues)?company.customerSegments[id].currentIssues:[];
+      company.customerSegments[id].productExposure=company.customerSegments[id].productExposure&&typeof company.customerSegments[id].productExposure==="object"?company.customerSegments[id].productExposure:{};
     }
+    company.customerProductExposure[id]={...(company.customerProductExposure[id]||{}),...(company.customerSegments[id].productExposure||{})};
+    company.customerSegments[id].productExposure=company.customerProductExposure[id];
   }
   syncCustomerSummaryFromSegments();
 }
 function syncCustomerSummaryFromSegments(){
   const segs=Object.values(company.customerSegments||{}),total=segs.reduce((s,x)=>s+(Number(x.activeCustomers)||0),0);
   company.customers=Math.max(0,Math.round(total));
-  const weighted=segs.reduce((s,x)=>s+(Number(x.activeCustomers)||0)*((Number(x.sentiment)||50)*.55+(Number(x.trust)||50)*.25+(100-(Number(x.churnRisk)||0))*.20),0);
+  const weighted=segs.reduce((s,x)=>s+(Number(x.activeCustomers)||0)*((Number(x.sentiment)||50)*.72+(Number(x.trust)||50)*.28),0);
   company.customerSentiment=Math.round(clamp(total?weighted/Math.max(1,total):(company.customerSentiment??company.trust??50),0,100));
+}
+function updateRetentionOutlook(seg){
+  seg.retentionOutlook=clamp((seg.sentiment||50)*.32+(seg.trust||50)*.18+(seg.switchingCost||50)*.24+(100-(seg.churnRisk||0))*.18+(seg.contractValue||0)*600,0,100);
+  return seg.retentionOutlook;
+}
+function syncCustomerExposure(segmentId,projectId,exposure={}){
+  if(!segmentId||!projectId)return null;
+  ensureCustomerMarketSystems();
+  const seg=company.customerSegments[segmentId];if(!seg)return null;
+  const prev=seg.productExposure?.[projectId]||{};
+  const rec={usageShare:clamp(Number(exposure.usageShare??prev.usageShare??.35),0,1),contractShare:clamp(Number(exposure.contractShare??prev.contractShare??.30),0,1),dependency:clamp(Number(exposure.dependency??prev.dependency??.45),0,1),publicVisibility:clamp(Number(exposure.publicVisibility??prev.publicVisibility??.35),0,1)};
+  seg.productExposure={...(seg.productExposure||{}),[projectId]:rec};
+  company.customerProductExposure[segmentId]={...(company.customerProductExposure[segmentId]||{}),[projectId]:rec};
+  return rec;
+}
+function projectForCustomerSource(sourceId=""){
+  return [...(company.projects||[]),...(company.projectArchive||[]),...(company.projectProposals||[])].find(p=>p.id===sourceId)||null;
+}
+function segmentProductExperience(seg){
+  const entries=Object.entries(seg.productExposure||{});
+  if(!entries.length)return null;
+  let weight=0,quality=0,delivery=0,roadmap=0,support=0;
+  for(const [projectId,exposure] of entries){
+    const p=projectForCustomerSource(projectId);if(!p)continue;
+    const w=clamp((exposure.usageShare||0)*.38+(exposure.contractShare||0)*.24+(exposure.dependency||0)*.24+(exposure.publicVisibility||0)*.14,0,1);
+    weight+=w;
+    quality+=w*Number(p.performance?.quality??p.quality??company.quality??50);
+    delivery+=w*Number(p.performance?.executionHealth??p.performance?.staffingCoverage??projectVisibleHealth?.(p)??55);
+    roadmap+=w*Number(p.performance?.strategicConfidence??p.visibleConfidence??50);
+    support+=w*Number(p.performance?.riskTrend??p.visibleRisk??40);
+  }
+  if(weight<=0)return null;
+  return {quality:quality/weight,delivery:delivery/weight,roadmap:roadmap/weight,supportLoad:support/weight,weight};
+}
+function updateDepartmentCapabilities(){
+  ensureCustomerMarketSystems();
+  const active=employees.filter(e=>e.active);
+  const roleValue={ProductManager:{customerSuccess:6,accountManagement:4,onboardingSupport:2},QAEngineer:{technicalSupport:4,support:2},VerificationEngineer:{technicalSupport:3},SoftwareLead:{technicalSupport:3},FinanceAnalyst:{accountManagement:1}};
+  const caps={customerSuccess:0,support:0,technicalSupport:0,onboardingSupport:0,accountManagement:0};
+  active.forEach(e=>{
+    const key=String(e.role||"").replace(/\s+/g,"");
+    const v=roleValue[key]||{};
+    Object.keys(caps).forEach(k=>caps[k]+=Number(v[k])||0);
+  });
+  company.departmentCapabilities=Object.fromEntries(Object.entries(caps).map(([k,v])=>[k,Math.round(clamp(v+(company.culture?.communication||50)*.08-avgStress()*.04,0,100))]));
+  return company.departmentCapabilities;
+}
+function customerSupportCapacity(){
+  const c=updateDepartmentCapabilities();
+  return clamp(34+(c.customerSuccess||0)*1.6+(c.support||0)*1.3+(c.technicalSupport||0)*.95+(c.onboardingSupport||0)*.75+(c.accountManagement||0)*.7,0,100);
 }
 function customerSegmentScore(seg,type){
   const unresolved=(seg.currentIssues||[]).filter(i=>!i.resolved).reduce((s,i)=>s+(i.severity||0),0)/Math.max(1,(seg.currentIssues||[]).length||1);
   const competitor=company.market?.competitorHeat||50,pricePressure=(company.worldState?.customerBudgetClimate<42?58:38)+(seg.priceSensitivity||50)*.15;
+  const retention=Number.isFinite(seg.retentionOutlook)?seg.retentionOutlook:updateRetentionOutlook(seg);
   const quality=(seg.reliabilitySatisfaction||50)*.35+(seg.supportSatisfaction||50)*.25+(seg.productFit||50)*.20+(seg.roadmapConfidence||50)*.20;
   if(type==="adopt")return quality+(company.market?.hardwareDemand||50)*.18+(company.market?.aiDemand||50)*.16-(competitor-50)*.22-pricePressure*.16;
-  if(type==="renew")return quality+(seg.switchingCost||50)*.22-unresolved*.35-pricePressure*.13;
+  if(type==="renew")return quality*.72+retention*.38-unresolved*.35-pricePressure*.13;
   if(type==="expand")return quality+(seg.expansionPotential||0)*.35+(company.trust||50)*.12-unresolved*.30;
-  if(type==="leave")return unresolved*.55+competitor*.20+pricePressure*.25-(seg.switchingCost||50)*.28-(seg.trust||50)*.22;
+  if(type==="leave")return unresolved*.55+competitor*.20+pricePressure*.25-(retention||50)*.36-(seg.trust||50)*.12;
   return quality-unresolved*.25;
 }
 function customerSegmentUtilities(seg){
@@ -64,11 +120,14 @@ function customerSegmentUtilities(seg){
 function recordCustomerExperience(segmentId,type,severity,description,sourceId="",isPublic=false){
   ensureCustomerMarketSystems();
   const seg=company.customerSegments[segmentId]||company.customerSegments.enterprise;
-  const rec={id:company.nextCustomerExperienceId++,day:company.day,segmentId,type,severity:Math.round(clamp(severity,0,100)),sourceId,public:!!isPublic,description,resolved:false,resolutionDay:null};
+  const project=projectForCustomerSource(sourceId);
+  const exposure=project?syncCustomerExposure(segmentId,project.id):null;
+  const rec={id:company.nextCustomerExperienceId++,day:company.day,segmentId,type,severity:Math.round(clamp(severity,0,100)),sourceId,projectId:project?.id||null,productExposureWeight:exposure?Number(((exposure.usageShare+exposure.contractShare+exposure.dependency+exposure.publicVisibility)/4).toFixed(2)):0,public:!!isPublic,description,resolved:false,resolutionDay:null};
   company.customerExperiences.unshift(rec);
   company.customerExperiences=company.customerExperiences.slice(0,220);
   seg.recentExperiences=[rec,...(seg.recentExperiences||[])].slice(0,8);
   if(severity>=55)seg.currentIssues=[rec,...(seg.currentIssues||[])].slice(0,6);
+  updateRetentionOutlook(seg);
   return rec;
 }
 function addCustomersToSegment(segmentId,count,reason="customer acquisition",sourceId=""){
@@ -76,6 +135,8 @@ function addCustomersToSegment(segmentId,count,reason="customer acquisition",sou
   const seg=company.customerSegments[segmentId]||company.customerSegments.enterprise;
   const n=Math.max(0,Math.round(count));
   if(!n)return;
+  const project=projectForCustomerSource(sourceId);
+  if(project)syncCustomerExposure(segmentId,project.id,{usageShare:clamp(.18+n*.015,0,1),contractShare:clamp(.14+n*.012,0,1),dependency:String(project.family||"").includes("legacy")?0.55:0.42,publicVisibility:.52});
   seg.activeCustomers=Math.max(0,Math.round((seg.activeCustomers||0)+n));
   seg.prospects=Math.max(0,Math.round((seg.prospects||0)-Math.min(n,seg.prospects||0)));
   seg.trust=clamp((seg.trust||50)+Math.min(5,n*.18),0,100);
@@ -103,15 +164,15 @@ function applyCustomerDelta(delta,reason="CEO decision",sourceId="decision"){
 function calculateCustomerRevenueDaily(){
   ensureCustomerMarketSystems();
   return Number(Object.entries(company.customerSegments||{}).reduce((sum,[id,seg])=>{
-    const use=clamp((seg.sentiment||50)*.006+(seg.trust||50)*.004+(100-(seg.churnRisk||0))*.002,.45,1.35);
+    updateRetentionOutlook(seg);
+    const use=clamp((seg.sentiment||50)*.005+(seg.trust||50)*.003+(seg.retentionOutlook||50)*.003,.45,1.35);
     const reliability=clamp((seg.reliabilitySatisfaction||50)/70,.55,1.25);
     return sum+(seg.activeCustomers||0)*(seg.contractValue||CUSTOMER_SEGMENT_DEFS[id]?.contractValue||.002)*use*reliability;
   },0).toFixed(4));
 }
 function processCustomerLocalResponses(){
   ensureCustomerMarketSystems();
-  const productStaff=employees.filter(e=>e.active&&["Product Manager","QA Engineer","Verification Engineer","Software Lead"].includes(e.role)).length;
-  const supportCapacity=clamp(48+productStaff*7+(company.culture?.communication||50)*.22-avgStress()*.18,0,100);
+  const supportCapacity=customerSupportCapacity();
   for(const [id,seg] of Object.entries(company.customerSegments||{})){
     const label=CUSTOMER_SEGMENT_DEFS[id]?.label||"Customer";
     const issues=(seg.currentIssues||[]).filter(i=>!i.resolved);
@@ -126,7 +187,8 @@ function processCustomerLocalResponses(){
         seg.supportSatisfaction=clamp((seg.supportSatisfaction||50)+Math.max(1,8-(issue.severity||50)/14),0,100);
         seg.sentiment=clamp((seg.sentiment||50)+Math.max(.4,5-(issue.severity||50)/18),0,100);
         seg.churnRisk=clamp((seg.churnRisk||0)-Math.max(2,10-(issue.severity||50)/10),0,100);
-        company.customerLocalResponses.unshift({day:company.day,segmentId:id,type:"resolved",issueType:issue.type,severity:issue.severity,description:`${label} ${issue.type} handled locally by customer-facing teams.`});
+        updateRetentionOutlook(seg);
+        company.customerLocalResponses.unshift({day:company.day,segmentId:id,type:"resolved",interventionType:"temporary-support-coverage",source:"customer-local-response",issueType:issue.type,severity:issue.severity,description:`${label} ${issue.type} handled locally by customer-facing teams.`});
       }else if(age>=7&&issue.severity>=62&&simulationRandom()<0.18){
         seg.churnRisk=clamp((seg.churnRisk||0)+2.5,0,100);
         seg.sentiment=clamp((seg.sentiment||50)-1.2,0,100);
@@ -140,17 +202,23 @@ function processCustomerLocalResponses(){
 function updateCustomerMarketDaily(){
   ensureCustomerMarketSystems();
   const publicQuality=clamp((company.quality||50)*.45+(company.trust||50)*.25+(company.manufacturing?.yield||50)*.15+(company.integration||50)*.15,0,100);
-  const supportCapacity=clamp(70-avgStress()*.22+(company.culture?.communication||50)*.20+(employees.filter(e=>e.active&&["Product Manager","QA Engineer"].includes(e.role)).length*5),0,100);
+  const supportCapacity=customerSupportCapacity();
   const delivery=clamp((company.manufacturing?.readiness||50)*.35+(company.manufacturing?.capacity||50)*.25+(100-(company.manufacturing?.supplyRisk||40))*.25+(company.phase==="launched"?8:0),0,100);
   for(const [id,seg] of Object.entries(company.customerSegments)){
     const d=CUSTOMER_SEGMENT_DEFS[id]||CUSTOMER_SEGMENT_DEFS.enterprise;
-    const experience=clamp(publicQuality*d.reliability*.40+supportCapacity*d.support*.24+delivery*.18+(company.trust||50)*.18-(company.market?.competitorHeat||50)*.10,0,100);
-    seg.reliabilitySatisfaction=clamp((seg.reliabilitySatisfaction||50)*.90+publicQuality*.10,0,100);
+    const productExperience=segmentProductExperience(seg);
+    const segmentQuality=productExperience?productExperience.quality:publicQuality;
+    const segmentDelivery=productExperience?productExperience.delivery:delivery;
+    const segmentRoadmap=productExperience?productExperience.roadmap:((company.trust||50)*.55+(company.integration||50)*.25+(company.marketConfidence||50)*.20);
+    const segmentSupportDrag=productExperience?Math.max(0,(productExperience.supportLoad||0)-55)*.08:0;
+    const experience=clamp(segmentQuality*d.reliability*.40+supportCapacity*d.support*.24+segmentDelivery*.18+(company.trust||50)*.18-(company.market?.competitorHeat||50)*.10-segmentSupportDrag,0,100);
+    seg.reliabilitySatisfaction=clamp((seg.reliabilitySatisfaction||50)*.90+segmentQuality*.10,0,100);
     seg.supportSatisfaction=clamp((seg.supportSatisfaction||50)*.88+supportCapacity*.12,0,100);
-    seg.roadmapConfidence=clamp((seg.roadmapConfidence||50)*.91+((company.trust||50)*.55+(company.integration||50)*.25+(company.marketConfidence||50)*.20)*.09,0,100);
+    seg.roadmapConfidence=clamp((seg.roadmapConfidence||50)*.91+segmentRoadmap*.09,0,100);
     seg.productFit=clamp((seg.productFit||50)*.92+((company.market?.aiDemand||50)*.28+(company.market?.hardwareDemand||50)*.28+(company.software||50)*.20+(company.chip||50)*.24)*.08,0,100);
     seg.sentiment=clamp((seg.sentiment||50)*.90+experience*.10,0,100);
     seg.trust=clamp((seg.trust||50)*.94+((company.trust||50)*.6+experience*.4)*.06,0,100);
+    updateRetentionOutlook(seg);
     const leave=customerSegmentScore(seg,"leave"),adopt=customerSegmentScore(seg,"adopt"),expand=customerSegmentScore(seg,"expand");
     seg.churnRisk=clamp(seg.churnRisk*.82+Math.max(0,leave-52)*.18,0,100);
     seg.expansionPotential=clamp(seg.expansionPotential*.84+Math.max(0,expand-58)*.16,0,100);
@@ -197,7 +265,7 @@ function maybeCreateCustomerLearningEpisode(){
   if(company.customerLearningEpisodes.some(e=>e.key===key))return;
   const comparisonSegments=Object.keys(company.customerSegments||{}).filter(id=>id!==risk[0]).slice(0,3);
   const recentIds=(risk[1].recentExperiences||[]).slice(0,4).map(e=>e.id);
-  company.customerLearningEpisodes.push({id:company.nextCustomerLearningEpisodeId++,key,type:"segment-risk",interventionType:"local-response",startedDay:company.day,affectedSegments:[risk[0]],comparisonSegments,customerExperienceIds:recentIds,baseline:{sentiment:risk[1].sentiment,customers:risk[1].activeCustomers,churnRisk:risk[1].churnRisk,comparisons:Object.fromEntries(comparisonSegments.map(id=>[id,{sentiment:company.customerSegments[id]?.sentiment||50,customers:company.customerSegments[id]?.activeCustomers||0,churnRisk:company.customerSegments[id]?.churnRisk||0}]))},baselineSentiment:risk[1].sentiment,baselineCustomers:risk[1].activeCustomers,actions:["local response"],reviewDays:[company.day+7,company.day+21,company.day+45],reviewWindows:["short","medium","long"],observations:[],status:"open"});
+  company.customerLearningEpisodes.push({id:company.nextCustomerLearningEpisodeId++,key,type:"segment-risk",interventionType:"temporary-support-coverage",interventionSource:"customer-success-local",startedDay:company.day,affectedSegments:[risk[0]],affectedProjects:Object.keys(risk[1].productExposure||{}),comparisonSegments,customerExperienceIds:recentIds,baseline:{sentiment:risk[1].sentiment,retentionOutlook:risk[1].retentionOutlook,customers:risk[1].activeCustomers,churnRisk:risk[1].churnRisk,comparisons:Object.fromEntries(comparisonSegments.map(id=>[id,{sentiment:company.customerSegments[id]?.sentiment||50,retentionOutlook:company.customerSegments[id]?.retentionOutlook||50,customers:company.customerSegments[id]?.activeCustomers||0,churnRisk:company.customerSegments[id]?.churnRisk||0}]))},baselineSentiment:risk[1].sentiment,baselineCustomers:risk[1].activeCustomers,actions:["temporary-support-coverage"],reviewDays:[company.day+7,company.day+21,company.day+45],reviewWindows:["short","medium","long"],observations:[],outcomes:[],attributionQuality:0,status:"open"});
 }
 function reviewCustomerLearningEpisodes(){
   ensureCustomerMarketSystems();
@@ -211,7 +279,8 @@ function reviewCustomerLearningEpisodes(){
       ep.observations.push({reviewDay:day,window,sentimentDelta:Number(sentimentDelta.toFixed(1)),comparisonDelta:Number(comparisonDelta.toFixed(1)),attributableDelta:Number(attributableDelta.toFixed(1)),customerDelta});
       if(window!=="short"&&(Math.abs(attributableDelta)>=5||Math.abs(customerDelta)>=3)){
         const positive=sentimentDelta>=0&&customerDelta>=0;
-        createOrReinforceLesson({key:`customer.launch-support-${positive?"retention":"churn"}-${ep.affectedSegments?.[0]}`,title:positive?"Customer recovery can protect retention when handled locally.":"Unresolved customer pressure can turn into churn.",department:"product",vector:{customerValidation:positive?0.5:-0.35,planning:0.35,escalation:positive?0.2:0.55},outcome:positive?"positive":"negative",confidence:65,evidence:`${CUSTOMER_SEGMENT_DEFS[ep.affectedSegments?.[0]]?.label||"Customer"} episode reviewed against comparison segments`,importance:4,episodeKey:`customer-episode-${ep.id}`,attributionQuality:window==="long"?76:64,reviewWindow:window});
+        ep.outcomes=[...(ep.outcomes||[]),positive?"recovered":"not-recovered"];ep.attributionQuality=window==="long"?76:64;
+        createOrReinforceLesson({key:`customer.${ep.interventionType}-${positive?"retention":"churn"}-${ep.affectedSegments?.[0]}`,title:positive?"Customer recovery can protect retention when the intervention matches the issue.":"Unresolved customer pressure can turn into churn.",department:"product",vector:{customerValidation:positive?0.5:-0.35,planning:0.35,escalation:positive?0.2:0.55},outcome:positive?"positive":"negative",confidence:65,evidence:`${CUSTOMER_SEGMENT_DEFS[ep.affectedSegments?.[0]]?.label||"Customer"} ${ep.interventionType} episode reviewed against comparison segments`,importance:4,episodeKey:`customer-episode-${ep.id}`,attributionQuality:window==="long"?76:64,reviewWindow:window});
         if(window==="long")ep.status="resolved";
       }
     });
@@ -222,12 +291,13 @@ function customerMarketDebugHtml(){
   ensureCustomerMarketSystems();
   const segments=Object.entries(company.customerSegments).map(([id,s])=>{
     const u=customerSegmentUtilities(s);
-    return `${CUSTOMER_SEGMENT_DEFS[id]?.label||id}: customers ${Math.round(s.activeCustomers||0)}, prospects ${Math.round(s.prospects||0)}, sentiment ${Math.round(s.sentiment||0)}, churn risk ${Math.round(s.churnRisk||0)}, expansion ${Math.round(s.expansionPotential||0)}<br>Utility adopt ${u.adopt}, renew ${u.renew}, expand ${u.expand}, wait ${u.wait}, reduce ${u.reduceUsage}, complain ${u.complain}, leave ${u.leave}<br>Recent: ${(s.recentExperiences||[]).slice(0,2).map(e=>e.type+" "+e.severity+(e.resolved?" resolved":"")).join(", ")||"none"}`;
+    return `${CUSTOMER_SEGMENT_DEFS[id]?.label||id}: customers ${Math.round(s.activeCustomers||0)}, prospects ${Math.round(s.prospects||0)}, sentiment ${Math.round(s.sentiment||0)}, retention outlook ${Math.round(s.retentionOutlook||0)}, churn risk ${Math.round(s.churnRisk||0)}, expansion ${Math.round(s.expansionPotential||0)}<br>Exposure: ${Object.keys(s.productExposure||{}).join(", ")||"none"}<br>Utility adopt ${u.adopt}, renew ${u.renew}, expand ${u.expand}, wait ${u.wait}, reduce ${u.reduceUsage}, complain ${u.complain}, leave ${u.leave}<br>Recent: ${(s.recentExperiences||[]).slice(0,2).map(e=>e.type+" "+e.severity+(e.resolved?" resolved":"")).join(", ")||"none"}`;
   }).join("<hr>");
   const responses=(company.customerLocalResponses||[]).slice(0,4).map(r=>`Day ${r.day}: ${r.description}`).join("<br>")||"none";
   const episodes=(company.customerLearningEpisodes||[]).slice(0,4).map(e=>`${e.key||e.id}: ${e.status}, observations ${(e.observations||[]).length}`).join("<br>")||"none";
   const stats=company.customerMarketStats||{};
-  return `${segments}<br>Local responses<br>${responses}<br>Market actions acquired ${stats.acquired||0}, renewed ${stats.renewed||0}, expanded ${stats.expanded||0}, churned ${stats.churned||0}, complaints ${stats.complaints||0}.<br>Learning episodes ${(company.customerLearningEpisodes||[]).length}; experiences ${(company.customerExperiences||[]).length}; daily segment revenue $${calculateCustomerRevenueDaily().toFixed(3)}M.<br>Episode detail<br>${episodes}`;
+  const caps=company.departmentCapabilities||{};
+  return `${segments}<br>Department capabilities: Customer Success ${caps.customerSuccess||0}, Support ${caps.support||0}, Technical Support ${caps.technicalSupport||0}, Onboarding ${caps.onboardingSupport||0}, Account Management ${caps.accountManagement||0}<br>Local responses<br>${responses}<br>Market actions acquired ${stats.acquired||0}, renewed ${stats.renewed||0}, expanded ${stats.expanded||0}, churned ${stats.churned||0}, complaints ${stats.complaints||0}.<br>Learning episodes ${(company.customerLearningEpisodes||[]).length}; experiences ${(company.customerExperiences||[]).length}; daily segment revenue $${calculateCustomerRevenueDaily().toFixed(3)}M.<br>Episode detail<br>${episodes}`;
 }
 function customerStrategicPressure(){
   ensureCustomerMarketSystems();
@@ -260,10 +330,11 @@ function applyCustomerStrategyDecision(strategy){
   ensureCustomerMarketSystems();
   const seg=company.customerSegments[strategy.segmentId]||company.customerSegments.enterprise,label=CUSTOMER_SEGMENT_DEFS[strategy.segmentId]?.label||"Customer";
   const learningBaseline=typeof companyLearningBaseline==="function"?companyLearningBaseline():null;
-  if(strategy.mode==="recovery"){seg.sentiment=clamp((seg.sentiment||50)+6,0,100);seg.trust=clamp((seg.trust||50)+5,0,100);seg.churnRisk=clamp((seg.churnRisk||0)-14,0,100);recordCustomerExperience(strategy.segmentId,"rapid-resolution",35,`${label} customers received a bounded recovery commitment.`,"ceo-customer",true);}
-  else if(strategy.mode==="support"){seg.supportSatisfaction=clamp((seg.supportSatisfaction||50)+8,0,100);seg.churnRisk=clamp((seg.churnRisk||0)-9,0,100);recordCustomerExperience(strategy.segmentId,"rapid-resolution",30,`${label} support capacity improved after CEO approval.`,"ceo-support",false);}
-  else if(strategy.mode==="hold"){seg.roadmapConfidence=clamp((seg.roadmapConfidence||50)-4,0,100);seg.churnRisk=clamp((seg.churnRisk||0)+7,0,100);recordCustomerExperience(strategy.segmentId,"roadmap-slip",58,`${label} customers saw leadership hold the roadmap line instead of making special commitments.`,"ceo-focus",true);}
-  createLearningEpisode({domain:"customer",sourceId:`customer-strategy-${strategy.segmentId}`,decisionTitle:"Customer strategy",choiceTitle:strategy.mode,strategy:strategy.mode,department:"product",customerSegmentIds:[strategy.segmentId],baseline:learningBaseline,reviewSchedule:[company.day+7,company.day+21,company.day+45],hypotheses:[{strategy:strategy.mode,expected:"Customer outcome will be reviewed after support, renewal, and sentiment changes appear."}]});
+  const interventionType=strategy.mode==="support"?"support-staffing":strategy.mode==="recovery"?"account-outreach":"roadmap-communication";
+  if(strategy.mode==="recovery"){recordCustomerExperience(strategy.segmentId,"rapid-resolution",35,`${label} customers received a bounded recovery commitment.`,"ceo-customer",true);const target=company.customerSegments[strategy.segmentId]||seg;target.sentiment=clamp((target.sentiment||50)+6,0,100);target.trust=clamp((target.trust||50)+5,0,100);target.churnRisk=clamp((target.churnRisk||0)-14,0,100);updateRetentionOutlook(target);}
+  else if(strategy.mode==="support"){recordCustomerExperience(strategy.segmentId,"rapid-resolution",30,`${label} support capacity improved after CEO approval.`,"ceo-support",false);const target=company.customerSegments[strategy.segmentId]||seg;target.supportSatisfaction=clamp((target.supportSatisfaction||50)+8,0,100);target.churnRisk=clamp((target.churnRisk||0)-9,0,100);updateRetentionOutlook(target);}
+  else if(strategy.mode==="hold"){recordCustomerExperience(strategy.segmentId,"roadmap-slip",58,`${label} customers saw leadership hold the roadmap line instead of making special commitments.`,"ceo-focus",true);const target=company.customerSegments[strategy.segmentId]||seg;target.roadmapConfidence=clamp((target.roadmapConfidence||50)-4,0,100);target.churnRisk=clamp((target.churnRisk||0)+7,0,100);updateRetentionOutlook(target);}
+  createLearningEpisode({domain:"customer",sourceId:`customer-strategy-${strategy.segmentId}`,decisionTitle:"Customer strategy",choiceTitle:strategy.mode,strategy:strategy.mode,department:"product",customerSegmentIds:[strategy.segmentId],interventionType,baseline:learningBaseline,reviewSchedule:[company.day+7,company.day+21,company.day+45],hypotheses:[{strategy:strategy.mode,expected:"Customer outcome will be reviewed after support, renewal, and sentiment changes appear."}]});
   syncCustomerSummaryFromSegments();
 }
 function makeProjectCommercializationEvent(project){
@@ -341,6 +412,34 @@ function applyProjectCommercializationDecision(decision){
     recordHistory(`${p.title} was shelved after completion instead of commercialized.`,"project",4);
     recordWeeklyEvent(`${p.title} was shelved after commercial review.`,"project",4);
   }
+}
+
+function publicProjectObservation(project){
+  if(!project)return null;
+  return {id:project.id,title:project.title,status:project.status,progress:Math.round(project.progress||0),quality:Math.round(project.performance?.quality??project.quality??0),executionHealth:Math.round(project.performance?.executionHealth??projectVisibleHealth?.(project)??50),staffingCoverage:Math.round(project.performance?.staffingCoverage??100),riskTrend:Math.round(project.performance?.riskTrend??project.visibleRisk??0),customerInterest:Math.round(project.performance?.customerInterest??project.customerInterest??0),commercialStatus:project.commercialStatus||"not ready"};
+}
+function buildEmployeeObservation(employeeId){
+  const e=employees.find(x=>x.id===employeeId);if(!e)return null;
+  return {day:company.day,employeeId:e.id,role:e.role,team:employeeTeam(e),energy:Math.round(e.energy||0),stress:Math.round(e.stress||0),morale:Math.round(e.morale||0),focus:Math.round(e.focus||0),currentWork:activeWorkForEmployee?.(e)?.title||null,visibleCompany:{cashBand:company.cash<3?"low":company.cash<8?"tight":"adequate",phase:company.phase,trust:Math.round(company.trust||0)},knownMessages:(e.knownMessages||[]).slice(0,5).map(m=>({subject:m.subject,source:m.source||m.from,reliability:m.reliability}))};
+}
+function buildManagerObservation(departmentId){
+  const team=company.teams?.[departmentId]||{};
+  const members=employees.filter(e=>e.active&&employeeTeam(e)===departmentId);
+  return {day:company.day,departmentId,staff:members.length,avgStress:Math.round(members.reduce((s,e)=>s+(e.stress||0),0)/Math.max(1,members.length)),backlog:Math.round(team.backlog||0),blockedWork:Math.round(team.blockedWork||0),pressure:Math.round(team.pressure||0),currentPriority:team.currentPriority||"delivery",projects:(company.projects||[]).filter(p=>(p.requiredDepartments||[]).includes(departmentId)).map(publicProjectObservation)};
+}
+function buildCustomerSuccessObservation(segmentId){
+  ensureCustomerMarketSystems();
+  const seg=company.customerSegments[segmentId];if(!seg)return null;
+  return {day:company.day,segmentId,label:CUSTOMER_SEGMENT_DEFS[segmentId]?.label||segmentId,activeCustomers:Math.round(seg.activeCustomers||0),sentiment:Math.round(seg.sentiment||0),retentionOutlookBand:(seg.retentionOutlook||0)>70?"strong":(seg.retentionOutlook||0)>45?"mixed":"weak",supportSatisfaction:Math.round(seg.supportSatisfaction||0),openIssues:(seg.currentIssues||[]).filter(i=>!i.resolved).map(i=>({id:i.id,type:i.type,severity:i.severity,projectId:i.projectId||null,public:i.public})),productExposure:Object.fromEntries(Object.entries(seg.productExposure||{}).map(([projectId,e])=>[projectId,{usageShare:e.usageShare,contractShare:e.contractShare,dependency:e.dependency,publicVisibility:e.publicVisibility}]))};
+}
+function buildInvestorRelationsObservation(){
+  return {day:company.day,valuation:Math.round(company.valuation||0),valuationTrend:valuationTrendLabel?.()||"unknown",investorConfidence:Math.round(company.shareholders?.confidence||company.board||0),boardConfidence:Math.round(company.board||0),pressure:Math.round(company.shareholders?.pressure||0),cash:Math.round(company.cash||0),publicRisks:(buildExecutiveIntelligenceSnapshot?.().topRisks||[]).slice(0,4).map(r=>({title:r.title,detail:r.detail,sourceIds:r.sourceIds||[]}))};
+}
+function buildBoardObservation(){
+  return {...buildInvestorRelationsObservation(),governanceStrikes:company.boardGovernance?.strikes||0,ceoPipActive:!!company.boardGovernance?.pipActive,crisis:company.crisis?{type:company.crisis.type,failureOwner:company.crisis.failureOwner,deadlineDay:company.crisis.deadlineDay,currentProgress:company.crisis.currentProgress}:null};
+}
+function buildCEOObservation(){
+  return {day:company.day,cash:Number((company.cash||0).toFixed(2)),board:Math.round(company.board||0),trust:Math.round(company.trust||0),customerSentiment:Math.round(company.customerSentiment||0),phase:company.phase,projects:(company.projects||[]).map(publicProjectObservation),inboxCount:(company.escalationQueue||[]).length+(company.pendingEvent?1:0),crisis:company.crisis?{type:company.crisis.type,visibleSignals:company.crisis.visibleSignals,recoveryCriteria:company.crisis.recoveryCriteria,deadlineDay:company.crisis.deadlineDay,currentProgress:company.crisis.currentProgress}:null};
 }
 
 class CustomerMarketSystem{

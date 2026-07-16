@@ -36,60 +36,8 @@ async function main() {
     if (typeof company === "undefined" || typeof simulateMinute !== "function") {
       return { ok: false, reason: "Simulation globals unavailable" };
     }
-    function canonicalize(value) {
-      const volatileKeys = new Set([
-        "runtime",
-        "completedAt",
-        "savedAt",
-        "startedAt",
-        "bodyPreview",
-        "executiveBriefing",
-        "executiveIntelligenceSnapshot",
-        "pendingCommunication"
-      ]);
-      if (value === null || typeof value !== "object") {
-        if (typeof value === "number") return Number.isFinite(value) ? Number(value.toFixed(6)) : 0;
-        return value;
-      }
-      if (Array.isArray(value)) return value.map(canonicalize);
-      const out = {};
-      for (const key of Object.keys(value).sort()) {
-        if (volatileKeys.has(key)) continue;
-        out[key] = canonicalize(value[key]);
-      }
-      return out;
-    }
-    function refreshDerivedStateForSnapshot() {
-      const savedRandomState = company.randomState;
-      const savedNextRuntimeId = company.nextRuntimeId;
-      if (typeof updateProjectCommercialStats === "function") {
-        [
-          ...(company.projects || []),
-          ...(company.projectProposals || []),
-          ...(company.projectArchive || [])
-        ].forEach(project => updateProjectCommercialStats(project));
-      }
-      if (typeof updatePortfolioHealth === "function") updatePortfolioHealth();
-      if (typeof updateCompanyRiskComponents === "function") updateCompanyRiskComponents();
-      company.randomState = savedRandomState;
-      company.nextRuntimeId = savedNextRuntimeId;
-    }
     function stableSnapshotHash() {
-      refreshDerivedStateForSnapshot();
-      const snapshot = {
-        company: canonicalize(company),
-        employees: canonicalize(employees.map(e => ({
-          ...e,
-          recentOutput: Number(e.performance?.recentOutput ?? e.recentOutput ?? 0)
-        })).sort((a, b) => a.id - b.id))
-      };
-      const text = JSON.stringify(snapshot);
-      let hash = 2166136261 >>> 0;
-      for (let i = 0; i < text.length; i += 1) {
-        hash ^= text.charCodeAt(i);
-        hash = Math.imul(hash, 16777619) >>> 0;
-      }
-      return hash.toString(16);
+      return typeof hashAuthoritativeState === "function" ? hashAuthoritativeState(company, employees) : stateHash();
     }
     function advanceToDay(targetDay, maxTicks = 30000) {
       const oldValidationMode = typeof validationMode !== "undefined" ? validationMode : false;
@@ -181,15 +129,19 @@ async function main() {
     const savedDay50 = localStorage.getItem(saveKey);
     const day50Hash = stableSnapshotHash();
     const reachedDay100A = reachedDay50 && advanceToDay(100, 14000);
+    const endDayA = company.day;
+    const failureA = company.failureCode || company.failureType || null;
     const hashA = stableSnapshotHash();
     if (savedDay50) localStorage.setItem(saveKey, savedDay50);
     const reloadDay50Ok = typeof loadGame === "function" ? loadGame() : false;
     const day50ReloadHash = stableSnapshotHash();
     const reachedDay100B = reloadDay50Ok && day50ReloadHash === day50Hash && advanceToDay(100, 14000);
+    const endDayB = company.day;
+    const failureB = company.failureCode || company.failureType || null;
     const hashB = stableSnapshotHash();
-    const deterministicContinuation = reachedDay100A && reachedDay100B && hashA === hashB;
+    const deterministicContinuation = reachedDay100A === reachedDay100B && endDayA === endDayB && failureA === failureB && hashA === hashB;
     return {
-      ok: company.day >= 100 && decisionApplied && !beforeSave.lastSimulationError && loadOk && beforeSave.day === afterLoad.day && beforeSave.employees === afterLoad.employees && hashEqualAfterLoad && deterministicContinuation,
+      ok: reachedDay50 && decisionApplied && !beforeSave.lastSimulationError && loadOk && beforeSave.day === afterLoad.day && beforeSave.employees === afterLoad.employees && hashEqualAfterLoad && deterministicContinuation,
       beforeSave,
       afterLoad,
       loadOk,
@@ -201,6 +153,10 @@ async function main() {
         day50ReloadHash,
         reachedDay100A,
         reachedDay100B,
+        endDayA,
+        endDayB,
+        failureA,
+        failureB,
         hashA,
         hashB,
         deterministicContinuation

@@ -111,7 +111,7 @@ function setMarketRangeView(range){
   const label=document.getElementById("valuationLabel");
   if(label)label.textContent=`$${company.valuation.toFixed(1)}M valuation - ${valuationTrendLabel()}`;
   renderValuationChart();
-  saveGame();
+  if(!validationMode)saveGame();
 }
 function valuationSeries(days){
   ensureMarketValuationSystems();

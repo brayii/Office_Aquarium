@@ -40,5 +40,9 @@ desktop.ini
 .agents/
 .codex/
 
+# Local Codex implementation specs
+OFFICE_AQUARIUM_CODEX_*.md
+OFFICE_AQUARIUM_V*_*.md
+
 # User-managed scratch/archive folder
 misc/

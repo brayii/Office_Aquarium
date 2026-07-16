@@ -23,25 +23,26 @@
         var(--surface);
     }
     button{font:inherit;-webkit-tap-highlight-color:rgba(42,183,169,.25)}
-    .app{width:min(1480px,calc(100% - 28px));margin:auto;padding:22px 0 32px}
+    .app{width:min(1320px,calc(100% - 24px));margin:auto;padding:16px 0 28px}
     .topbar,.panel-heading,.track-top,.employee-head,.clock-row{
       display:flex;align-items:center;justify-content:space-between;gap:14px
     }
-    .topbar{margin-bottom:16px}
+    .topbar{margin-bottom:10px}
     .eyebrow{margin:0 0 5px;color:var(--muted);font-size:.7rem;font-weight:850;letter-spacing:.12em;text-transform:uppercase}
     h1,h2,h3,p{margin-top:0}
-    h1{margin-bottom:0;font-size:clamp(2rem,5vw,4.4rem);line-height:.95}
+    h1{margin-bottom:0;font-size:clamp(2rem,4vw,3.15rem);line-height:.98}
     h2{margin-bottom:0;font-size:1.18rem}
     h3{margin-bottom:5px;font-size:.96rem}
     .glass,.panel,.metric,.decision,.employee-card,.track-card{
       background:rgba(255,255,255,.9);border:1px solid var(--line);box-shadow:var(--shadow)
     }
-    .top-status{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-    .pill{padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.9);min-width:120px}
+    .top-status{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+    .header-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+    .pill{padding:8px 11px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.9);min-width:108px}
     .pill span{display:block;color:var(--muted);font-size:.7rem;font-weight:800;text-transform:uppercase}
     .pill strong{display:block;margin-top:2px;font-size:1.05rem}
-    .main-grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(310px,.8fr);gap:16px}
-    .panel{border-radius:12px;padding:16px}
+    .main-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.85fr);gap:12px}
+    .panel{border-radius:10px;padding:13px}
     .office-panel{padding:12px}
     .office-toolbar{padding:4px 4px 12px}
     .clock-controls{display:flex;align-items:center;gap:8px}
@@ -53,7 +54,7 @@
     }
     .speed-btn.active{background:var(--night);color:#fff;border-color:var(--night)}
     .office{
-      position:relative;min-height:570px;overflow:hidden;border:1px solid #cbd8dc;border-radius:12px;
+      position:relative;min-height:460px;overflow:hidden;border:1px solid #cbd8dc;border-radius:12px;
       background:
         linear-gradient(rgba(255,255,255,.5),rgba(255,255,255,.5)),
         repeating-linear-gradient(0deg,#dce8e5 0 1px,transparent 1px 44px),
@@ -89,7 +90,7 @@
       font-size:.63rem;line-height:1.25;color:#425164;opacity:0;transition:opacity .2s;pointer-events:none
     }
     .agent:hover .thought,.agent.selected .thought{opacity:1}
-    .right-stack{display:grid;gap:16px;align-content:start}
+    .right-stack{display:grid;gap:12px;align-content:start}
     .metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
     .metric{padding:11px;border-radius:9px;box-shadow:none}
     .metric small{display:block;color:var(--muted);font-weight:800;font-size:.66rem;text-transform:uppercase}
@@ -115,10 +116,10 @@
     .bar{height:7px;margin-top:3px;border-radius:999px;background:#e6ecef;overflow:hidden}
     .bar span{display:block;height:100%;background:var(--aqua)}
     .bar.stress span{background:var(--coral)}
-    .bottom-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:16px;margin-top:16px;align-items:start}
+    .bottom-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:12px;margin-top:12px;align-items:start}
     .company-layout{align-items:start}
-    .section-stack{display:grid;gap:12px;align-content:start}
-    .tracks{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+    .section-stack{display:grid;gap:10px;align-content:start}
+    .tracks{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
     .track-card{padding:11px;border-radius:9px;box-shadow:none}
     .track-top span{color:var(--muted);font-size:.68rem;font-weight:800}
     .track-top strong{font-size:.88rem}
@@ -148,7 +149,7 @@
       background:#fff5f5;color:#7a271a
     }
     .crisis-box strong{display:block;margin-bottom:5px}
-    .crisis-box p{margin:0;line-height:1.4}
+    .crisis-box p{margin:0;line-height:1.4;white-space:pre-line}
     .game-over-overlay{
       position:fixed;inset:0;z-index:999;display:grid;place-items:center;padding:20px;
       background:rgba(23,32,42,.72);backdrop-filter:blur(4px)
@@ -183,6 +184,12 @@
     .employee-card.clickable{cursor:pointer}.employee-card.clickable:hover{border-color:var(--aqua)}
     .detail-modal{position:fixed;inset:0;background:rgba(10,20,32,.66);display:grid;place-items:center;z-index:100;padding:18px}
     .detail-card{width:min(520px,100%);max-height:85vh;overflow:auto;background:white;border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+    .guide-card{width:min(760px,100%);max-height:min(88vh,calc(100dvh - 36px));overflow:auto;background:white;border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+    .guide-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+    .guide-section{border:1px solid var(--line);border-radius:10px;background:#f8fbfb;padding:12px;line-height:1.42}
+    .guide-section strong{display:block;margin-bottom:5px}
+    .guide-section p{margin:0;color:#465668}
+    .guide-section ul{margin:0;padding-left:18px;color:#465668}
     .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.detail-grid div{padding:10px;border:1px solid var(--line);border-radius:10px}
     .phase-badge{display:inline-flex;padding:7px 10px;border-radius:999px;background:#edf8f6;border:1px solid #bfe5df;font-weight:800}
     .agent.offsite{opacity:.18;pointer-events:none}.agent.resigned{opacity:.08;filter:grayscale(1)}
@@ -310,7 +317,7 @@
       .confirm-actions{grid-template-columns:1fr}
     }
 
-    /* AI debug additions */
+    /* Modal and internal diagnostics */
     .modal-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
     .small-btn{border:1px solid var(--line);background:#f8fbfb;border-radius:9px;min-height:36px;padding:0 10px;font-weight:850;cursor:pointer}
     .small-btn.active{background:var(--night);color:#fff;border-color:var(--night)}
@@ -323,6 +330,9 @@
     .valuation-chart{width:100%;height:74px;display:block;grid-column:1 / -1;border:1px solid #d6e4e4;border-radius:8px;background:#fff}
     @media(max-width:680px){.market-strip{grid-template-columns:1fr}.market-range-control{justify-content:flex-start}.market-range-btn{flex:1 1 42px}}
     .briefing-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+    .company-toolbar{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+    .company-view-select{min-height:36px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:0 10px;font:inherit;font-weight:850;color:var(--ink)}
+    .view-hidden{display:none!important}
     .briefing-card{border:1px solid var(--line);border-radius:10px;background:#fff;padding:10px;min-width:0}
     .briefing-card strong{display:block;margin-bottom:5px}.briefing-card small{display:block;color:var(--muted);line-height:1.35}
     .intelligence-card{border:1px solid var(--line);border-radius:10px;background:#f8fbfb;padding:12px;color:#253447;line-height:1.45}
@@ -349,7 +359,7 @@
     .lesson-tag{padding:4px 7px;border-radius:999px;background:#edf8f6;border:1px solid #bfe5df;font-size:.65rem;font-weight:800;color:#286c65}
 
 @media(max-width:980px){.briefing-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    @media(max-width:560px){.briefing-grid{grid-template-columns:1fr}}
+    @media(max-width:560px){.briefing-grid,.guide-body{grid-template-columns:1fr}}
         @media(max-width:560px){.detail-card{width:96vw;max-height:92vh;overflow:auto}.modal-actions{justify-content:flex-start}.small-btn{flex:1 1 42%;min-width:112px}.story-thread{padding:9px}.story-beats{padding-left:16px}.insight-grid,.release-grid,.market-strip{grid-template-columns:1fr}}
 .debug-panel{margin-top:14px;padding:12px;border:1px dashed #9fb4c0;border-radius:12px;background:#f7fbfc}
     .debug-panel h3{margin:0 0 8px}.debug-panel code{font-size:.76rem;white-space:pre-wrap;word-break:break-word}
@@ -391,6 +401,25 @@
     <button class="primary" id="restartAfterLoss">Restart Company</button>
   </div>
 </div>
+<div id="guideModal" class="detail-modal hidden">
+  <div class="guide-card">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">Player Guide</p>
+        <h2>How to Read Office Aquarium</h2>
+      </div>
+      <button id="closeGuide" class="small-btn">Close</button>
+    </div>
+    <div class="guide-body">
+      <div class="guide-section"><strong>You are the CEO</strong><p>Employees choose their own work, ask for help, learn from outcomes, and escalate only the decisions that need executive authority.</p></div>
+      <div class="guide-section"><strong>Watch the office</strong><p>The Live Office shows what people are doing now. Quiet moments usually mean teams are handling work without needing you.</p></div>
+      <div class="guide-section"><strong>Use the CEO Inbox</strong><p>Email and memos are where you make decisions. Read the situation, compare the choices, and remember that advice can be imperfect.</p></div>
+      <div class="guide-section"><strong>Read Company views</strong><p>Overview is the daily dashboard. Projects shows portfolio pressure. Workforce shows hiring and staffing. Story shows history and consequences.</p></div>
+      <div class="guide-section"><strong>Lead indirectly</strong><ul><li>Set priorities through decisions.</li><li>Approve or delay headcount.</li><li>Protect quality, cash, people, or speed.</li><li>Let departments execute the details.</li></ul></div>
+      <div class="guide-section"><strong>Success is balance</strong><p>Cash matters, but so do trust, product health, customers, morale, board confidence, and the company's ability to recover from mistakes.</p></div>
+    </div>
+  </div>
+</div>
 <main class="app">
   <nav class="mobile-tabs" aria-label="Simulation sections">
     <button data-tab="office" class="active">Office</button><button data-tab="employees">Employees</button><button data-tab="inbox">CEO Inbox</button><button data-tab="company">Company</button><button data-tab="newspaper">Paper</button>
@@ -404,6 +433,7 @@
       <div class="pill"><span>Company Time</span><strong id="timeLabel">Mon 8:00 AM</strong></div>
       <div class="pill"><span>Cash</span><strong id="cashLabel">$18.0M</strong></div>
       <div class="pill"><span>Board Confidence</span><strong id="boardLabel">72</strong></div><div class="pill"><span>Company Risk</span><strong id="riskLabel">Stable</strong></div>
+      <button class="icon-btn" id="guideBtn">Guide</button>
     </div>
   </header>
 
@@ -476,9 +506,18 @@
     <section class="panel tab-section section-stack" data-section="company">
       <div class="panel-heading">
         <div><p class="eyebrow">Company Systems</p><h2>Operating Health</h2></div>
-        <div><span id="phaseLabel" class="phase-badge">Prototype</span> <strong id="valuationLabel">$42.0M valuation</strong><div class="save-note" id="saveNote">Autosave ready</div></div>
+        <div class="company-toolbar">
+          <label><span class="eyebrow" style="margin:0">View</span><select id="companyViewSelect" class="company-view-select" aria-label="Company view">
+            <option value="overview">Overview</option>
+            <option value="projects">Projects</option>
+            <option value="workforce">Workforce</option>
+            <option value="story">Story</option>
+            <option value="all" selected>All</option>
+          </select></label>
+          <div><span id="phaseLabel" class="phase-badge">Prototype</span> <strong id="valuationLabel">$42.0M valuation</strong><div class="save-note" id="saveNote">Autosave ready</div></div>
+        </div>
       </div>
-      <div class="market-strip">
+      <div class="market-strip" data-company-view="overview story all">
         <div><strong id="marketViewTitle">Valuation Trend</strong><small id="marketViewDetail">Daily view will appear after the first close.</small></div>
         <div class="market-range-control" aria-label="Valuation range">
           <button class="market-range-btn" data-market-range="1d">1D</button>
@@ -491,7 +530,7 @@
         </div>
         <canvas id="valuationChart" class="valuation-chart" width="620" height="92" aria-label="Valuation trend chart"></canvas>
       </div>
-<div class="tracks">
+<div class="tracks" data-company-view="overview story all">
         <div class="track-card"><div class="track-top"><span>Chip Project</span><strong id="chipText">22%</strong></div><div class="meter"><span id="chipBar"></span></div></div>
         <div class="track-card"><div class="track-top"><span>Software</span><strong id="softwareText">31%</strong></div><div class="meter"><span id="softwareBar"></span></div></div>
         <div class="track-card"><div class="track-top"><span>Morale</span><strong id="moraleText">74</strong></div><div class="meter"><span id="moraleBar"></span></div></div>
@@ -503,15 +542,15 @@
         <div class="track-card"><div class="track-top"><span>Team Cohesion</span><strong id="cohesionText">60</strong></div><div class="meter"><span id="cohesionBar"></span></div></div>
         <div class="track-card" title="A weighted estimate of customer satisfaction, trust, and willingness to continue doing business with the company."><div class="track-top"><span>Customer Sentiment</span><strong id="sentimentText">65</strong></div><div class="meter"><span id="sentimentBar"></span></div></div>
       </div>
-      <div class="briefing-grid" id="departmentBriefing"></div>
-      <div class="insight-grid" id="operationalDashboard"></div>
-      <button class="section-toggle" data-collapse-target="projectPortfolioWrap">Project Portfolio <small>projects, budget, staffing</small></button>
-      <div id="projectPortfolioWrap" class="compact-section"><div class="intelligence-card" id="projectPortfolio"></div></div>
-      <div id="workforcePressure" class="intelligence-card"></div>
-      <button class="section-toggle collapsed" data-collapse-target="internalReportsWrap">Internal Reports <small>employee signals</small></button>
-      <div id="internalReportsWrap" class="compact-section collapsed"><div id="internalReports" class="report-list compact-list"></div></div>
+      <div class="briefing-grid" id="departmentBriefing" data-company-view="overview workforce all"></div>
+      <div class="insight-grid" id="operationalDashboard" data-company-view="overview all"></div>
+      <button class="section-toggle" data-collapse-target="projectPortfolioWrap" data-company-view="projects all">Project Portfolio <small>projects, budget, staffing</small></button>
+      <div id="projectPortfolioWrap" class="compact-section" data-company-view="projects all"><div class="intelligence-card" id="projectPortfolio"></div></div>
+      <div id="workforcePressure" class="intelligence-card" data-company-view="workforce all"></div>
+      <button class="section-toggle collapsed" data-collapse-target="internalReportsWrap" data-company-view="workforce all">Internal Reports <small>employee signals</small></button>
+      <div id="internalReportsWrap" class="compact-section collapsed" data-company-view="workforce all"><div id="internalReports" class="report-list compact-list"></div></div>
     </section>
-    <section class="panel tab-section section-stack" data-section="company">
+    <section class="panel tab-section section-stack" data-section="company" data-company-view="story all">
       <p class="eyebrow">Emergent Events</p>
       <h2>Company Story</h2>
       <div id="organizationalDynamics" class="intelligence-card"></div>
@@ -539,7 +578,7 @@
   </section>
 </main>
 
-<div id="employeeModal" class="detail-modal hidden"><div class="detail-card"><div class="panel-heading"><h2 id="detailName">Employee</h2><div class="modal-actions"><button id="aiDebugToggle" class="small-btn">AI Debug</button><button id="balanceProjectionBtn" class="small-btn hidden">Balance Run</button><button id="balanceMatrixBtn" class="small-btn hidden">Balance Matrix</button><button id="closeEmployee" class="small-btn">Close</button></div></div><p id="detailRole"></p><div id="detailBody"></div></div></div>
+<div id="employeeModal" class="detail-modal hidden"><div class="detail-card"><div class="panel-heading"><h2 id="detailName">Employee</h2><div class="modal-actions"><button id="closeEmployee" class="small-btn">Close</button></div></div><p id="detailRole"></p><div id="detailBody"></div></div></div>
 
 <script src="src/services/runtime-services.js"></script>
 <script src="src/core/state-startup.js"></script>

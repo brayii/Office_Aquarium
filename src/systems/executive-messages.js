@@ -149,7 +149,7 @@ function concreteMemoEvidence(ev,comm,dept,msg=null){
   if(dept==="people"||eventCategory(ev)==="people"||/hire|staff|burnout|morale|retention|layoff|performance|coach/.test(text))lines.push(`${employees.filter(e=>e.active).length} employees are active, with ${qualitativeBand(avgStress(),{low:45,high:70,lowText:"manageable",midText:"elevated",highText:"high"})} workload pressure and ${employees.filter(e=>e.active&&(e.retentionRisk||0)>60).length} elevated retention case(s).`);
   if(dept==="quality"||eventCategory(ev)==="operations"||/quality|verify|defect|supplier|manufactur|launch|pilot/.test(text))lines.push(`Quality is ${qualitativeBand(company.quality,{low:50,high:75,lowText:"below target",midText:"mixed",highText:"healthy"})}, with ${Math.round(company.simulationMetrics?.counters?.qualityMistakes||0)} unresolved mistake(s) and ${qualitativeBand(company.manufacturing?.supplyRisk,{low:35,high:68,lowText:"limited",midText:"material",highText:"high"})} manufacturing risk.`);
   if(eventCategory(ev)==="customer"||dept==="customer success"||/customer|renewal|churn|support|segment/.test(text))lines.push(`The company has ${Math.round(company.customers||0)} customer${Math.round(company.customers||0)===1?"":"s"}, ${qualitativeBand(company.customerSentiment,{low:45,high:72,lowText:"weak",midText:"mixed",highText:"healthy"})} customer sentiment, and about $${calculateCustomerRevenueDaily().toFixed(3)}M in daily segment revenue.`);
-  if(eventCategory(ev)==="board"||/board|shareholder|pip|crisis|strategy/.test(text))lines.push(`The board sees ${qualitativeBand(ctx.board,{low:45,high:72,lowText:"weak",midText:"mixed",highText:"strong"})} confidence, ${qualitativeBand(ctx.trust,{low:45,high:72,lowText:"fragile",midText:"mixed",highText:"healthy"})} trust, and ${qualitativeBand(Math.min(company.cash/3,company.board/10,company.trust/10,(100-avgStress())/10)*10,{low:35,high:70,lowText:"high",midText:"material",highText:"limited"})} company risk.`);
+  if(eventCategory(ev)==="board"||/board|shareholder|pip|crisis|strategy/.test(text)){updateCompanyRiskComponents?.();lines.push(`The board sees ${qualitativeBand(ctx.board,{low:45,high:72,lowText:"weak",midText:"mixed",highText:"strong"})} confidence, ${qualitativeBand(ctx.trust,{low:45,high:72,lowText:"fragile",midText:"mixed",highText:"healthy"})} trust, and ${String(company.companyRiskComponents?.label||"Watch").toLowerCase()} company risk.`);}
   const snapshot=buildExecutiveIntelligenceSnapshot();
   const risk=(snapshot.topRisks||[]).find(r=>evidenceSignalIds(`${r.title} ${r.detail}`).some(id=>evidenceSignalIds(text).includes(id)))||snapshot.topRisks?.[0];
   const opportunity=(snapshot.topOpportunities||[]).find(o=>evidenceSignalIds(`${o.title} ${o.detail}`).some(id=>evidenceSignalIds(text).includes(id)));
@@ -818,17 +818,22 @@ function archiveCommunication(ev,choice,comm){
 function teamDisplayName(team){return {hardware:"Hardware",software:"Software",quality:"Quality",product:"Product",finance:"Finance",people:"People","customer success":"Customer Success",board:"Board",company:"Company"}[String(team||"").toLowerCase()]||team;}
 function departmentBriefingHtml(){
   ensureBibleSystems?.();
+  const allocation=typeof buildWorkforceAllocationSnapshot==="function"?buildWorkforceAllocationSnapshot():null;
   return ["hardware","software","product","finance"].map(team=>{
     const t=company.teams?.[team]||{},items=(company.workItems||[]).filter(w=>w.status==="open"&&w.assignedTeam===team).sort((a,b)=>(b.priority||0)-(a.priority||0));
     const top=items[0],members=employees.filter(e=>e.active&&employeeTeam(e)===team);
-    const blockers=items.reduce((s,w)=>s+(w.blockedBy?.length||0),0);
+    const row=allocation?.departments?.[team];
+    const blockers=row?row.observedBlockedWork:items.reduce((s,w)=>s+(w.blockedBy?.length||0),0);
     const lead=members.sort((a,b)=>(b.focus+b.morale)-(a.focus+a.morale))[0];
-    return `<div class="briefing-card"><strong>${teamDisplayName(team)}</strong><small>Priority: ${t.currentPriority||"delivery"}<br>Backlog ${t.backlog||items.length}, blocked ${t.blockedWork??blockers}<br>Pressure ${Math.round(t.pressure||0)}, defect risk ${Math.round(t.defectRisk||0)}<br>Coverage ${Math.round(t.knowledgeCoverage||0)}, staffing gap ${t.staffingGap||0}<br>${top?`Top work: ${top.title} - ${workStatusLabel(top)}`:"No open priority"}<br>${lead?`Signal: ${lead.name} sees ${lead.dailyBriefing?.knownBlockers?.length||0} blocker(s)`:"No active team member"}</small></div>`;
+    const staffing=row?`Department coverage ${row.departmentCoverage}%; project coverage ${row.projectCoverage}%; missing project staff ${row.missingAssignments}`:`Knowledge coverage ${Math.round(t.knowledgeCoverage||0)}%`;
+    const blockerLabel=row&&row.unreportedBlockedWork>0?`Reported blockers ${blockers}; manager awareness incomplete`:`Reported blockers ${blockers}`;
+    return `<div class="briefing-card"><strong>${teamDisplayName(team)}</strong><small>Priority: ${t.currentPriority||"delivery"}<br>Backlog ${t.backlog||items.length}; ${blockerLabel}<br>Pressure ${Math.round(t.pressure||0)}, defect risk ${Math.round(t.defectRisk||0)}<br>${staffing}<br>${top?`Top work: ${top.title} - ${workStatusLabel(top)}`:"No open priority"}<br>${lead?`Signal: ${lead.name} has ${lead.dailyBriefing?.knownBlockers?.length||0} reported blocker(s) in briefing`:"No active team member"}</small></div>`;
   }).join("");
 }
 function projectPortfolioHtml(){
   ensureProjectPortfolio();updatePortfolioHealth();
   const h=company.portfolioHealth,currentItems=[...company.projectProposals,...company.projects],archiveItems=[...(company.projectArchive||[])];
+  const allocation=typeof buildWorkforceAllocationSnapshot==="function"?buildWorkforceAllocationSnapshot():null;
   const projectStaffing=projectStaffingDetails();
   const projectCard=p=>{
     updateProjectCommercialStats(p);
@@ -853,10 +858,16 @@ function projectPortfolioHtml(){
       :p.status==="completed"?completedAction
       :p.status==="paused"?`<button class="small-btn" onclick="requestProjectDecision('${p.id}','resume')">Resume</button><button class="small-btn" onclick="requestProjectDecision('${p.id}','review')">Review</button><button class="small-btn" onclick="requestProjectDecision('${p.id}','cancel')">Cancel</button>`
       :`<button class="small-btn" onclick="requestProjectDecision('${p.id}','review')">Review</button><button class="small-btn" onclick="requestProjectDecision('${p.id}','pause')">Pause</button><button class="small-btn" onclick="requestProjectDecision('${p.id}','cancel')">Cancel</button>`;
-    const currentStaffingCoverage=Math.round(derivedStaffingCoverage(p));
+    const projectAllocation=allocation?.projects?.[p.id];
+    const currentStaffingCoverage=Math.round(projectAllocation?.coverage??derivedStaffingCoverage(p));
     const required=Object.values(p.requiredHeadcount||{}).reduce((a,b)=>a+(Number(b)||0),0),missing=projectStaffing.filter(x=>x.project.id===p.id),staffingRows=Object.entries(p.requiredHeadcount||{}).filter(([,n])=>Number(n)>0).map(([dept,need])=>`${teamDisplayName(dept)} ${Number(projectAllocatedFte(p,dept)).toFixed(1)}/${Number(need).toFixed(1)}`).join(", ");
     const missingText=missing.length?missing.map(x=>`+${x.missingFte} FTE ${x.role} (${teamDisplayName(x.dept)}, ${x.status})`).join("; "):"fully allocated";
-    return `<div class="briefing-card"><strong>${p.title}</strong><small>${p.family} | ${p.originType} | ${projectStatusLabel(p)}${lineage}<br>Current Execution Health: ${overall} (base ${healthBreakdown.base}; company ${healthBreakdown.companyModifier>=0?"+":""}${healthBreakdown.companyModifier}; staffing ${healthBreakdown.staffingModifier>=0?"+":""}${healthBreakdown.staffingModifier}; risk ${healthBreakdown.riskModifier})<br>Dependencies: ${dependencyText}<br>Progress ${Math.round(p.progress||0)}%; target ${p.estimatedDuration||"?"} day(s); pace ${paceLabel}; spend ${spend}<br>Timing: ${timing.short}; ${timing.status}; ${timing.confidenceLabel} confidence<br>Schedule ${perf.scheduleVariance??0}; budget ${perf.budgetVariance??0}; quality ${Math.round(perf.quality||p.quality||0)}; open work ${perf.backlogCount??0}; blockers ${perf.blockerCount??0}<br>Required staff ${required}; allocated ${staffingRows||"none"}; staffing ${currentStaffingCoverage}; overload ${Math.round(perf.workloadOverload||projectOverloadPressure(p))}; missing ${missingText}<br>Customer interest ${Math.round(perf.customerInterest||p.customerInterest||0)}; risk ${Math.round(perf.riskTrend||p.visibleRisk||0)}; confidence ${Math.round(perf.strategicConfidence||p.visibleConfidence||0)}<br>Commercial: ${commercialLabel}; readiness ${Math.round(p.commercialReadiness||0)}; potential ${Math.round(p.commercialPotential||0)}; ${commercialRevenueText}; customers ${Math.round(p.convertedCustomers||0)}<br>Recommendation: ${rec}</small><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${actions}</div></div>`;
+    const actualBlockers=projectAllocation?.actualBlockers??perf.blockerCount??0,observedBlockers=projectAllocation?.observedBlockers??actualBlockers;
+    const blockerText=actualBlockers===observedBlockers?`Reported blockers ${observedBlockers}`:`Reported blockers ${observedBlockers}; manager awareness incomplete`;
+    const targetDays=Number(p.estimatedDuration)||0;
+    const riskLabel=qualitativeBand(perf.riskTrend||p.visibleRisk||0,{low:35,high:70,lowText:"contained",midText:"visible",highText:"elevated"});
+    const confidenceLabel=qualitativeBand(perf.strategicConfidence||p.visibleConfidence||0,{low:40,high:70,lowText:"uncertain",midText:"developing",highText:"strong"});
+    return `<div class="briefing-card"><strong>${p.title}</strong><small>${p.family} | ${p.originType} | ${projectStatusLabel(p)}${lineage}<br>Current Execution Health: ${overall} (base ${healthBreakdown.base}; company ${healthBreakdown.companyModifier>=0?"+":""}${healthBreakdown.companyModifier}; staffing ${healthBreakdown.staffingModifier>=0?"+":""}${healthBreakdown.staffingModifier}; risk ${healthBreakdown.riskModifier})<br>Dependencies: ${dependencyText}<br>Progress ${Math.round(p.progress||0)}%; target ${targetDays||"?"} ${targetDays===1?"day":"days"}; pace ${paceLabel}; spend ${spend}<br>Timing: ${timing.short}; ${timing.status}; ${timing.confidenceLabel} confidence<br>Schedule ${perf.scheduleVariance??0}; budget ${perf.budgetVariance??0}; quality ${Math.round(perf.quality||p.quality||0)}; open work ${perf.backlogCount??0}; ${blockerText}<br>Required staff ${required}; allocated ${staffingRows||"none"}; project coverage ${currentStaffingCoverage}%; overload ${Math.round(perf.workloadOverload||projectOverloadPressure(p))}; missing ${missingText}<br>Customer interest ${Math.round(perf.customerInterest||p.customerInterest||0)}; risk is ${riskLabel}; confidence is ${confidenceLabel}<br>Commercial: ${commercialLabel}; readiness ${Math.round(p.commercialReadiness||0)}; potential ${Math.round(p.commercialPotential||0)}; ${commercialRevenueText}; customers ${Math.round(p.convertedCustomers||0)}<br>Recommendation: ${rec}</small><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${actions}</div></div>`;
   };
   const cards=currentItems.map(projectCard).join("");
   const archiveCards=archiveItems.map(projectCard).join("");
@@ -875,10 +886,10 @@ function projectPortfolioHtml(){
   const archiveOpen=company.projectArchiveOpen||(!currentItems.length&&archiveItems.length);
   const archiveSummary=archiveItems.length?`<br><span class="save-note">Archived history: ${archiveItems.length} filed; completed ${archiveStats.completed}; commercial ${archiveStats.commercial}; canceled ${archiveStats.canceled}; rejected ${archiveStats.rejected}; merged ${archiveStats.merged}; lifetime spend $${archiveStats.spent.toFixed(2)}M; active archive revenue $${archiveStats.revenue.toFixed(3)}M/day; archive customers ${Math.round(archiveStats.customers)}</span>`:"";
   const archiveBlock=archiveItems.length?`<details class="archive-details" style="margin-top:10px" ${archiveOpen?"open":""} ontoggle="setProjectArchiveOpen(this.open)"><summary>Project Archive (${archiveItems.length}) - completed, canceled, merged, and commercialized projects</summary><div class="briefing-grid" style="margin-top:10px">${archiveCards}</div></details>`:"";
-  const missingTotal=projectStaffing.reduce((s,x)=>s+x.missing,0);
+  const missingTotal=allocation?.totals?.missingAssignments??projectStaffing.reduce((s,x)=>s+x.missing,0);
   const hasActiveWork=h.activeProjects>0||h.proposedProjects>0;
   const activeSummary=hasActiveWork
-    ?`Active work: active ${h.activeProjects}; proposed ${h.proposedProjects}; at risk ${h.atRiskProjects}; paused ${h.pausedProjects}; spend $${h.totalProjectSpendDaily.toFixed(3)}M/day; committed $${h.committedProjectBudget.toFixed(2)}M; project-required staff ${h.staffingDemand}; currently missing ${missingTotal}; concentration risk ${h.concentrationRisk}%; next review ${h.nextProjectReview>=999?"none":h.nextProjectReview+" day(s)"}`
+    ?`Active work: active ${h.activeProjects}; proposed ${h.proposedProjects}; at risk ${h.atRiskProjects}; paused ${h.pausedProjects}; spend $${h.totalProjectSpendDaily.toFixed(3)}M/day; committed $${h.committedProjectBudget.toFixed(2)}M; project-required staff ${h.staffingDemand}; currently missing ${missingTotal}; concentration risk ${h.concentrationRisk}%; next review ${h.nextProjectReview>=999?"none":`${h.nextProjectReview} ${h.nextProjectReview===1?"day":"days"}`}`
     :"Active work: no active or proposed projects. New initiatives can be started below; completed work is filed in the archive.";
   return `<strong>Project Portfolio</strong><br><small>${activeSummary}${archiveSummary}</small><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="small-btn" onclick="requestStrategicProjectProposal('hardware')">Hardware Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('software')">Software Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('business')">Business Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('internal')">Internal Initiative</button></div><div class="briefing-grid" style="margin-top:10px">${cards||'<div class="briefing-card"><strong>No active or proposed projects</strong><small>The active portfolio is empty. Completed, canceled, rejected, and merged projects are filed in the archive below.</small></div>'}</div>${archiveBlock}`;
 }
@@ -982,7 +993,7 @@ function strongestDepartmentBeliefs(health){
   const qualityTelemetry=company.simulationMetrics?.lastBalance?.qualityTelemetry||company.simulationMetrics?.counters?.qualityTelemetry||{};
   if((qualityTelemetry.reworkActions||0)>8||health.portfolioQuality<60)beliefs.push(makeBriefingItem("beliefs","Quality believes rework is tied to late verification pressure.",`Recent telemetry shows ${Math.round(qualityTelemetry.reworkActions||0)} rework action(s) and ${Math.round(qualityTelemetry.verificationFailures||0)} verification failure signal(s).`,{department:"quality",sourceType:"qualityTelemetry",sourceIds:[briefSourceId("quality","rework")],severity:58,urgency:48,strategicImpact:61,confidence:64,ceoRelevance:58}));
   const lesson=(company.lessons||[]).filter(l=>(l.confidence||0)>=65&&company.day-(l.lastReinforcedDay??l.createdDay??company.day)<=45).sort((a,b)=>(b.confidence||0)+(b.importance||0)*5-(a.confidence||0)-(a.importance||0)*5)[0];
-  if(lesson)beliefs.push(makeBriefingItem("beliefs",`${teamDisplayName(lesson.department||"company")} is applying a recent lesson.`,`${lesson.title} Confidence ${Math.round(lesson.confidence||0)}%; evidence: ${lesson.evidence||"recent company history"}.`,{department:lesson.department||"company",sourceType:"institutionalLearning",sourceIds:[briefSourceId("lesson",lesson.key||lesson.id)],severity:45,urgency:32,strategicImpact:60,confidence:Math.round(lesson.confidence||65),ceoRelevance:52}));
+  if(lesson)beliefs.push(makeBriefingItem("beliefs",`${teamDisplayName(lesson.department||"company")} is applying a recent lesson.`,`${lesson.title} The lesson has ${qualitativeBand(lesson.confidence,{low:45,high:75,lowText:"early",midText:"credible",highText:"strong"})} support from recent company history. Evidence: ${lesson.evidence||"recent company history"}.`,{department:lesson.department||"company",sourceType:"institutionalLearning",sourceIds:[briefSourceId("lesson",lesson.key||lesson.id)],severity:45,urgency:32,strategicImpact:60,confidence:Math.round(lesson.confidence||65),ceoRelevance:52}));
   return beliefs.sort((a,b)=>b.priority-a.priority).slice(0,3);
 }
 function buildExecutiveBriefing(){
@@ -992,7 +1003,7 @@ function buildExecutiveBriefing(){
   recentHistory.forEach(h=>items.changed.push(makeBriefingItem("changed",h.text,`Recorded on day ${(h.day??0)+1}.`,{sourceType:"history",sourceIds:[briefSourceId("history",h.text)],severity:45+(h.importance||0)*8,urgency:35,strategicImpact:50+(h.importance||0)*7,confidence:86,ceoRelevance:55+(h.importance||0)*5})));
   const activeProjects=(company.projects||[]).filter(p=>["approved","planning","prototype","execution","verification","pilot","scaling","at risk","blocked","paused"].includes(p.status));
   const riskProject=activeProjects.slice().sort((a,b)=>(b.performance?.riskTrend??b.visibleRisk??0)-(a.performance?.riskTrend??a.visibleRisk??0))[0];
-  if(riskProject&&((riskProject.performance?.riskTrend??riskProject.visibleRisk??0)>72||(riskProject.performance?.scheduleVariance||0)>12))items.attention.push(makeBriefingItem("attention",`${riskProject.title} needs schedule or risk review.`,`Schedule variance is ${Math.round(riskProject.performance?.scheduleVariance||0)} day(s), staffing coverage is ${Math.round(riskProject.performance?.staffingCoverage??derivedStaffingCoverage(riskProject))}%.`,{sourceType:"project",sourceIds:[briefSourceId("project",riskProject.id)],projectId:riskProject.id,department:riskProject.category||"portfolio",severity:78,urgency:68,strategicImpact:76,confidence:Math.round(riskProject.performance?.strategicConfidence??riskProject.visibleConfidence??62),ceoRelevance:76,requiresAction:(riskProject.performance?.riskTrend??0)>84}));
+  if(riskProject&&((riskProject.performance?.riskTrend??riskProject.visibleRisk??0)>72||(riskProject.performance?.scheduleVariance||0)>12)){const scheduleDays=Math.round(riskProject.performance?.scheduleVariance||0);items.attention.push(makeBriefingItem("attention",`${riskProject.title} needs schedule or risk review.`,`Schedule variance is ${scheduleDays} ${scheduleDays===1?"day":"days"}, staffing coverage is ${Math.round(riskProject.performance?.staffingCoverage??derivedStaffingCoverage(riskProject))}%.`,{sourceType:"project",sourceIds:[briefSourceId("project",riskProject.id)],projectId:riskProject.id,department:riskProject.category||"portfolio",severity:78,urgency:68,strategicImpact:76,confidence:Math.round(riskProject.performance?.strategicConfidence??riskProject.visibleConfidence??62),ceoRelevance:76,requiresAction:(riskProject.performance?.riskTrend??0)>84}));}
   const finance=company.finance||{};
   if((finance.runwayDays||999)<100||Number(finance.netCashFlowDaily||0)<-.18)items.attention.push(makeBriefingItem("attention","Finance expects runway pressure if spending does not change.",`Runway is ${finance.runwayDays>=999?"positive":Math.round(finance.runwayDays)+" days"} with net cash flow of $${Number(finance.netCashFlowDaily||0).toFixed(3)}M/day.`,{sourceType:"finance",sourceIds:[briefSourceId("finance","cashflow")],department:"finance",severity:(finance.runwayDays||999)<70?88:72,urgency:(finance.runwayDays||999)<70?82:62,strategicImpact:82,confidence:78,ceoRelevance:84,requiresAction:(finance.runwayDays||999)<70}));
   const governance=company.boardGovernance||{};
@@ -1002,7 +1013,7 @@ function buildExecutiveBriefing(){
   const suppression=summarizeSuppressedReports();
   if(suppression){
     const severe=!!suppression.severeCount;
-    const detail=severe?`${suppression.department} filtering includes ${suppression.protectedCount} protected signal(s), maximum severity ${suppression.maxSeverity}, and manager credibility is ${suppression.managerCredibility}.`:`Mostly ${suppression.mainType} from ${suppression.department}; ${suppression.duplicates} duplicate(s), ${suppression.discoveredCount} later discovered, average confidence ${suppression.avgConfidence}%, reason: ${suppression.reason}.`;
+    const detail=severe?`${suppression.department} filtering includes ${suppression.protectedCount} protected signal${suppression.protectedCount===1?"":"s"}, with ${qualitativeBand(suppression.maxSeverity,{low:45,high:75,lowText:"limited",midText:"material",highText:"serious"})} concern and ${qualitativeBand(suppression.managerCredibility,{low:45,high:75,lowText:"weak",midText:"mixed",highText:"strong"})} manager credibility.`:`Mostly ${suppression.mainType} from ${suppression.department}; ${suppression.duplicates} duplicate${suppression.duplicates===1?"":"s"}, ${suppression.discoveredCount} later discovered, ${qualitativeBand(suppression.avgConfidence,{low:45,high:75,lowText:"uncertain",midText:"credible",highText:"well-supported"})} evidence, reason: ${suppression.reason}.`;
     items[severe?"attention":"changed"].push(makeBriefingItem(severe?"attention":"changed",severe?`${suppression.severeCount} filtered report(s) may need review.`:`${suppression.count} reports were filtered this week.`,detail,{sourceType:"suppressionRecords",sourceIds:[briefSourceId("suppression",company.day)],severity:severe?82:42,urgency:severe?76:30,strategicImpact:severe?78:40,confidence:68,ceoRelevance:severe?84:48,requiresAction:severe}));
   }
   const trends=[
@@ -1018,7 +1029,7 @@ function buildExecutiveBriefing(){
   ].filter(Boolean);
   trends.forEach(t=>{
     const target=t.direction==="improving"?items.improving:items.worsening;
-    target.push(makeBriefingItem(t.direction==="improving"?"improving":"worsening",`${t.label} is ${t.direction}.`,`${t.label} moved from about ${t.previousAverage} to ${t.current} over ${t.durationDays} tracked day(s).`,{sourceType:"operatingHealthHistory",sourceIds:[briefSourceId("operatingHealth",t.key)],severity:t.direction==="worsening"?68:42,urgency:t.direction==="worsening"?58:30,strategicImpact:62,confidence:Math.round(t.confidence),trendStrength:t.trendStrength,ceoRelevance:t.direction==="worsening"?68:52,trendBacked:true}));
+    target.push(makeBriefingItem(t.direction==="improving"?"improving":"worsening",`${t.label} is ${t.direction}.`,`${t.label} moved from about ${t.previousAverage} to ${t.current} over ${t.durationDays} tracked ${t.durationDays===1?"day":"days"}.`,{sourceType:"operatingHealthHistory",sourceIds:[briefSourceId("operatingHealth",t.key)],severity:t.direction==="worsening"?68:42,urgency:t.direction==="worsening"?58:30,strategicImpact:62,confidence:Math.round(t.confidence),trendStrength:t.trendStrength,ceoRelevance:t.direction==="worsening"?68:52,trendBacked:true}));
   });
   const issue=(company.issueRecords||[]).filter(i=>company.day-(i.createdDay??company.day)<=14).sort((a,b)=>(b.severity+b.urgency+b.strategicImpact)-(a.severity+a.urgency+a.strategicImpact))[0];
   const topRisk=issue?makeBriefingItem("attention",`Top unresolved risk: ${String(issue.type||"risk").replace(/-/g," ")}.`,(issue.evidence||[])[0]||`Owner: ${teamDisplayName((issue.sourceDepartments||[])[0]||"company")}.`,{sourceType:"issueRecord",sourceIds:[issue.id],department:(issue.sourceDepartments||[])[0]||null,severity:issue.severity,urgency:issue.urgency,strategicImpact:issue.strategicImpact,confidence:issue.confidence,ceoRelevance:76,requiresAction:issue.status==="ceo-decision"}):null;
@@ -1070,12 +1081,48 @@ function tinyBars(values){
   const max=Math.max(1,...list.map(v=>Math.abs(Number(v)||0)));
   return "<div class=\"sparkline\">"+list.map(v=>"<span style=\"height:"+clamp(Math.abs(Number(v)||0)/max*100,8,100)+"%\"></span>").join("")+"</div>";
 }
+function observationSeverityBand(value){return value>=70?"high":value>=45?"elevated":value>=25?"watch":"low";}
+function observationTextForPillar(pillar){
+  const label=riskPillarName?.(pillar.key)||pillar.label||"Company risk";
+  if(pillar.key==="financial")return `Finance is watching runway and net cash flow because ${label.toLowerCase()} risk is ${observationSeverityBand(pillar.value)}.`;
+  if(pillar.key==="productDelivery")return `Product delivery is carrying pressure from project execution, blockers, or quality work; this is the main item to watch.`;
+  if(pillar.key==="customerMarket")return `Customer and market signals are less comfortable than the headline numbers suggest, especially around sentiment, renewals, or competitor pressure.`;
+  if(pillar.key==="workforce")return `Workforce strain is visible, but it becomes company risk through output, mistakes, absence, and retention rather than stress alone.`;
+  if(pillar.key==="operations")return `Operations has enough friction that delivery reliability or supplier execution deserves attention.`;
+  if(pillar.key==="governance")return `Governance risk is rising through board confidence, investor pressure, or leadership credibility.`;
+  return `Strategic risk is worth watching because the portfolio, innovation path, or market fit may be narrowing future options.`;
+}
+function updateExecutiveObservations(){
+  ensureBibleSystems?.();
+  updateCompanyRiskComponents?.();
+  const observations=[],components=company.companyRiskComponents||{},top=components.topContributors||[];
+  if(top[0])observations.push({id:`risk-${company.day}-${top[0].key}`,day:company.day,type:"risk",pillar:top[0].key,severity:top[0].value,sourceIds:[`risk:${top[0].key}`],text:observationTextForPillar(top[0])});
+  const detection=(company.managerDetections||[]).find(d=>company.day-(d.day??company.day)<=7);
+  if(detection)observations.push({id:`detection-${company.day}-${detection.dept}`,day:company.day,type:"friction",department:detection.dept,severity:detection.risk||50,sourceIds:[`friction:${detection.dept}:${detection.signal}`],text:detection.text});
+  const background=(company.backgroundEvents||[]).find(e=>company.day-(e.day??company.day)<=7&&e.status==="handled-locally");
+  if(background)observations.push({id:`background-${background.id}`,day:company.day,type:"background",department:background.department,severity:background.severity||45,sourceIds:[`background:${background.id}`],text:`${teamDisplayName(background.department)} handled a background issue locally: ${background.title}.`});
+  const improving=(company.localFrictionResponses||[]).find(r=>company.day-(r.day??company.day)<=5);
+  if(improving)observations.push({id:`local-${company.day}-${improving.dept}`,day:company.day,type:"local-response",department:improving.dept,severity:40,sourceIds:[`local:${improving.dept}:${improving.signal}`],text:improving.action});
+  if(!observations.length)observations.push({id:`quiet-${company.day}`,day:company.day,type:"watch",severity:25,sourceIds:["quiet-period"],text:"No major strategic warning emerged this period. The main item to watch is whether current workload remains sustainable as projects advance."});
+  company.executiveObservations=observations.sort((a,b)=>(b.severity||0)-(a.severity||0)).slice(0,3);
+  return company.executiveObservations;
+}
+function executiveObservationDebugHtml(){
+  if(!debugMode)return "";
+  const pillars=company.riskPillars||{},friction=company.departmentFriction||{};
+  const pillarText=Object.entries(pillars).map(([k,v])=>`${riskPillarName?.(k)||k}: ${Math.round(v)}`).join("; ");
+  const frictionText=Object.entries(friction).map(([dept,vals])=>`${teamDisplayName(dept)} ${Math.round(frictionAverage?.(dept)||0)}`).join("; ");
+  const detections=(company.managerDetections||[]).slice(0,3).map(d=>`${teamDisplayName(d.dept)} ${d.signal} p=${d.probability}`).join("; ")||"none";
+  const responses=(company.localFrictionResponses||[]).slice(0,3).map(r=>`${teamDisplayName(r.dept)}: ${r.signal}`).join("; ")||"none";
+  return `<br><small>AI Debug - Risk Pillars: ${htmlEscape(pillarText||"none")}<br>Department Friction: ${htmlEscape(frictionText||"none")}<br>Manager Detection: ${htmlEscape(detections)}<br>Local Responses: ${htmlEscape(responses)}<br>Background Events: ${(company.backgroundEvents||[]).length}; Observation Ranking: ${(company.executiveObservations||[]).map(o=>htmlEscape(o.id)).join(", ")}</small>`;
+}
 function balanceTuningHtml(){
-  const m=company.simulationMetrics?.lastBalance,r=lastValidationReport,tips=[];
+  const m=company.simulationMetrics?.lastBalance,r=lastValidationReport,tips=[],observations=(updateExecutiveObservations?.()||company.executiveObservations||[]);
+  observations.slice(0,3).forEach(o=>tips.push(o.text));
   if(r?.matrix){if(r.survivalRate<70)tips.push("Economy or stress is too punishing across seeds.");if(r.avgMemoRepeat>35)tips.push("Memo variety needs more category spread.");if(r.avgCeoDecisions>18)tips.push("CEO interruption rate may be too high.");if(r.avgActionDiversity<45)tips.push("Employee behavior may be collapsing into too few actions.");}
   if(m?.flags?.length)tips.push("Current run flags: "+m.flags.join(", ")+");");
-  if(!tips.length)tips.push("No immediate balance warning from the latest telemetry.");
-  return tips.map(x=>"<small>"+x+"</small>").join("<br>");
+  if(!tips.length)tips.push("No major strategic warning emerged this period. The main item to watch is whether current workload remains sustainable as projects advance.");
+  return tips.slice(0,3).map(x=>"<small>"+htmlEscape(x)+"</small>").join("<br>")+executiveObservationDebugHtml();
 }
 function operationalDashboardHtml(){
   const daily=company.simulationMetrics?.daily||[];
@@ -1087,7 +1134,7 @@ function operationalDashboardHtml(){
     "<div class=\"insight-card\"><strong>Finance Health</strong><small>"+fmtHealth(health.financeHealth)+"; "+trend(health.financeHealthTrend)+"</small>"+tinyBars((company.operatingHealthHistory||[]).map(d=>d.financeHealth).filter(Number.isFinite))+"</div>"+
     "<div class=\"insight-card\"><strong>"+health.labels.manufacturing+"</strong><small>"+fmtHealth(health.manufacturingHealth)+"; "+trend(health.manufacturingHealthTrend)+"</small>"+tinyBars((company.operatingHealthHistory||[]).map(d=>d.manufacturingHealth).filter(Number.isFinite))+"</div>"+
     "<div class=\"insight-card\"><strong>"+health.labels.customer+"</strong><small>"+fmtHealth(health.customerSentiment)+"; "+trend(health.customerSentimentTrend)+"</small>"+tinyBars((company.operatingHealthHistory||[]).map(d=>d.customerSentiment).filter(Number.isFinite))+"</div>"+
-    "<div class=\"insight-card\"><strong>Balance Notes</strong>"+balanceTuningHtml()+"</div>";
+    "<div class=\"insight-card\"><strong>Executive Observations</strong>"+balanceTuningHtml()+"</div>";
 }
 function internalReportsHtml(){
   const reports=[],seen=new Map();
@@ -1108,10 +1155,11 @@ function internalReportsHtml(){
     if(work){lines.push(`Current work: ${workStatusLabel(work)}`);lines.push(`Owner: ${owner?owner.name:"unassigned"}; deadline day ${work.deadlineDay+1}`);if(work.blockedBy?.length)lines.push(`Blocker: ${work.blockedBy[0]}`);}
     else if(issue){lines.push(`Current issue: ${issue.type.replace(/-/g," ")}; route ${issue.status}`);(issue.evidence||[]).slice(0,2).forEach(x=>lines.push(x));}
     else lines.push(...(m.evidence||[]).slice(0,3));
-    if(m.count>1)lines.push(`${m.count} similar report(s): ${m.names.slice(0,3).join(", ")}`);
+    if(m.count>1)lines.push(`${m.count} similar reports: ${m.names.slice(0,3).join(", ")}`);
     const severityText=qualitativeBand(m.severity,{low:45,high:78,lowText:"limited concern",midText:"material concern",highText:"serious concern"});
     const confidenceText=qualitativeBand(m.confidence,{low:45,high:75,lowText:"uncertain evidence",midText:"credible evidence",highText:"well-supported evidence"});
-    return "<div class=\"report-item\"><strong>"+subject+"</strong><small>"+m.type.replace(/-/g," ")+" from "+(m.fromName||"employee")+" - "+teamDisplayName(m.department)+" - day "+((m.createdDay??0)+1)+" ("+age+" day(s) ago) - "+severityText+", "+confidenceText+"<br>"+lines.slice(0,4).join("<br>")+"</small></div>";
+    const ageText=age===0?"today":`${age} ${age===1?"day":"days"} ago`;
+    return "<div class=\"report-item\"><strong>"+subject+"</strong><small>"+m.type.replace(/-/g," ")+" from "+(m.fromName||"employee")+" - "+teamDisplayName(m.department)+" - reported "+ageText+" - "+severityText+", "+confidenceText+"<br>"+lines.slice(0,4).join("<br>")+"</small></div>";
   }).join("");
 }
 function releaseReadinessHtml(){
@@ -1350,7 +1398,7 @@ function decisionOutcomeLabel(choice,ev){
   if(s==="speed"||s==="revenue")return "Immediate: momentum rises. Later: quality and customer trust test the decision.";
   if(s==="finance"||s==="cost-control")return "Immediate: runway posture changes. Later: morale, delivery, and board confidence respond.";
   if(s==="people")return "Immediate: team pressure changes. Later: retention and execution reveal the effect.";
-  return "Immediate: leadership signal changes. Later: the organization reacts.";
+  return "Immediate: leadership priorities become clearer. Later: employees, departments, and the Board react.";
 }
 function applyDelayedProjectOutcome(outcome){
   const impact=outcome.projectImpact;if(!impact)return;
@@ -1854,7 +1902,45 @@ function completePolicyTransition(){
   company.directive=null;
   company.directiveDays=0;
 }
-function maybeCreateDecisionEvent(){if(company.pendingEvent)return;ensureBibleSystems?.();if(Array.isArray(company.escalationQueue)&&company.escalationQueue.length){const ev=prepareStrategicDecision(company.escalationQueue.shift());company.pendingEvent=ev;company.selected=validationMode?chooseValidationDecisionIndex(ev):0;if(validationMode){applyDecision();return;}company.paused=true;document.getElementById("pauseBtn").textContent="Resume";company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);switchMobileTab("inbox");return;}if(company.eventCooldown>0)return;if(simulationRandom()>.006)return;const selected=chooseCEOEvent();if(!selected)return;const ev=prepareStrategicDecision({...selected,choices:(selected.choices||[]).map(c=>({...c}))});company.pendingEvent=ev;recordEventShown(ev);company.selected=validationMode?chooseValidationDecisionIndex(ev):0;if(validationMode){applyDecision();return;}company.paused=true;document.getElementById("pauseBtn").textContent="Resume";company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);switchMobileTab("inbox");}
+function normalizeInboxFlow(){
+  company.inboxFlow={day:company.day||0,openedToday:0,lastOpenedDay:-999,...(company.inboxFlow||{})};
+  if(company.inboxFlow.day!==company.day){company.inboxFlow.day=company.day;company.inboxFlow.openedToday=0;}
+  return company.inboxFlow;
+}
+function memoPriorityBypass(ev){
+  const text=[ev?.title,ev?.category,ev?.generatedCommunication?.priority,ev?.generatedCommunication?.subject,ev?.copy].join(" ");
+  return !!(ev?.forceImmediate||ev?.protectedDirect||/urgent|pip|payroll|insolven|legal|safety|whistle|retaliation|harassment|fraud|failure|board strike/i.test(text));
+}
+function canOpenQueuedMemo(ev){
+  if(validationMode||memoPriorityBypass(ev))return true;
+  const flow=normalizeInboxFlow();
+  if(flow.openedToday>=1)return false;
+  if(typeof recentCeoDecisionPressure==="function"&&recentCeoDecisionPressure(5)>4)return false;
+  return true;
+}
+function markQueuedMemoOpened(ev){
+  if(validationMode)return;
+  const flow=normalizeInboxFlow();
+  flow.openedToday+=1;
+  flow.lastOpenedDay=company.day;
+}
+function nextEligibleQueuedMemo(){
+  const queue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];
+  const urgentIndex=queue.findIndex(memoPriorityBypass);
+  if(urgentIndex>=0)return queue.splice(urgentIndex,1)[0];
+  const normalIndex=queue.findIndex(canOpenQueuedMemo);
+  return normalIndex>=0?queue.splice(normalIndex,1)[0]:null;
+}
+function openDecisionEvent(ev){
+  company.pendingEvent=prepareStrategicDecision(ev);
+  company.selected=validationMode?chooseValidationDecisionIndex(company.pendingEvent):0;
+  if(validationMode){applyDecision();return;}
+  company.paused=true;
+  document.getElementById("pauseBtn").textContent="Resume";
+  company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);
+  switchMobileTab("inbox");
+}
+function maybeCreateDecisionEvent(){if(company.pendingEvent)return;ensureBibleSystems?.();if(Array.isArray(company.escalationQueue)&&company.escalationQueue.length){const queued=nextEligibleQueuedMemo();if(queued){markQueuedMemoOpened(queued);openDecisionEvent(queued);return;}}if(company.eventCooldown>0)return;if(simulationRandom()>.004)return;const selected=chooseCEOEvent();if(!selected)return;const ev=prepareStrategicDecision({...selected,choices:(selected.choices||[]).map(c=>({...c}))});recordEventShown(ev);markQueuedMemoOpened(ev);openDecisionEvent(ev);}
 function applyDecision(){if(!company.pendingEvent)return;recordMetricEvent("ceoDecisions");const ev=prepareStrategicDecision(company.pendingEvent),d=ev.choices[company.selected],comm=company.pendingCommunication||eventCommunication(ev),archivedMemo=archiveCommunication(ev,d,comm);applyLeadershipFootprint(ev,d);const delayedOutcome=evaluateStrategicOutcome(ev,d),thread=createDecisionThread(ev,d,comm,delayedOutcome,archivedMemo);if(ev.storyId)addStoryBeat(ev.storyId,`CEO chose: ${d.title}.`,"decision");startPolicyTransition(d.directive,d.days||0,d.title);Object.entries(d.effect||{}).forEach(([k,v])=>{if(k==="valuation"){addValuationShock(v*.35,`Market reaction to CEO decision: ${d.title}`,ev.id,20);return;}if(k==="customers"){applyCustomerDelta(v*.35,d.title,ev.id);return;}const systemic=["board","trust","quality","integration"].includes(k);company[k]=(company[k]||0)+v*(systemic?.35:1);});adjustCulture(d.culture||{});employees.forEach(e=>{
     if(d.directive==="cuts")addMemory(e,"CEO_CUTS","Leadership cut costs and increased pressure.","negative",14,"CEO");
     else if(d.directive==="people")addMemory(e,"CEO_SUPPORT","Leadership invested in employees.","positive",12,"CEO");
@@ -1927,7 +2013,7 @@ function resolveHiring(mode,roleOverride=null){
     });
     employees[slot]=replacement;
     company.log.push(`${replacement.name} joined as the new ${role}.`);recordWeeklyEvent(`${replacement.name} joined as the new ${role}.`,"people",4);
-    buildOffice();
+    if(!validationMode)buildOffice();
   }else if(mode==="promote"){
     const candidate=employees.filter(e=>e.active).sort((a,b)=>(b.focus+b.achievements*8)-(a.focus+a.achievements*8))[0];
     if(candidate){

@@ -9,6 +9,32 @@
 
 ------------------------------------------------------------------------
 
+# Current Implementation Notes - Save Version 38
+
+The current implementation has moved from a single giant script into a
+main `Office_Aquarium.html` file plus ordered JavaScript files under
+`src/`. The browser version remains offline and local.
+
+Current practical rules for Codex:
+
+-   The CEO remains strategic only. Do not add direct employee
+    micromanagement.
+-   Project staffing separates total department headcount from actual
+    project allocation.
+-   One short-staffed active project is a portfolio or workforce warning,
+    not automatically a company crisis.
+-   A staffing crisis requires broader sustained evidence, such as
+    multiple affected projects, major missing assignments or FTE,
+    failed recruiting, critical open roles, or visible delivery damage.
+-   Normal UI reports what the organization knows or has reported. AI
+    Debug may expose hidden actual blockers, observed blockers, and
+    unreported blockers.
+-   Release outputs are generated under `dist/` and
+    `src-tauri/target/`. The `misc/` folder is user-managed and should
+    not be cleaned or reorganized by Codex.
+
+------------------------------------------------------------------------
+
 # Mission
 
 Office Aquarium is a **living technology company simulator**.

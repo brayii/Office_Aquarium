@@ -125,13 +125,62 @@ function checkCausalLearningIntegrity() {
   const missing = requiredSignals.filter(([pattern]) => !pattern.test(learning)).map(([, label]) => label);
   if (missing.length) throw new Error(`Missing causal learning guard(s): ${missing.join(", ")}`);
   const regression = read(path.join("tests", "simulation-regression-test.js"));
-  if (!/company:\s*canonicalize\s*\(\s*company\s*\)/.test(regression)) {
-    throw new Error("Regression test must canonicalize authoritative company state");
+  if (!/hashAuthoritativeState\s*\(\s*company\s*,\s*employees\s*\)/.test(regression)) {
+    throw new Error("Regression test must use side-effect-free authoritative state hashing");
   }
-  if (!/performance\?\.recentOutput\s*\?\?\s*e\.recentOutput/.test(regression)) {
-    throw new Error("Regression test must hash performance.recentOutput");
+  const learningSource = read(path.join("src", "systems", "institutional-company-intelligence.js"));
+  if (!/function\s+canonicalAuthoritativeState/.test(learningSource) || !/NON_AUTHORITATIVE_PATHS/.test(learningSource)) {
+    throw new Error("Authoritative hash must use path-specific canonicalization");
   }
   return requiredSignals.length;
+}
+
+function checkValidationIsolationGuards(files) {
+  const html = read("Office_Aquarium.html");
+  const employeeModal = html.match(/<div id="employeeModal"[\s\S]*?<\/div><\/div><\/div>/)?.[0] || "";
+  if (/balanceProjectionBtn|balanceMatrixBtn|Balance Run|Balance Matrix/.test(employeeModal)) {
+    throw new Error("Employee modal must not contain balance validation controls");
+  }
+  const validation = read(path.join("src", "ui", "rendering-validation.js"));
+  const projectionBody = validation.match(/function\s+runBalanceProjection\s*\([^)]*\)\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  const matrixBody = validation.match(/function\s+runBalanceMatrix\s*\([^)]*\)\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  const validationText = projectionBody + "\n" + matrixBody;
+  const forbidden = [
+    [/reset\s*\(/, "runBalanceProjection/runBalanceMatrix must not reset the live company"],
+    [/validationSession\.begin\s*\(/, "runBalanceProjection/runBalanceMatrix must not use ValidationSession snapshot rollback"],
+    [/restartTimer\s*\(/, "validation must not restart the live timer"],
+    [/saveRepository\.(write|remove)\s*\(/, "validation must not write production storage"],
+    [/localStorage\.(setItem|removeItem|clear)\s*\(/, "isolated validation must not use localStorage"]
+  ];
+  const found = forbidden.filter(([pattern]) => pattern.test(validationText)).map(([, label]) => label);
+  if (found.length) throw new Error(`Validation isolation regression: ${found.join("; ")}`);
+  const required = [
+    [/class\s+SimulationContext/, "SimulationContext"],
+    [/class\s+InMemorySaveRepository/, "InMemorySaveRepository"],
+    [/class\s+ManualSimulationTimer/, "ManualSimulationTimer"],
+    [/function\s+assertIsolatedValidationEnvironment/, "assertIsolatedValidationEnvironment"],
+    [/createIsolatedValidationContext/, "isolated validation factory"],
+    [/Run Isolated 120-Day Projection/, "renamed isolated projection button"],
+    [/Run Isolated 8-Seed Balance Matrix/, "renamed isolated matrix button"]
+  ];
+  const projectText = allProjectText(files.concat(["Office_Aquarium.html"]));
+  const missing = required.filter(([pattern]) => !pattern.test(projectText)).map(([, label]) => label);
+  if (missing.length) throw new Error(`Missing validation isolation component(s): ${missing.join(", ")}`);
+  return required.length;
+}
+
+function checkPublicReleaseUi() {
+  const html = read("Office_Aquarium.html");
+  const forbiddenPublicUi = [
+    [/id="developerToolsPanel"/, "developer tools panel"],
+    [/id="aiDebugToggle"/, "AI Debug button"],
+    [/id="balanceProjectionBtn"/, "balance projection button"],
+    [/id="balanceMatrixBtn"/, "balance matrix button"],
+    [/>[^<]*(Developer Tools|Simulation Validation|AI Debug|Balance Run|Balance Matrix)[^<]*</, "debug/developer visible label"]
+  ];
+  const found = forbiddenPublicUi.filter(([pattern]) => pattern.test(html)).map(([, label]) => label);
+  if (found.length) throw new Error(`Public UI contains release-hidden control(s): ${found.join(", ")}`);
+  return forbiddenPublicUi.length;
 }
 
 const htmlIds = checkDuplicateHtmlIds();
@@ -143,4 +192,6 @@ const topLevelDeclarations = checkDuplicateTopLevelDeclarations(collectJsFiles("
 const forbiddenChecks = checkForbiddenPatterns(collectJsFiles("src"));
 const randomAndTimers = checkRandomAndTimers(collectJsFiles("src"));
 const causalLearningGuards = checkCausalLearningIntegrity();
-console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards }, null, 2));
+const validationIsolationGuards = checkValidationIsolationGuards(collectJsFiles("src"));
+const publicReleaseUiGuards = checkPublicReleaseUi();
+console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards, validationIsolationGuards, publicReleaseUiGuards }, null, 2));

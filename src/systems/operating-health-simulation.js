@@ -13,7 +13,7 @@ function derivedStaffingCoverage(project){
   const req=Object.entries(project.requiredHeadcount||{}).filter(([,n])=>Number(n)>0);
   if(!req.length)return 100;
   const ratios=req.map(([dept,need])=>{
-    const allocated=projectAllocatedFte(project,dept);
+    const allocated=typeof projectQualifiedAllocatedFte==="function"?projectQualifiedAllocatedFte(project,dept):projectAllocatedFte(project,dept);
     return clamp(allocated/Math.max(.1,need)*100,0,100);
   });
   return ratios.reduce((s,v)=>s+v,0)/Math.max(1,ratios.length);
@@ -91,7 +91,8 @@ function projectTimingForecast(project){
   const uncertainty=Math.round(clamp(8+(100-confidence)*.18+risk*.10+blockers*3+Math.max(0,70-staffing)*.08,5,60));
   const low=Math.max(1,Math.round(midpoint*(1-uncertainty/140))),high=Math.max(low+1,Math.round(midpoint*(1+uncertainty/95))),targetDay=company.day+midpoint,deadline=Number(project.deadlineDay)||targetDay,deadlineDelta=targetDay-deadline;
   const status=deadlineDelta>7?"likely late":deadlineDelta<-7?"ahead of plan":"near plan",confidenceLabel=confidence>=75?"high":confidence>=55?"medium":"low";
-  return {summary:`Estimated completion: ${low}-${high} day(s), target day ${targetDay+1}; ${status}, ${confidenceLabel} confidence.`,short:`${low}-${high} day(s), target day ${targetDay+1}`,range:`${low}-${high} day(s)`,target:`day ${targetDay+1}`,status,confidenceLabel,low,high,midpoint,targetDay,deadlineDelta};
+  const rangeText=low===high?`${low} ${low===1?"day":"days"}`:`${low}-${high} days`;
+  return {summary:`Estimated completion: ${rangeText}, target day ${targetDay+1}; ${status}, ${confidenceLabel} confidence.`,short:`${rangeText}, target day ${targetDay+1}`,range:rangeText,target:`day ${targetDay+1}`,status,confidenceLabel,low,high,midpoint,targetDay,deadlineDelta};
 }
 function projectStrategicImportance(project){return clamp(Number(project.priority??project.estimatedBenefit??project.visibleConfidence??50),0,100);}
 function projectStatusWeight(status){
@@ -268,7 +269,7 @@ function maybeQueueBoardPortfolioConcern(){
   if(h.concentrationRisk>70&&h.activeProjects>=3)concerns.push("portfolio concentration risk");
   if(h.averageBudgetVariance>35)concerns.push("repeated budget overrun");
   const snapshot=buildExecutiveIntelligenceSnapshot();
-  if((snapshot.topRisks||[]).some(r=>/project|portfolio|deadline|staffing|quality/i.test(`${r.title} ${r.detail}`)))concerns.push("internal intelligence flagged project execution risk");
+  if((snapshot.topRisks||[]).some(r=>/project|portfolio|deadline|staffing|quality/i.test(`${r.title} ${r.detail}`)))concerns.push("recent operating reports point to project execution risk");
   if((snapshot.suppressedReportFindings||[]).some(s=>s.severeCount>0))concerns.push("serious filtered reports may be obscuring portfolio risk");
   if(!concerns.length)return;
   company.escalationQueue.push({id:`portfolio-board-review-${company.day}`,repeatable:false,category:"project",title:"Board portfolio review",copy:`The board flagged ${concerns.join(", ")}.`,generatedCommunication:{type:"Board Portfolio Letter",priority:"Decision Needed",sender:{name:"Board Strategy Committee",role:"Board"},subject:"Portfolio Discipline Review",message:`The board reviewed the project portfolio and flagged: ${concerns.join(", ")}. The CEO should set a portfolio direction without micromanaging project execution.`,recs:[["Board","Restore portfolio discipline",82],["Finance",h.totalProjectSpendDaily>.12?"Reduce project burn":"Keep spending tied to milestones",72],["Portfolio","Use gated reviews and cancellation discipline",76]],impacts:["Board confidence may change","Project reviews may be accelerated","Hiring and restructuring pressure may follow"]},choices:[{title:"Order portfolio triage",detail:"Queue reviews for the riskiest projects.",effect:{board:1},directive:"quality",days:7,portfolioAction:"triage",strategy:"risk-control",benefits:["forces evidence review"],risks:["slows momentum"],uncertainty:"Material",estimatedConfidence:68},{title:"Protect growth bets",detail:"Accept risk to preserve upside.",effect:{board:-2,trust:1},directive:"speed",days:8,portfolioAction:"protect-growth",strategy:"growth",benefits:["preserves upside"],risks:["board patience falls"],uncertainty:"High",estimatedConfidence:48},{title:"Cut project burn",detail:"Reduce scope across the active portfolio.",effect:{board:3},directive:"cuts",days:8,portfolioAction:"cut-burn",strategy:"cost-control",benefits:["improves runway"],risks:["morale and opportunity loss"],uncertainty:"Material",estimatedConfidence:58}]});
@@ -311,7 +312,9 @@ function makeProjectProposalEvent(p){
     {title:"Delay one quarter",detail:"Keep the proposal alive while protecting focus.",effect:{board:0},directive:"quality",days:5,projectDecision:{id:p.id,action:"delay"},strategy:"finance",benefits:["protects runway","waits for more evidence"],risks:["timing window may close","originators may lose trust"],uncertainty:"Material",estimatedConfidence:55},
     {title:"Reject proposal",detail:"Decline the project and keep the current portfolio focused.",effect:{board:1},directive:null,days:0,projectDecision:{id:p.id,action:"reject"},strategy:"focus",benefits:["avoids distraction","protects cash"],risks:["missed opportunity","innovation morale may fall"],uncertainty:"Material",estimatedConfidence:50}
   ].filter(Boolean);
-  return {id:`project-proposal-${p.id}`,repeatable:false,category:"project",title:`${p.sourceProjectId?"Successor project proposal":"Project proposal"}: ${p.codename}`,copy:`${p.title}. Estimated cost $${p.estimatedCost}M, working estimate ${timing.range}, visible risk ${p.visibleRisk}, confidence ${p.visibleConfidence}.${successorNote}`,generatedCommunication:{type:"Portfolio Memo",priority:"Decision Needed",sender:{name:"Portfolio Council",role:"Strategy"},subject:`${p.sourceProjectId?"Successor Project Proposal":"Project Proposal"} - ${p.title}`,message:`Origin: ${p.originType}. Purpose: ${p.strategicNarrative} ${successorNote} ${timing.summary} Estimated staffing demand: ${p.requiredDepartments.map(teamDisplayName).join(", ")}. Unknowns include supplier timing, customer adoption, competitor response, and technical validation.`,recs:[[teamDisplayName(p.proposingDepartment),`${p.sourceProjectId?"Approve only as a gated successor if the evidence is credible":"Approve a gated pilot if capacity is available"}; timing estimate ${timing.range}`,p.visibleConfidence],["Finance",company.cash<p.estimatedCost*.4?"Protect runway and phase spending":"Fundable with milestone discipline",Math.round(clamp(80-p.estimatedCost*5,35,82))],["Board",p.estimatedBenefit>65?"Portfolio needs growth options":"Require evidence before scaling",65]],impacts:[`Portfolio estimate: ${timing.summary}`,p.sourceProjectId?"The old project remains archived; this is a new successor proposal":"Project work items will be generated","Staffing demand may create hiring requests","Future reviews may recommend pause, expansion, or cancellation"]},choices:choices.slice(0,3)};
+  const riskLabel=typeof qualitativeBand==="function"?qualitativeBand(p.visibleRisk,{low:35,high:70,lowText:"contained",midText:"visible",highText:"elevated"}):p.visibleRisk;
+  const confidenceLabel=typeof qualitativeBand==="function"?qualitativeBand(p.visibleConfidence,{low:40,high:70,lowText:"early",midText:"credible",highText:"strong"}):p.visibleConfidence;
+  return {id:`project-proposal-${p.id}`,repeatable:false,category:"project",title:`${p.sourceProjectId?"Successor project proposal":"Project proposal"}: ${p.codename}`,copy:`${p.title}. Estimated cost $${p.estimatedCost}M, working estimate ${timing.range}, ${riskLabel} visible risk, and ${confidenceLabel} evidence.${successorNote}`,generatedCommunication:{type:"Portfolio Memo",priority:"Decision Needed",sender:{name:"Portfolio Council",role:"Strategy"},subject:`${p.sourceProjectId?"Successor Project Proposal":"Project Proposal"} - ${p.title}`,message:`Origin: ${p.originType}. Purpose: ${p.strategicNarrative} ${successorNote} ${timing.summary} Estimated staffing demand: ${p.requiredDepartments.map(teamDisplayName).join(", ")}. Unknowns include supplier timing, customer adoption, competitor response, and technical validation.`,recs:[[teamDisplayName(p.proposingDepartment),`${p.sourceProjectId?"Approve only as a gated successor if the evidence is credible":"Approve a gated pilot if capacity is available"}; timing estimate ${timing.range}`,p.visibleConfidence],["Finance",company.cash<p.estimatedCost*.4?"Protect runway and phase spending":"Fundable with milestone discipline",Math.round(clamp(80-p.estimatedCost*5,35,82))],["Board",p.estimatedBenefit>65?"Portfolio needs growth options":"Require evidence before scaling",65]],impacts:[`Portfolio estimate: ${timing.summary}`,p.sourceProjectId?"The old project remains archived; this is a new successor proposal":"Project work items will be generated","Staffing demand may create hiring requests","Future reviews may recommend pause, expansion, or cancellation"]},choices:choices.slice(0,3)};
 }
 function compatibleProjectFor(project){
   return activeProjects().find(p=>p.id!==project.id&&(p.proposingDepartment===project.proposingDepartment||p.family===project.family||p.requiredDepartments.some(d=>(project.requiredDepartments||[]).includes(d))))||null;
@@ -364,6 +367,12 @@ function queuePortfolioMemoOnce(ev,{front=false}={}){
     front?company.escalationQueue.unshift(ev):company.escalationQueue.push(ev);
     return true;
   }
+  if(!front){
+    company.escalationQueue.push(ev);
+    company.escalationQueue=company.escalationQueue.slice(0,3);
+    return true;
+  }
+  ev.forceImmediate=true;
   company.eventCooldown=0;
   company.pendingEvent=prepareStrategicDecision(ev);
   company.selected=validationMode?chooseValidationDecisionIndex(company.pendingEvent):0;
@@ -380,6 +389,7 @@ function queueImmediatePortfolioMemo(ev){
 }
 function queueImmediateExecutiveMemo(ev){
   if(!ev)return;
+  ev.forceImmediate=true;
   if(company.pendingEvent){
     company.escalationQueue.unshift(ev);
     return;
