@@ -136,6 +136,20 @@ async function main() {
     assert((counts.statuses["Candidate Search"] || 0) === counts.searching, "Visible candidate search count should match records");
     assert((counts.statuses["Onboarding"] || 0) === counts.onboarding, "Visible onboarding count should match active onboarding employees");
 
+    // Hiring explanations should use the same assessment that created the signal, not raw zero-value debug fields.
+    employees.forEach(e => {
+      e.stress = 86;
+    });
+    updateStaffingModel();
+    updateHiringNeedHistory();
+    const peopleRow = hiringPipelineRows().find(row => row.dept === "people");
+    assert(peopleRow, "People staffing signal should be visible under organization-wide pressure");
+    assert(!/capacity gap 0|overload 0|backlog 0|blocked 0|skill 0/i.test(peopleRow.reason), `Hiring reason should not dump zero-value counters: ${peopleRow.reason}`);
+    assert((peopleRow.evidence || []).length >= 1, "Hiring row should include concrete evidence");
+    const pipelineHtml = hiringPipelineHtml();
+    assert(pipelineHtml.includes("Situation:"), "Hiring pipeline should use Situation wording");
+    assert(!/capacity gap 0|blocked 0|skill 0/i.test(pipelineHtml), "Hiring pipeline HTML should not expose unrelated zero counters");
+
     validationMode = false;
     return {
       ok: failures.length === 0,

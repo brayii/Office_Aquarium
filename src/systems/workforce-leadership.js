@@ -88,7 +88,8 @@ function updateStaffingModel(){
     const maximumUseful=minimumHealthy+managementCapacity+1;
     const current=groups[dept]?.length||0;
     const skillCoverage=clamp(current?groups[dept].reduce((s,e)=>s+(Math.max(...Object.values(e.skills||{general:40}))),0)/current:0,0,100);
-    company.staffingModel[dept]={current,minimumHealthy,maximumUseful,workload,backlog,blockedWork,customerLoad,phaseDemand,projectDemand:Number((projectDemand[dept]||0).toFixed(1)),projectCapacity:Number(deptCapacity.toFixed(1)),projectLoad:Number(deptLoad.toFixed(1)),projectOverload:Number(deptOverload.toFixed(1)),capacityGap:Number(capacityGap.toFixed(1)),skillCoverage,managementCapacity,understaffed:current<minimumHealthy||capacityGap>.35||deptOverload>.25,overstaffed:current>maximumUseful&&deptOverload<.1};
+    const activeProjectCount=active.filter(p=>(p.requiredDepartments||[]).includes(dept)||(Number(p.requiredHeadcount?.[dept])||0)>0).length;
+    company.staffingModel[dept]={current,minimumHealthy,maximumUseful,workload,backlog,blockedWork,customerLoad,phaseDemand,activeProjectCount,projectDemand:Number((projectDemand[dept]||0).toFixed(1)),projectCapacity:Number(deptCapacity.toFixed(1)),projectLoad:Number(deptLoad.toFixed(1)),projectOverload:Number(deptOverload.toFixed(1)),capacityGap:Number(capacityGap.toFixed(1)),skillCoverage,managementCapacity,understaffed:current<minimumHealthy||capacityGap>.35||deptOverload>.25,overstaffed:current>maximumUseful&&deptOverload<.1};
   }
 }
 function calculateLivingFinance(){
@@ -244,7 +245,8 @@ function hiringPipelineRows(){
       }
       const signalCount=shortage>0?shortage:1;
       const labelRole=shortage>0?role:"capacity signal";
-      rows.push({dept,role:labelRole,count:signalCount,status,reason:recruiting?`${recruiting.project?.title||"department need"}; expected fill ${recruiting.expectedFillDays||"?"} day(s); target day ${recruiting.dueDay}`:`workload ${st.workload}, capacity gap ${st.capacityGap||0}, overload ${st.projectOverload||0}, backlog ${st.backlog}, blocked ${st.blockedWork}, skill ${Math.round(st.skillCoverage||0)}`,confidence:Math.round(hist.confidence||0),actualRole:role});
+      const narrative=hiringNeedNarrative(dept,st,role);
+      rows.push({dept,role:labelRole,count:signalCount,status,reason:recruiting?`${recruiting.project?.title||"department need"}; expected fill ${recruiting.expectedFillDays||"?"} day(s); target day ${recruiting.dueDay}`:narrative.reason,evidence:recruiting?[`Market condition: ${recruiting.market||"average"}`,`Target fill day ${recruiting.dueDay}`]:narrative.evidence,confidence:Math.round(hist.confidence||0),actualRole:role});
     }
   }
   (company.openRoles||[]).forEach(role=>{
@@ -253,10 +255,10 @@ function hiringPipelineRows(){
   });
   (company.recruitingPipeline||[]).filter(r=>["requisition","searching","interviewing","offer","exception","paused-policy"].includes(r.status)).forEach(r=>{
     const status=r.status==="paused-policy"?"Paused by Hiring Policy":r.status==="exception"?"Exception Memo":r.status==="requisition"?"Requisition Opened":r.status==="interviewing"?"Interviewing":r.status==="offer"?"Offer Outstanding":"Candidate Search";
-    if(!rows.some(row=>row.role===r.role&&["Requisition Opened","Candidate Search","Interviewing","Offer Outstanding","Exception Memo","Paused by Hiring Policy"].includes(row.status)))rows.push({dept:r.department,role:r.role,count:1,status,reason:r.status==="paused-policy"?(r.policyReason||"suppressed by hiring policy"):`${r.project?.title||r.market||"average market"}; expected fill ${r.expectedFillDays||"?"} day(s); target day ${r.dueDay}`,confidence:70});
+    if(!rows.some(row=>row.role===r.role&&["Requisition Opened","Candidate Search","Interviewing","Offer Outstanding","Exception Memo","Paused by Hiring Policy"].includes(row.status)))rows.push({dept:r.department,role:r.role,count:1,status,reason:r.status==="paused-policy"?(r.policyReason||"suppressed by hiring policy"):`HR is actively recruiting for ${articleFor(r.role)} ${r.role}.`,evidence:r.status==="paused-policy"?[r.policyReason||"Suppressed by hiring policy"]:[`${r.project?.title||r.market||"average market"}`,`expected fill ${r.expectedFillDays||"?"} day(s)`, `target day ${r.dueDay}`],confidence:70});
   });
   employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||21)).forEach(e=>{
-    rows.push({dept:roleDepartment(e.role),role:e.role,count:1,status:"Onboarding",reason:`${e.name} joined on day ${e.joinedDay}; productivity ${e.onboarding?.productivity||Math.round(onboardingProductivity(e)*100)}%; mentor ${employees.find(m=>m.id===e.onboarding?.mentorId)?.name||"none"}`,confidence:80});
+    rows.push({dept:roleDepartment(e.role),role:e.role,count:1,status:"Onboarding",reason:`${e.name} is ramping into the role.`,evidence:[`joined on day ${e.joinedDay}`,`productivity ${e.onboarding?.productivity||Math.round(onboardingProductivity(e)*100)}%`,`mentor ${employees.find(m=>m.id===e.onboarding?.mentorId)?.name||"none"}`],confidence:80});
   });
   return rows;
 }
@@ -264,8 +266,9 @@ function hiringPipelineHtml(){
   const rows=hiringPipelineRows();
   if(!rows.length)return `<br><br><strong>Hiring Pipeline</strong><br><small>No active staffing requests. Departments may still be monitoring early signals.</small>`;
   const visible=rows.slice(0,8),extra=rows.slice(8);
-  const cards=visible.map(r=>`<div class="briefing-card"><strong>${teamDisplayName(r.dept)} +${r.count} ${r.role}</strong><small>Status: ${r.status}<br>Reason: ${r.reason}<br>Confidence ${r.confidence}%</small></div>`).join("");
-  const more=extra.length?`<details class="pipeline-more"><summary>${extra.length} more staffing item(s)</summary><div class="briefing-grid" style="margin-top:8px">${extra.map(r=>`<div class="briefing-card"><strong>${teamDisplayName(r.dept)} +${r.count} ${r.role}</strong><small>Status: ${r.status}<br>Reason: ${r.reason}<br>Confidence ${r.confidence}%</small></div>`).join("")}</div></details>`:"";
+  const card=r=>`<div class="briefing-card"><strong>${teamDisplayName(r.dept)} +${r.count} ${r.role}</strong><small>Status: ${r.status}<br>Situation: ${r.reason}${(r.evidence||[]).length?`<br>Evidence: ${(r.evidence||[]).slice(0,3).join("; ")}`:""}<br>Confidence ${r.confidence}%</small></div>`;
+  const cards=visible.map(card).join("");
+  const more=extra.length?`<details class="pipeline-more"><summary>${extra.length} more staffing item(s)</summary><div class="briefing-grid" style="margin-top:8px">${extra.map(card).join("")}</div></details>`:"";
   return `<br><br><strong>Hiring Pipeline</strong><div class="briefing-grid" style="margin-top:8px">${cards}</div>${more}`;
 }
 function staffingShortageSummary(){
@@ -444,14 +447,58 @@ function hiringNeedScore(dept,st){
   const manufacturingDemand=(dept==="hardware"||dept==="quality")?Math.max(0,(company.manufacturing?.supplyRisk||0)-45)*.22:0;
   return clamp((st.minimumHealthy-st.current)*24+(st.backlog||0)*3.8+(st.blockedWork||0)*8+stressTrend+qualityBurden+customerDemand+manufacturingDemand+retirementRisk+successionRisk+skillGap-financeConstraint-(st.overstaffed?30:0),0,100);
 }
+function hiringNeedAssessment(dept,st={}){
+  const members=employees.filter(e=>e.active&&roleDepartment(e.role)===dept),financeConstraint=company.finance?.runwayDays<60?28:company.finance?.netCashFlowDaily<-.08?18:0;
+  const retirementCases=members.filter(e=>(e.retirementReadiness||0)>55).length;
+  const successionCases=members.filter(e=>(e.careerLifecycle?.successionRisk||0)>45).length;
+  const stressTrend=members.reduce((s,e)=>s+Math.max(0,e.stress-60),0)/Math.max(1,members.length);
+  const staffingGap=Math.max(0,(st.minimumHealthy||0)-(st.current||0));
+  const skillGap=(st.current||0)>0?Math.max(0,62-(st.skillCoverage||50))*.65:0;
+  const qualityBurden=dept==="quality"||dept==="hardware"?Math.max(0,100-company.quality)*.18:0;
+  const customerDemand=(dept==="product"||dept==="finance")?Math.min(28,(company.customers||0)/6):0;
+  const manufacturingDemand=(dept==="hardware"||dept==="quality")?Math.max(0,(company.manufacturing?.supplyRisk||0)-45)*.22:0;
+  const activeProjects=Number(st.activeProjectCount)||0;
+  const projectDemand=Number(st.projectDemand)||0;
+  const factors=[
+    {key:"staffing-gap",score:staffingGap*24,text:dept==="people"?"People Operations has no dedicated coordination capacity":`${teamDisplayName(dept)} is below its healthy staffing range`,evidence:(st.current||0)>0?`${st.current} current vs ${st.minimumHealthy||0} healthy staffing target`:`no current ${teamDisplayName(dept)} staff assigned`},
+    {key:"project-demand",score:projectDemand*9,text:`${teamDisplayName(dept)} is carrying project-driven coordination demand`,evidence:`${activeProjects} active project${activeProjects===1?"":"s"} ${activeProjects===1?"requires":"require"} ${teamDisplayName(dept)} support`},
+    {key:"capacity-gap",score:(Number(st.capacityGap)||0)*22,text:"project assignments exceed available department capacity",evidence:`allocated project demand exceeds capacity by ${Number(st.capacityGap||0).toFixed(1)} FTE`},
+    {key:"overload",score:(Number(st.projectOverload)||0)*18,text:"assigned employees are already above sustainable project load",evidence:`project overload is ${Number(st.projectOverload||0).toFixed(1)}`},
+    {key:"backlog",score:(st.backlog||0)*3.8,text:"open work is building faster than the department can clear it",evidence:`${st.backlog||0} open work item${(st.backlog||0)===1?"":"s"}`},
+    {key:"blocked",score:(st.blockedWork||0)*8,text:"blocked work needs more focused ownership",evidence:`${st.blockedWork||0} blocked work item${(st.blockedWork||0)===1?"":"s"}`},
+    {key:"stress",score:stressTrend,text:"current staff are absorbing sustained workload pressure",evidence:`average excess stress contribution ${Math.round(stressTrend)}`},
+    {key:"customer-growth",score:customerDemand,text:"customer growth is increasing coordination and planning work",evidence:`${Math.round(company.customers||0)} customer${Math.round(company.customers||0)===1?"":"s"} now require support`},
+    {key:"manufacturing",score:manufacturingDemand,text:"manufacturing risk is increasing technical support demand",evidence:`supply risk ${Math.round(company.manufacturing?.supplyRisk||0)}`},
+    {key:"quality",score:qualityBurden,text:"quality weakness is creating additional review demand",evidence:`company quality ${Math.round(company.quality||0)}`},
+    {key:"retirement",score:retirementCases*12,text:"succession coverage is becoming thin",evidence:`${retirementCases} retirement watch case${retirementCases===1?"":"s"}`},
+    {key:"succession",score:successionCases*10,text:"the department has key-person continuity risk",evidence:`${successionCases} succession risk case${successionCases===1?"":"s"}`},
+    {key:"skill-gap",score:skillGap,text:"available skills are below the work the department is being asked to own",evidence:`skill coverage ${Math.round(st.skillCoverage||0)}`}
+  ].filter(f=>f.score>1.5).sort((a,b)=>b.score-a.score);
+  const score=clamp(factors.reduce((s,f)=>s+f.score,0)-financeConstraint-(st.overstaffed?30:0),0,100);
+  return {score,factors,financeConstraint};
+}
+function hiringNeedNarrative(dept,st={},role=roleForDepartmentHire(dept)){
+  const assessment=hiringNeedAssessment(dept,st),factors=assessment.factors.slice(0,3);
+  const top=factors[0];
+  let reason;
+  if(top)reason=`${teamDisplayName(dept)} recommends adding ${articleFor(role)} ${role} because ${top.text}.`;
+  else reason=`${teamDisplayName(dept)} is monitoring staffing before operational failures appear. The request is preventive rather than a response to a blocked queue.`;
+  const evidence=factors.map(f=>f.evidence).filter(Boolean);
+  if(!evidence.length)evidence.push("No immediate blockers are visible; the signal is based on forward staffing risk.");
+  if(assessment.financeConstraint>0)evidence.push("Finance is applying runway caution to the recommendation.");
+  return {reason,evidence,assessment};
+}
+function articleFor(text){return /^[aeiou]/i.test(String(text||""))?"an":"a";}
 function updateHiringNeedHistory(){
   ensureWorkforceEconomySystems();updateStaffingModel();
   for(const [dept,st] of Object.entries(company.staffingModel||{})){
-    const score=Math.round(hiringNeedScore(dept,st)),hist=company.hiringNeedHistory[dept]||{days:0,lastScore:0,peak:0,confidence:0};
+    const assessment=hiringNeedAssessment(dept,st);
+    const score=Math.round(assessment.score),hist=company.hiringNeedHistory[dept]||{days:0,lastScore:0,peak:0,confidence:0};
     hist.days=score>=60?(hist.days||0)+1:Math.max(0,(hist.days||0)-1);
     hist.lastScore=score;hist.peak=Math.max(score,hist.peak||0);
     const signals=[st.current<st.minimumHealthy,st.backlog>5,st.blockedWork>0,st.workload>70,st.skillCoverage<58,company.finance?.runwayDays>45].filter(Boolean).length;
     hist.confidence=clamp(hist.days*8+signals*9+(score-hist.days)*.12,0,100);
+    hist.factors=assessment.factors.slice(0,4);
     company.hiringNeedHistory[dept]=hist;
   }
 }
@@ -709,8 +756,9 @@ function roleForDepartmentHire(dept){
 function makeHiringRequestEvent(dept,st){
   const role=roleForDepartmentHire(dept),annualCost=defaultEmploymentForRole(role).annualSalary*1.34;
   const hist=company.hiringNeedHistory?.[dept]||{},confidence=Math.round(hist.confidence||62),needScore=Math.round(hist.lastScore||hiringNeedScore(dept,st));
-  const reasons=[];if(st.current<st.minimumHealthy)reasons.push(`${teamDisplayName(dept)} is below healthy staffing`);if(st.blockedWork)reasons.push(`${st.blockedWork} blocked work item(s)`);if(st.workload>75)reasons.push("sustained workload above healthy capacity");if((company.finance?.runwayDays||999)<90)reasons.push("finance flagged runway impact");
-  return {id:`hiring-request-${dept}-${company.day}`,repeatable:false,category:"people",title:`Hiring request: ${role}`,copy:`${teamDisplayName(dept)} recommends adding a ${role}. Need score ${needScore}, confidence ${confidence}. Reasons: ${reasons.join("; ")}. Estimated annual employment cost is about $${annualCost.toFixed(2)}M.`,hiringRequest:{department:dept,role,requestedCount:1,confidence,reasons,financeAssessment:`Runway impact about ${Math.max(1,Math.round(annualCost/365/Math.max(.001,Math.abs(company.finance?.netCashFlowDaily||-.01))))} day(s) under current flow`,operationalImpact:`Need score ${needScore}; workload ${st.workload}; blocked work ${st.blockedWork}`,successionImpact:"Improves coverage if current staff leave or retire"},generatedCommunication:{type:"Hiring Request",priority:"Decision Needed",sender:{name:"People and Finance Review",role:"Operating Council"},subject:`Hiring Request - ${role}`,message:`${teamDisplayName(dept)} is asking for one ${role}. The request is based on sustained staffing range, workload, blocked work, succession risk, skill coverage, and runway impact. Confidence: ${confidence}%.`,recs:[[teamDisplayName(dept),`Approve the position; confidence ${confidence}%`,confidence],["Finance",(company.finance?.runwayDays||999)<75?"Delay until runway improves":"Fundable if growth remains controlled",Math.max(45,80-Math.max(0,90-(company.finance?.runwayDays||999)))],["People","Candidate market and retention pressure support action",72],["Board",needScore>88?"Approve if cash discipline remains visible":"Monitor payroll impact",64]],impacts:["Recruiting starts after approval","Payroll increases only after a candidate joins","Onboarding temporarily slows output","Capability and retention may improve"]},choices:[
+  const narrative=hiringNeedNarrative(dept,st,role);
+  const reasons=narrative.evidence;
+  return {id:`hiring-request-${dept}-${company.day}`,repeatable:false,category:"people",title:`Hiring request: ${role}`,copy:`${narrative.reason} Estimated annual employment cost is about $${annualCost.toFixed(2)}M.`,hiringRequest:{department:dept,role,requestedCount:1,confidence,reasons,financeAssessment:`Runway impact about ${Math.max(1,Math.round(annualCost/365/Math.max(.001,Math.abs(company.finance?.netCashFlowDaily||-.01))))} day(s) under current flow`,operationalImpact:`Need score ${needScore}; ${reasons.slice(0,2).join("; ")}`,successionImpact:"Improves coverage if current staff leave or retire"},generatedCommunication:{type:"Hiring Request",priority:"Decision Needed",sender:{name:"People and Finance Review",role:"Operating Council"},subject:`Hiring Request - ${role}`,message:`${narrative.reason} People and Finance reviewed the request against workload, staffing range, project demand, succession risk, skills, and runway. Confidence: ${confidence}%. Evidence: ${reasons.slice(0,3).join("; ")}.`,recs:[[teamDisplayName(dept),`Approve the position because ${reasons[0]||"capacity risk is rising"}`,confidence],["Finance",(company.finance?.runwayDays||999)<75?"Delay until runway improves":"Fundable if growth remains controlled",Math.max(45,80-Math.max(0,90-(company.finance?.runwayDays||999)))],["People","Candidate market and retention pressure support action",72],["Board",needScore>88?"Approve if cash discipline remains visible":"Monitor payroll impact",64]],impacts:["Recruiting starts after approval","Payroll increases only after a candidate joins","Onboarding temporarily slows output","Capability and retention may improve"]},choices:[
     {title:"Approve position",detail:"Authorize this role and let HR open recruiting.",effect:{board:1},directive:"people",days:8,people:{stress:-2,morale:2},hire:"specialist",hireRole:role,hireDept:dept,opinion:{support:2,trust:1},strategy:"people",benefits:["opens the role without CEO candidate review","may reduce workload pressure","improves succession depth"],risks:["raises payroll after joining","candidate may decline","runway shortens later"],uncertainty:"Material",estimatedConfidence:confidence},
     {title:"Delay position",detail:"Revisit the headcount request next quarter while the team manages workload.",effect:{board:1},directive:"quality",days:6,people:{stress:2,morale:-1},deferHiring:{dept,role},opinion:{fairness:-1},strategy:"finance",benefits:["protects runway","keeps flexibility"],risks:["backlog may grow","retention may worsen"],uncertainty:"Material",estimatedConfidence:54},
     {title:"Reject and reprioritize",detail:"Decline the position and ask the department to reduce scope instead.",effect:{cash:.05,board:2,quality:-1},directive:"cuts",days:8,people:{stress:4,morale:-3},rejectHiring:{dept,role},opinion:{support:-2,trust:-1},strategy:"cost-control",benefits:["protects cash","forces focus"],risks:["trust may decline","workload may rise","quality can suffer"],uncertainty:"High",estimatedConfidence:44}
