@@ -576,10 +576,43 @@ function institutionalLearningLine(model){
   if(/customer|retention|churn|support/i.test(`${lessons.key} ${lessons.title}`))return `Customer Success ${state} a customer lesson from ${Math.max(1,evidenceCount)} prior signal(s): ${title}. That experience shapes how this memo weighs renewals, churn, and promises.`;
   return `${teamDisplayName(lessons.department||model.department||"company")} ${state} a relevant company lesson from ${Math.max(1,evidenceCount)} prior signal(s): ${title}.`;
 }
+function allPortfolioSubjects(){
+  return [...(company.projects||[]),...(company.projectProposals||[]),...(company.projectArchive||[])];
+}
+function projectFromWorkSubject(work){
+  if(!work?.projectId)return null;
+  return allPortfolioSubjects().find(p=>p.id===work.projectId)||null;
+}
+function hiringDecisionRole(ev,choice={}){
+  return choice.hire?.role||choice.hireRole||choice.hiringException?.role||choice.deferHiring?.role||choice.rejectHiring?.role||ev.hiringRequest?.role||ev.hireRole||ev.deferHiring?.role||ev.rejectHiring?.role||null;
+}
+function decisionContextSubject(ev,choice={}){
+  const work=decisionWorkSubject(ev);
+  const project=decisionProjectSubject(ev,choice)||projectFromWorkSubject(work);
+  if(project)return {kind:"project",label:"Project",name:project.title||project.codename||project.id,id:project.id,detail:work?.title?`Related work: ${work.title}`:project.status?`Status: ${project.status}`:""};
+  if(work)return {kind:"work",label:"Work item",name:work.title||work.id,id:work.id,detail:work.assignedTeam?`Team: ${teamDisplayName(work.assignedTeam)}`:""};
+  const role=hiringDecisionRole(ev,choice);
+  if(role)return {kind:"hiring",label:"Hiring request",name:role,id:ev.hiringRequest?.id||null,detail:ev.hiringRequest?.team?`Team: ${teamDisplayName(ev.hiringRequest.team)}`:""};
+  if(ev.customerSegmentId)return {kind:"customer",label:"Customer segment",name:CUSTOMER_SEGMENT_DEFS[ev.customerSegmentId]?.label||ev.customerSegmentId,id:ev.customerSegmentId,detail:"Customer-facing decision"};
+  const department=ev.memoIntelligence?.department||eventCategory(ev);
+  if(department)return {kind:"department",label:"Department",name:teamDisplayName(department),id:department,detail:"Company-level operating decision"};
+  return null;
+}
+function decisionContextSummary(ev,choice={}){
+  const ctx=decisionContextSubject(ev,choice);
+  return ctx?`${ctx.label}: ${ctx.name}`:"";
+}
+function decisionContextBlockHtml(model,ev={}){
+  const ctx=model.decisionContext||decisionContextSubject(ev);
+  const work=model.relatedWorkItemTitle?`Related work: ${model.relatedWorkItemTitle}`:ctx?.detail;
+  const items=[ctx?`Decision context: ${ctx.label}: ${ctx.name}`:null,work||null,model.relatedDepartmentIds?.length?`Responsible area: ${model.relatedDepartmentIds.map(teamDisplayName).join(", ")}`:null].filter(Boolean);
+  if(!items.length)return "";
+  return `<div class="memo-block memo-context"><h4>Decision context</h4><ul class="evidence-list">${items.map(x=>`<li>${x}</li>`).join("")}</ul></div>`;
+}
 function buildStructuredExecutiveMessage(ev,comm,intel){
-  const dept=intel.department||memoDepartmentFor(ev,comm),cred=ensureSenderCredibility(comm.from,dept),observations=selectMemoObservations(intel,ev,comm),sourceMsg=(company.employeeMessages||[]).find(m=>m.id===ev.sourceMessageId),senderEmployee=employees.find(e=>e.name===comm.from),project=decisionProjectSubject(ev),sourceIds=[ev.id,ev.sourceMessageId,sourceMsg?.issueId,sourceMsg?.workItemId].filter(Boolean);
-  const role=ev.hiringRequest?.role||ev.hireRole||ev.deferHiring?.role||ev.rejectHiring?.role||null;
-  const model={senderId:senderEmployee?.id??null,senderName:comm.from||"Executive Office",senderRole:comm.role||"Leadership Team",department:dept,subject:comm.subject||ev.title,sentDay:company.day,sentMinute:company.minute||0,reasonForWriting:"",observations,assessment:"",recommendation:"",confidenceBand:confidenceBand((cred.evidenceQuality||58)*.45+(cred.estimateAccuracy||55)*.35+(100-(cred.overconfidence||0))*.2),uncertaintyNote:"",sourceIds,relatedProjectId:project?.id||null,relatedProjectName:project?.title||null,relatedRoleIds:role?[role]:[],relatedEmployeeIds:intel.originEmployeeIds||[],relatedDecisionId:ev.id,senderPersonality:senderPersonalityFor(comm,dept),senderCredibility:{...cred},debug:{senderBias:departmentBiasProfile(dept),recommendationScores:(ev.choices||[]).map(c=>({choice:c.title,score:Math.round(evaluateChoiceForDepartment(c,dept,{event:ev,evidence:intel.evidence||[]}).score)})),observationsRaw:intel.evidence||[],institutionalLearning:[]}};
+  const dept=intel.department||memoDepartmentFor(ev,comm),cred=ensureSenderCredibility(comm.from,dept),observations=selectMemoObservations(intel,ev,comm),sourceMsg=(company.employeeMessages||[]).find(m=>m.id===ev.sourceMessageId),senderEmployee=employees.find(e=>e.name===comm.from),work=decisionWorkSubject(ev),project=decisionProjectSubject(ev)||projectFromWorkSubject(work),sourceIds=[ev.id,ev.sourceMessageId,sourceMsg?.issueId,sourceMsg?.workItemId].filter(Boolean);
+  const role=hiringDecisionRole(ev);
+  const model={senderId:senderEmployee?.id??null,senderName:comm.from||"Executive Office",senderRole:comm.role||"Leadership Team",department:dept,subject:comm.subject||ev.title,sentDay:company.day,sentMinute:company.minute||0,reasonForWriting:"",observations,assessment:"",recommendation:"",confidenceBand:confidenceBand((cred.evidenceQuality||58)*.45+(cred.estimateAccuracy||55)*.35+(100-(cred.overconfidence||0))*.2),uncertaintyNote:"",sourceIds,decisionContext:decisionContextSubject(ev),relatedProjectId:project?.id||null,relatedProjectName:project?.title||project?.codename||null,relatedWorkItemId:work?.id||sourceMsg?.workItemId||null,relatedWorkItemTitle:work?.title||null,relatedRoleIds:role?[role]:[],relatedEmployeeIds:intel.originEmployeeIds||[],relatedDecisionId:ev.id,senderPersonality:senderPersonalityFor(comm,dept),senderCredibility:{...cred},debug:{senderBias:departmentBiasProfile(dept),recommendationScores:(ev.choices||[]).map(c=>({choice:c.title,score:Math.round(evaluateChoiceForDepartment(c,dept,{event:ev,evidence:intel.evidence||[]}).score)})),observationsRaw:intel.evidence||[],institutionalLearning:[]}};
   model.contextKind=ev.hiringRequest?"hiring":ev.customerSegmentId?"customer":ev.projectDecision||project?"project":eventCategory(ev);
   model.reasonForWriting=memoOpeningSentence(model,ev);
   model.assessment=memoAssessmentSentence(model);
@@ -590,18 +623,19 @@ function buildStructuredExecutiveMessage(ev,comm,intel){
   return model;
 }
 function renderStructuredExecutiveMessage(model,ev={}){
-  const related=[model.relatedProjectName?`Related Project: ${model.relatedProjectName}`:model.relatedProjectId?`Related Project: ${model.relatedProjectId}`:null,model.relatedCustomerSegment?`Affected Customer Segment: ${model.relatedCustomerSegment}`:null,model.relatedDepartmentIds?.length?`Related Department: ${model.relatedDepartmentIds.map(teamDisplayName).join(", ")}`:null,model.relatedRoleIds?.length?`Affected Role: ${model.relatedRoleIds.join(", ")}`:null,model.decisionDeadlineDay!==undefined?`Decision Needed By: Day ${model.decisionDeadlineDay+1}`:null,model.reasonForEscalation?`Why You Are Receiving This: ${model.reasonForEscalation}`:null].filter(Boolean).map(x=>`<li>${x}</li>`).join("");
-  return `${renderExecutiveEmailBody(model,ev)}${related?`<h4>Decision context</h4><ul class="evidence-list">${related}</ul>`:""}`;
+  const related=[model.relatedCustomerSegment?`Affected Customer Segment: ${model.relatedCustomerSegment}`:null,model.relatedRoleIds?.length?`Affected Role: ${model.relatedRoleIds.join(", ")}`:null,model.decisionDeadlineDay!==undefined?`Decision Needed By: Day ${model.decisionDeadlineDay+1}`:null,model.reasonForEscalation?`Why You Are Receiving This: ${model.reasonForEscalation}`:null].filter(Boolean).map(x=>`<li>${x}</li>`).join("");
+  return `${decisionContextBlockHtml(model,ev)}${renderExecutiveEmailBody(model,ev)}${related?`<h4>Decision details</h4><ul class="evidence-list">${related}</ul>`:""}`;
 }
 function communicationHeaderHtml(comm,model){
   const cc=(model?.ccRecipients||[]).join(", ")||"Executive Staff";
   const sent=model?.sentDay!==undefined?`Day ${model.sentDay+1}, ${formatMemoTime(model.sentMinute||company.minute||0)}`:comm.date;
   const subject=model?.subject||comm.subject;
   const type=model?.messageType||comm.type||"Executive Email";
+  const context=model?.decisionContext?`<div><strong>Decision Context:</strong> ${model.decisionContext.label}: ${model.decisionContext.name}</div>`:"";
   if(type==="Board Memorandum"||String(comm.type||"").includes("Board")){
-    return `<div class="memo-meta"><div><strong>To:</strong> CEO</div><div><strong>From:</strong> ${comm.from}, ${comm.role}</div><div><strong>Date:</strong> ${sent}</div><div><strong>Subject:</strong> ${subject}</div><div><strong>Priority:</strong> ${comm.priority}</div><div><strong>Decision Required:</strong> ${model?.decisionRequired?"Yes":"No"}</div></div>`;
+    return `<div class="memo-meta"><div><strong>To:</strong> CEO</div><div><strong>From:</strong> ${comm.from}, ${comm.role}</div><div><strong>Date:</strong> ${sent}</div><div><strong>Subject:</strong> ${subject}</div>${context}<div><strong>Priority:</strong> ${comm.priority}</div><div><strong>Decision Required:</strong> ${model?.decisionRequired?"Yes":"No"}</div></div>`;
   }
-  return `<div class="memo-meta"><div><strong>From:</strong> ${comm.from}, ${comm.role}</div><div><strong>To:</strong> CEO</div><div><strong>Cc:</strong> ${cc}</div><div><strong>Subject:</strong> ${subject}</div><div><strong>Sent:</strong> ${sent}</div><div><strong>Priority:</strong> ${comm.priority}</div><div><strong>Status:</strong> ${model?.decisionRequired?"Decision required":"Informational"}</div></div>`;
+  return `<div class="memo-meta"><div><strong>From:</strong> ${comm.from}, ${comm.role}</div><div><strong>To:</strong> CEO</div><div><strong>Cc:</strong> ${cc}</div><div><strong>Subject:</strong> ${subject}</div>${context}<div><strong>Sent:</strong> ${sent}</div><div><strong>Priority:</strong> ${comm.priority}</div><div><strong>Status:</strong> ${model?.decisionRequired?"Decision required":"Informational"}</div></div>`;
 }
 function formatMemoTime(minute){
   const m=Number.isFinite(minute)?minute:480,h=Math.floor(m/60)%24,mm=String(Math.floor(m%60)).padStart(2,"0"),period=h>=12?"PM":"AM",display=h%12||12;
@@ -679,7 +713,8 @@ function choiceDepartmentPerspectiveText(choice,ev){
   return `${teamDisplayName(dept)}: ${departmentViewpointReason(dept,ev,choice)}`;
 }
 function renderDecisionChoiceHtml(choice,ev){
-  return `<strong>${displayChoiceTitle(choice,ev)}</strong><small>${choice.detail}</small><small><b>Why choose this?</b> ${optionReasonText(choice,ev)}</small><small><b>Potential benefit:</b> ${optionBenefitSentence(choice,ev)}</small><small><b>Potential downside:</b> ${optionRiskSentence(choice,ev)}</small>${expectedEffectsHtml(choice,ev)}`;
+  const context=decisionContextSummary(ev,choice);
+  return `<strong>${displayChoiceTitle(choice,ev)}</strong>${context?`<small><b>Applies to:</b> ${context}</small>`:""}<small>${choice.detail}</small><small><b>Why choose this?</b> ${optionReasonText(choice,ev)}</small><small><b>Potential benefit:</b> ${optionBenefitSentence(choice,ev)}</small><small><b>Potential downside:</b> ${optionRiskSentence(choice,ev)}</small>${expectedEffectsHtml(choice,ev)}`;
 }
 function messageFingerprintFor(ev,comm){
   const subjectType=ev.category||eventCategory(ev),subjectId=ev.customerSegmentId||ev.commercialProjectId||ev.projectDecision?.id||ev.hiringRequest?.id||ev.sourceMessageId||ev.id,issueType=ev.id||ev.title||comm.subject,escalationLevel=comm.priority||"Normal";
@@ -1250,10 +1285,10 @@ function decisionOptionScore(choice,ctx,department="company"){
 function decisionProjectSubject(ev,choice={}){
   choice=choice||{};
   const id=choice.projectDecision?.id||choice.commercializeProject?.id||ev.projectDecision?.id||ev.commercialProjectId||ev.projectId;
-  if(id)return [...(company.projects||[]),...(company.projectProposals||[]),...(company.projectArchive||[])].find(p=>p.id===id)||null;
+  if(id)return allPortfolioSubjects().find(p=>p.id===id)||null;
   const msg=ev.sourceMessageId?(company.employeeMessages||[]).find(m=>m.id===ev.sourceMessageId):null;
   const work=msg?messageWorkItem(msg):null;
-  if(work?.projectId)return [...(company.projects||[]),...(company.projectProposals||[])].find(p=>p.id===work.projectId)||null;
+  if(work?.projectId)return projectFromWorkSubject(work);
   return null;
 }
 function decisionWorkSubject(ev){
@@ -1699,12 +1734,13 @@ function renderDecisionEvent(){
   if(!company.pendingEvent){document.getElementById("eventTitle").textContent=queuedCount?`${queuedCount} memo${queuedCount===1?"":"s"} queued`:"No urgent decisions";document.getElementById("eventCopy").textContent=queuedCount?"The organization has queued CEO memo(s). They will open as soon as the current simulation tick processes.":"The company is operating on its own. A memo or email will appear when leadership is needed.";memo.classList.add("hidden");grid.classList.add("hidden");button.classList.add("hidden");badge.textContent=queuedCount?"Queued":"Watching";badge.className=queuedCount?"inbox-badge alert":"inbox-badge quiet";alert.classList.add("hidden");return;}
   const stale=validateMessageContext(company.pendingEvent);if(!stale.valid){const old=company.pendingEvent;recordHistory(`CEO memo superseded: ${old.title||old.id} (${stale.reason}).`,"communication",2);company.pendingEvent=null;company.pendingCommunication=null;renderDecisionEvent();return;}
   const ev=prepareStrategicDecision(company.pendingEvent),comm=eventCommunication(ev);company.pendingCommunication=comm;
-  document.getElementById("eventTitle").textContent=comm.subject;document.getElementById("eventCopy").textContent="Review the communication and record a CEO decision.";badge.textContent="Action needed";badge.className="inbox-badge alert";grid.classList.remove("hidden");button.classList.remove("hidden");memo.classList.remove("hidden");
+  const contextText=decisionContextSummary(ev);
+  document.getElementById("eventTitle").textContent=comm.subject;document.getElementById("eventCopy").textContent=contextText?`Decision context: ${contextText}. Review the communication and record a CEO decision.`:"Review the communication and record a CEO decision.";badge.textContent="Action needed";badge.className="inbox-badge alert";grid.classList.remove("hidden");button.classList.remove("hidden");memo.classList.remove("hidden");
   const priorityClass=comm.priority==="Urgent"?"urgent":comm.priority==="FYI"?"fyi":"";
   ev.memoIntelligence=ev.memoIntelligence||buildMemoIntelligence(ev,comm);
   ensureExecutiveMessageModel(ev,comm);
   memo.innerHTML=`<article class="memo-card"><div class="memo-header"><div><div class="memo-type">${comm.type}</div><h3>${comm.subject}</h3></div><span class="memo-priority ${priorityClass}">${comm.priority}</span></div>${communicationHeaderHtml(comm,comm.structuredMessage)}<div class="memo-message">${comm.message}</div>${memoIntelligenceHtml(ev,comm)}<div class="memo-signature">${comm.signature.replace(/\n/g,"<br>")}</div></article>`;
-  alert.innerHTML=`<strong>${comm.type}: ${comm.subject}</strong>${comm.from} requests a CEO decision.`;alert.classList.remove("hidden");grid.innerHTML="";ev.choices.forEach((d,i)=>{const b=document.createElement("button");b.className="decision"+(i===company.selected?" selected":"");b.innerHTML=renderDecisionChoiceHtml(d,ev);b.onclick=()=>{company.selected=i;renderDecisionEvent()};grid.appendChild(b);});
+  alert.innerHTML=`<strong>${comm.type}: ${comm.subject}</strong>${comm.from} requests a CEO decision${contextText?` for ${contextText}`:""}.`;alert.classList.remove("hidden");grid.innerHTML="";ev.choices.forEach((d,i)=>{const b=document.createElement("button");b.className="decision"+(i===company.selected?" selected":"");b.innerHTML=renderDecisionChoiceHtml(d,ev);b.onclick=()=>{company.selected=i;renderDecisionEvent()};grid.appendChild(b);});
 }
 function eventCategory(ev){return ev.category||({cash:"finance",performance:"people",hiring:"people",burnout:"people",culture:"culture",milestone:"product",launch:"product","pilot-review":"product","market-shift":"market","supply-chain":"operations","shareholder-letter":"board"}[ev.id]||"opportunity");}
 function eventBaseWeight(ev){return Number(ev.baseWeight)||({performance:.75,cash:.8,hiring:1.25,burnout:1,culture:.95,"market-shift":1,milestone:1.1,launch:1.2,"pilot-review":1.2}[ev.id]||1);}
