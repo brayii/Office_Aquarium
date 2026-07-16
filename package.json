@@ -9,7 +9,8 @@
     "test:static": "node tests/static-structure-check.js",
     "test:smoke": "node tests/browser-smoke-test.js",
     "test:regression": "node tests/simulation-regression-test.js",
-    "test": "npm run test:static && npm run test:smoke && npm run test:regression",
+    "test:workforce": "node tests/workforce-regression-test.js",
+    "test": "npm run test:static && npm run test:smoke && npm run test:regression && npm run test:workforce",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

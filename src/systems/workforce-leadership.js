@@ -253,12 +253,27 @@ function hiringPipelineRows(){
   employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||21)).forEach(e=>{
     rows.push({dept:roleDepartment(e.role),role:e.role,count:1,status:"Onboarding",reason:`${e.name} joined on day ${e.joinedDay}; productivity ${e.onboarding?.productivity||Math.round(onboardingProductivity(e)*100)}%; mentor ${employees.find(m=>m.id===e.onboarding?.mentorId)?.name||"none"}`,confidence:80});
   });
-  return rows.slice(0,8);
+  return rows;
 }
 function hiringPipelineHtml(){
   const rows=hiringPipelineRows();
   if(!rows.length)return `<br><br><strong>Hiring Pipeline</strong><br><small>No active staffing requests. Departments may still be monitoring early signals.</small>`;
-  return `<br><br><strong>Hiring Pipeline</strong><div class="briefing-grid" style="margin-top:8px">${rows.map(r=>`<div class="briefing-card"><strong>${teamDisplayName(r.dept)} +${r.count} ${r.role}</strong><small>Status: ${r.status}<br>Reason: ${r.reason}<br>Confidence ${r.confidence}%</small></div>`).join("")}</div>`;
+  const visible=rows.slice(0,8),extra=rows.slice(8);
+  const cards=visible.map(r=>`<div class="briefing-card"><strong>${teamDisplayName(r.dept)} +${r.count} ${r.role}</strong><small>Status: ${r.status}<br>Reason: ${r.reason}<br>Confidence ${r.confidence}%</small></div>`).join("");
+  const more=extra.length?`<details class="pipeline-more"><summary>${extra.length} more staffing item(s)</summary><div class="briefing-grid" style="margin-top:8px">${extra.map(r=>`<div class="briefing-card"><strong>${teamDisplayName(r.dept)} +${r.count} ${r.role}</strong><small>Status: ${r.status}<br>Reason: ${r.reason}<br>Confidence ${r.confidence}%</small></div>`).join("")}</div></details>`:"";
+  return `<br><br><strong>Hiring Pipeline</strong><div class="briefing-grid" style="margin-top:8px">${cards}</div>${more}`;
+}
+function staffingShortageSummary(){
+  ensureWorkforceEconomySystems();updateStaffingModel();
+  const rows=Object.entries(company.staffingModel||{}).map(([dept,st])=>{
+    const missing=Math.max(0,Math.ceil((st.minimumHealthy||0)-(st.current||0)+(st.capacityGap||0)+(st.projectOverload||0)));
+    const critical=(st.blockedWork||0)>=2||(st.workload||0)>=90||(st.skillCoverage||100)<45||missing>=2;
+    return {dept,missing,critical,monitoring:st.understaffed&&missing===0,workload:st.workload||0};
+  });
+  const critical=rows.filter(r=>r.missing>0&&r.critical).map(r=>`${teamDisplayName(r.dept)} +${r.missing}`);
+  const moderate=rows.filter(r=>r.missing>0&&!r.critical).map(r=>`${teamDisplayName(r.dept)} +${r.missing}`);
+  const monitoring=rows.filter(r=>r.monitoring).map(r=>teamDisplayName(r.dept));
+  return `${critical.length?`Critical shortages: ${critical.join(", ")}`:"Critical shortages: none"} | ${moderate.length?`Moderate shortages: ${moderate.join(", ")}`:"Moderate shortages: none"}${monitoring.length?` | Monitoring capacity: ${monitoring.join(", ")}`:""}`;
 }
 function workforceFinancialPressureHtml(){
   ensureWorkforceEconomySystems();updateCompanyRiskComponents();
@@ -277,6 +292,7 @@ function workforceFinancialPressureHtml(){
     Employees ${activeEmployees} (${inOffice} in office); vacancies/backfills ${(company.openRoles||[]).length}; payroll $${f.payrollDaily.toFixed(3)}M/day; total cost $${f.totalDailyCost.toFixed(3)}M/day<br>
     Net cash flow $${f.netCashFlowDaily.toFixed(3)}M/day; runway ${f.runwayDays>=999?"positive":f.runwayDays+" day(s)"}; unpaid payroll ${company.unpaidPayrollDays||0} day(s)<br>
     Understaffed: ${below.length?below.join(", "):"none"} | Overstaffed: ${above.length?above.join(", "):"none"}<br>
+    ${staffingShortageSummary()}<br>
     Hiring policy: ${hiringPolicyLabel()}${company.hiringPolicy?.reviewDay?`; review day ${company.hiringPolicy.reviewDay}`:""} <button class="small-btn" onclick="requestHiringPolicyReview()">Review Hiring Policy</button><br>
     Staffing signals ${identified}; preparing CEO memo ${preparing}; memo queued ${queuedMemos}; recent hiring decisions ${recentHiringActions}; requisitions ${requisitions}; searching ${recruiting}; interviewing ${interviewing}; offers ${offers}; paused ${pausedRecruiting}; suppressed ${suppressed}; onboarding ${onboarding}; coaching ${coaching}; PIP ${pips}; burnout watch ${burnout}<br>
     Average expected time to fill ${avgFill||"n/a"} day(s). Hiring flow: department signal -> finance/HR review -> CEO Inbox memo -> approve position -> HR recruits and hires.<br>
@@ -517,6 +533,7 @@ function startRecruiting(role,mode="specialist",department=roleDepartment(role))
   createOrReinforceLesson({key:"hiring-starts-before-crisis",title:"Hiring works best when recruiting starts before capacity fully breaks.",department,vector:workforceLearningVector("hiring"),outcome:"positive",confidence:60,evidence:`Recruiting started for ${role}`,importance:3});
 }
 function generateRecruitingCandidate(item){
+  if(validationMode&&company.forceRecruitingCandidateForTest)return {...company.forceRecruitingCandidateForTest};
   const marketBoost={excellent:16,healthy:9,average:0,tight:-8,"very tight":-15}[item.market]||0;
   const labor=laborMarketForDepartment(item.department||roleDepartment(item.role));
   const health=(recruitingHealthScore(item)-50)*.16;
@@ -579,7 +596,7 @@ function processRecruitingPipeline(){
     if(item.status==="searching"){
       item.attempts=(item.attempts||0)+1;
       const candidate=generateRecruitingCandidate(item);
-      if(candidate.mediocre&&simulationRandom()<.55){
+      if(candidate.mediocre&&((validationMode&&candidate.forceRetry)||simulationRandom()<.55)){
         if(elapsed>=90||(item.attempts||0)>=5){company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"search-exception"});queueHiringExceptionEvent(item,"failed-search",candidate);}
         else{item.dueDay=company.day+stageDaysForRecruiting(item,"searching");company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"search-continued"});recordHistory(`HR kept searching for ${item.role} after a weak candidate screen.`,"people",2);}
         continue;
