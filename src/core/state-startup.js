@@ -339,11 +339,142 @@ company.market={...initialCompany.market,...(company.market||{})};
   company.weeklyEvents=company.weeklyEvents.slice(-40);
 }
 function signed(value,digits=0){const n=Number(value)||0;return `${n>=0?"+":""}${n.toFixed(digits)}`;}
+function htmlEscape(text){
+  return String(text??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+function qualitativeLevel(value,{low=35,high=70,lowText="Low",midText="Mixed",highText="Strong"}={}){
+  const n=Number(value)||0;
+  if(n<low)return lowText;
+  if(n>=high)return highText;
+  return midText;
+}
+function titleCase(text){return String(text||"").replace(/\b\w/g,c=>c.toUpperCase());}
+function plainDecisionTitle(text){
+  let t=String(text||"").replace(/^CEO decision:\s*/i,"").replace(/^Decision outcome:\s*/i,"").trim();
+  const lower=t.toLowerCase();
+  const project=[...(company.projects||[]),...(company.projectArchive||[]),...(company.projectProposals||[])].find(p=>lower.includes(String(p.title||"").toLowerCase())||lower.includes(String(p.codename||"").toLowerCase()));
+  if(/^approve position/i.test(t))return "Approved a new role for the department after workforce review.";
+  if(/^delay position/i.test(t))return "Delayed a hiring request to protect runway and reassess workload.";
+  if(/^reject and reprioritize/i.test(t))return "Rejected a hiring request and asked the department to reduce scope.";
+  if(/^approve/i.test(t))return `${t.replace(/^approve/i,"Approved")}${project?` for ${project.title}`:""}.`.replace(/\.\.$/,".");
+  if(/^delay/i.test(t))return `${t.replace(/^delay/i,"Delayed")}${project?` for ${project.title}`:""}.`.replace(/\.\.$/,".");
+  if(/^continue/i.test(t))return `${t.replace(/^continue/i,"Continued")}${project?` on ${project.title}`:""}.`.replace(/\.\.$/,".");
+  if(/^cancel/i.test(t))return `${t.replace(/^cancel/i,"Canceled")} ${project?project.title:"the project"}.`;
+  return t.endsWith(".")?t:`${t}.`;
+}
+function explainWeeklyEvent(event){
+  const text=String(event?.text||"").trim();
+  if(!text)return "";
+  if(/^CEO decision:/i.test(text))return plainDecisionTitle(text);
+  if(/^Decision outcome:/i.test(text))return explainDecisionOutcome(text);
+  if(/Product phase advanced to/i.test(text)){
+    const phase=text.replace(/.*Product phase advanced to\s*/i,"").replace(/\.$/,"");
+    return `The product moved into ${phase}, which changes what evidence and execution risk matter next.`;
+  }
+  if(/hit a development blocker/i.test(text))return text.replace(/\.$/,".")+" The project now has visible development friction for the team to resolve.";
+  if(/board issued a strike/i.test(text))return "The Board raised a formal concern, increasing pressure on leadership to explain cash discipline and execution risk.";
+  if(/cash discipline/i.test(text))return text.replace(/\.$/,".")+" Finance and the Board are watching whether spending matches the company's current runway.";
+  if(/was unblocked by/i.test(text)||/unblocked/i.test(text))return text.replace(/\.$/,".")+" That reduced near-term execution friction.";
+  if(/created rework/i.test(text))return text.replace(/\.$/,".")+" This adds quality pressure rather than simple progress.";
+  if(/joined as the new/i.test(text)||/HR hired/i.test(text))return text.replace(/\.$/,".")+" The new hire will need onboarding before becoming fully productive.";
+  if(/resigned|retired|fired|left through|layoffs/i.test(text))return text.replace(/\.$/,".")+" The change affects continuity, morale, and staffing coverage.";
+  if(/completed/i.test(text)&&/Project/i.test(text))return text.replace(/\.$/,".")+" Completion moves attention from development risk toward commercial value.";
+  return text.endsWith(".")?text:`${text}.`;
+}
+function explainDecisionOutcome(text){
+  const clean=String(text||"").replace(/^Decision outcome:\s*/i,"").trim();
+  const lower=clean.toLowerCase();
+  const project=[...(company.projects||[]),...(company.projectArchive||[]),...(company.projectProposals||[])].find(p=>lower.includes(String(p.title||"").toLowerCase())||lower.includes(String(p.codename||"").toLowerCase()));
+  const subject=project?project.title:"the related issue";
+  const tone=/negative|worsen|delay|cost|risk|miss|pressure/.test(lower)?"worsened":/positive|improved|gained|reduced|resolved|success/.test(lower)?"improved":"remained mixed";
+  if(tone==="improved")return `The decision improved ${subject}, although the full long-term result is still being watched.`;
+  if(tone==="worsened")return `The decision created pressure around ${subject}; near-term risk or cost increased while the longer-term result remains uncertain.`;
+  return `The decision produced mixed early results for ${subject}; some evidence improved, but the long-term outcome remains uncertain.`;
+}
+function weeklyMetricExplanation(delta,now){
+  const lines=[];
+  if(Math.abs(delta.cash)>=.05){
+    const cause=(company.portfolioHealth?.totalProjectSpendDaily||0)>.01||company.finance?.totalDailyCost>0?"normal operating activity, payroll, and project spending":"normal operating activity";
+    lines.push(`Cash ${delta.cash<0?"fell":"rose"} by $${Math.abs(delta.cash).toFixed(1)}M across ${cause}.`);
+  }
+  if(Math.abs(delta.customers)>=1)lines.push(`${Math.abs(Math.round(delta.customers))} customer${Math.abs(Math.round(delta.customers))===1?"":"s"} ${delta.customers>0?"joined":"left"} after recent commercial activity.`);
+  if(Math.abs(delta.board)>=1)lines.push(`Board confidence ${delta.board>0?"improved":"weakened"} by ${Math.abs(Math.round(delta.board))} point${Math.abs(Math.round(delta.board))===1?"":"s"} based on operating and leadership signals.`);
+  if(Math.abs(delta.morale)>=1)lines.push(`Morale ${delta.morale>0?"improved":"declined"} by ${Math.abs(Math.round(delta.morale))} point${Math.abs(Math.round(delta.morale))===1?"":"s"} as employees reacted to workload and company conditions.`);
+  if(now.phase!==delta.phaseBefore)lines.push(`The product entered the ${now.phase} phase, changing the company's operating priorities.`);
+  return lines;
+}
+function weeklyMetricInterpretation(delta,now,intelligence){
+  if(now.cash<6||company.finance?.runwayDays<75)return "Financial flexibility is tight, so spending decisions and project scope matter more next week.";
+  if(Math.round(now.customers)>0&&delta.cash<-.5)return "Customer activity is present, but current spending is reducing financial flexibility.";
+  if(intelligence?.topRisks?.[0])return `The main operating signal to watch is ${String(intelligence.topRisks[0].title||"current risk").replace(/\.$/,"").toLowerCase()}.`;
+  if(delta.customers>0&&delta.board>=0)return "Commercial and board signals are improving, while execution still needs steady follow-through.";
+  return "The company is operating steadily, with no single metric overwhelming the week.";
+}
+function weeklyExecutiveSummary({events,majorDecisions,notableEvents,metricExplanations,delta,now,intelligence}){
+  if(!events.length&&Math.abs(delta.cash)<.05&&Math.abs(delta.customers)<1&&Math.abs(delta.board)<1&&Math.abs(delta.morale)<1){
+    return "No major strategic events occurred. Departments continued executing existing plans, and no new CEO decision was required.";
+  }
+  const changed=majorDecisions[0]?.text||notableEvents[0]?.text||metricExplanations[0]||"The company completed another operating week.";
+  const improved=delta.customers>0?"customer activity improved":delta.board>0?"board confidence improved":delta.morale>0?"morale improved":notableEvents.find(e=>/completed|unblocked|hired|launched|raised|improved/i.test(e.text))?.text||"some internal work continued";
+  const risk=intelligence?.topRisks?.[0]?.title||notableEvents.find(e=>/blocked|rework|risk|strike|resigned|layoff|pressure|fell|weakened/i.test(e.text))?.text||(delta.cash<0?"cash reserves tightened":"execution risk remains the main item to monitor");
+  return `${changed} ${String(improved).replace(/\.$/,"").replace(/^./,c=>c.toUpperCase())}. The main concern for next week is ${String(risk).replace(/\.$/,"").toLowerCase()}.`;
+}
+function meaningfulPeopleToWatch(){
+  const active=employees.filter(e=>e.active);
+  const candidates=active.map(e=>{
+    const reasons=[];
+    if(e.stress>78)reasons.push("under sustained workload pressure");
+    if(e.sickDays>0)reasons.push("unavailable while assigned work may need coverage");
+    if((e.performance?.qualityMistakes||0)>1)reasons.push("connected to recent quality rework");
+    if((e.performance?.reviewRiskDays||0)>=3)reasons.push("approaching a documented performance review");
+    if((e.retentionRisk||0)>60||e.jobSearchDays>0)reasons.push("showing elevated retention risk");
+    if((e.achievements||0)>1||e.taskProgress>18)reasons.push("contributing visible project progress");
+    if(e.action==="break"&&e.stress>70)reasons.push("taking recovery time after pressure");
+    return {e,reasons,score:reasons.length*20+(e.stress||0)*.2+(e.achievements||0)*5+(e.taskProgress||0)*.5};
+  }).filter(x=>x.reasons.length&&x.e.action!=="home"&&!(x.e.action==="break"&&x.e.stress<=70)).sort((a,b)=>b.score-a.score).slice(0,2);
+  return candidates.map(({e,reasons})=>`${e.name}, ${e.role} - ${reasons[0]}.`);
+}
+function dedupeStoryBeats(beats=[]){
+  const seen=new Set();
+  return beats.map(b=>({day:b.day,text:String(b.text||"").replace(/^Update\s+/i,"").trim(),type:b.type})).filter(b=>{
+    const key=b.text.toLowerCase();
+    if(!key||seen.has(key))return false;
+    seen.add(key);return true;
+  });
+}
+function storyChainForWeeklyIssue(intelligence){
+  const sourceSet=new Set(intelligence.sourceIds||[]);
+  const storyThread=(company.storyChains||[]).slice().sort((a,b)=>{
+    const aMatch=(a.beats||[]).some(beat=>[...sourceSet].some(id=>String(beat.text||"").includes(String(id).split(":").pop()))),bMatch=(b.beats||[]).some(beat=>[...sourceSet].some(id=>String(beat.text||"").includes(String(id).split(":").pop())));
+    return (bMatch?20:0)+(b.lastDay||0)-((aMatch?20:0)+(a.lastDay||0));
+  })[0];
+  if(!storyThread)return null;
+  const beats=dedupeStoryBeats(storyThread.beats||[]).slice(-5);
+  if(!beats.length)return null;
+  return {subject:storyThread.subject,beats};
+}
+function riskDeskNarrative(issue){
+  const trust=qualitativeLevel(issue.metrics.trust,{low:45,high:75,lowText:"weak",midText:"mixed",highText:"strong"});
+  const stress=qualitativeLevel(issue.metrics.stress,{low:42,high:68,lowText:"manageable",midText:"elevated",highText:"high"});
+  const primary=issue.intelligence?.risk||((issue.metrics.stress>68)?"workload pressure":"normal execution risk");
+  return `The primary company risk is ${String(primary).replace(/\.$/,"").toLowerCase()}. Leadership trust is ${trust}, and workload pressure is ${stress}.`;
+}
 function chooseHeadline(events,delta,current){
   const snapshot=buildExecutiveIntelligenceSnapshot();
   const topRisk=snapshot.topRisks?.[0],topOpportunity=snapshot.topOpportunities?.[0];
-  const major=[...(events||[])].sort((a,b)=>(b.importance||0)-(a.importance||0))[0];
-  if(major)return major.text;
+  const major=[...(events||[])].sort((a,b)=>(b.importance||0)-(a.importance||0))[0],majorText=String(major?.text||"");
+  if(/^CEO decision:/i.test(majorText)){
+    const clean=majorText.replace(/^CEO decision:\s*/i,"").replace(/\.$/,"");
+    if(/launch|market window|release/i.test(clean))return "Company Holds Release Plan While Execution Risk Remains";
+    if(/validation|quality|verification/i.test(clean))return "Validation Work Becomes This Week's Main Leadership Focus";
+    if(/hire|position|staff/i.test(clean))return "Leadership Reviews Staffing Against Runway and Workload";
+    if(/project/i.test(clean))return "Portfolio Decision Reshapes Project Priorities";
+    return `${titleCase(clean)} Becomes the Week's Executive Decision`;
+  }
+  if(/blocked|blocker/i.test(majorText))return "Development Blockers Shape the Week's Execution Risk";
+  if(/board issued a strike|cash discipline|runway|financial/i.test(majorText))return "Board and Cash Discipline Become the Week's Main Concern";
+  if(/completed/i.test(majorText)&&/project/i.test(majorText))return "Completed Project Shifts Attention Toward Commercial Value";
+  if(major)return explainWeeklyEvent(major).replace(/\.$/,"");
   if(topRisk&&topRisk.priority>=75)return topRisk.title;
   if(topOpportunity&&topOpportunity.priority>=60)return topOpportunity.title;
   if(current.phase!==delta.phaseBefore)return `Company advances into ${String(current.phase).replace(/\b\w/g,c=>c.toUpperCase())}`;
@@ -363,28 +494,22 @@ function publishWeeklyNewspaper(){
   };
   const events=[...(company.weeklyEvents||[])];
   const intelligence=buildExecutiveIntelligenceSnapshot();
-  const headline=chooseHeadline(events,delta,now);
-  const people=employees.filter(e=>e.active)
-    .sort((a,b)=>(b.achievements+b.taskProgress)-(a.achievements+a.taskProgress))
-    .slice(0,2).map(e=>`${e.name}, ${e.role}: ${e.action}.`);
-  const summary=[];
-  if(Math.abs(delta.cash)>=.05)summary.push(`Cash changed ${signed(delta.cash,1)}M.`);
-  if(Math.abs(delta.customers)>=1)summary.push(`Customers changed ${signed(delta.customers,0)}.`);
-  if(Math.abs(delta.board)>=1)summary.push(`Board confidence moved ${signed(delta.board,0)} points.`);
-  if(Math.abs(delta.morale)>=1)summary.push(`Morale moved ${signed(delta.morale,0)} points.`);
-  if(now.phase!==before.phase)summary.push(`The product entered the ${now.phase} phase.`);
-  if(!summary.length)summary.push("The company completed a relatively stable week.");
-  const storyLead=contentPick(v25Content?.newspaperLeads||["The company completed another week."],events.length);
-  const sourceSet=new Set(intelligence.sourceIds||[]);
-  const storyThread=(company.storyChains||[]).slice().sort((a,b)=>{
-    const aMatch=(a.beats||[]).some(beat=>[...sourceSet].some(id=>String(beat.text||"").includes(String(id).split(":").pop()))),bMatch=(b.beats||[]).some(beat=>[...sourceSet].some(id=>String(beat.text||"").includes(String(id).split(":").pop())));
-    return (bMatch?20:0)+(b.lastDay||0)-((aMatch?20:0)+(a.lastDay||0));
-  })[0];
+  const headline=chooseHeadline(events,delta,now),topEvents=events.sort((a,b)=>(b.importance||0)-(a.importance||0)).slice(0,8);
+  const majorDecisions=topEvents.filter(e=>/^CEO decision:/i.test(e.text)).slice(0,3).map(e=>({...e,text:explainWeeklyEvent(e)}));
+  const notableEvents=topEvents.filter(e=>!/^CEO decision:/i.test(e.text)).slice(0,events.length>8?3:5).map(e=>({...e,text:explainWeeklyEvent(e)}));
+  const metricExplanations=weeklyMetricExplanation(delta,now);
+  const summary=weeklyExecutiveSummary({events,majorDecisions,notableEvents,metricExplanations,delta,now,intelligence});
+  const storyThread=storyChainForWeeklyIssue(intelligence);
+  const people=meaningfulPeopleToWatch();
   const issue={
-    week:Math.floor(company.day/5),publishedAt:`Day ${company.day+1}`,storyLead,storyThread:storyThread?{subject:storyThread.subject,beats:(storyThread.beats||[]).slice(-3)}:null,
-    title:"Office Aquarium Weekly",headline,summary:summary.join(" "),
+    week:Math.floor(company.day/5),publishedAt:`Day ${company.day+1}`,storyLead:null,storyThread,
+    title:"Office Aquarium Weekly",headline,summary,
     metrics:{cash:now.cash,board:now.board,trust:now.trust,customers:now.customers,revenue:now.revenue,morale:now.morale,stress:now.stress,phase:now.phase},
-    events:events.sort((a,b)=>(b.importance||0)-(a.importance||0)).slice(0,6),
+    events:topEvents,
+    majorDecisions,
+    notableEvents,
+    metricExplanations,
+    glanceInterpretation:weeklyMetricInterpretation(delta,now,intelligence),
     people,
     intelligence:{risk:intelligence.topRisks?.[0]?.title||null,opportunity:intelligence.topOpportunities?.[0]?.title||null,tension:intelligence.departmentBeliefs?.[0]?.title||null,trend:intelligence.majorTrends?.[0]?.title||null}
   };
@@ -411,32 +536,38 @@ function renderNewspapers(){
   if(summary)summary.textContent=issues.length?`${issues.length} issue(s) archived; showing one issue to keep long saves readable.`:"";
   if(!issues.length){archive.innerHTML='<div class="paper-empty">No issue yet. The first newspaper appears after five simulated workdays.</div>';return;}
   const issue=issues[clamp(Number(company.selectedNewspaperIndex)||0,0,issues.length-1)]||issues[0];
+  const majorDecisions=Array.isArray(issue.majorDecisions)?issue.majorDecisions:[...(issue.events||[])].filter(e=>/^CEO decision:/i.test(e.text||"")).map(e=>({...e,text:explainWeeklyEvent(e)}));
+  const notableEvents=Array.isArray(issue.notableEvents)?issue.notableEvents:[...(issue.events||[])].filter(e=>!/^CEO decision:/i.test(e.text||"")).map(e=>({...e,text:explainWeeklyEvent(e)})).slice(0,5);
+  const metricExplanations=Array.isArray(issue.metricExplanations)?issue.metricExplanations:[];
+  const people=Array.isArray(issue.people)?issue.people:[];
+  const storyBeats=dedupeStoryBeats(issue.storyThread?.beats||[]);
+  const riskNarrative=riskDeskNarrative(issue);
   archive.innerHTML=`
     <article class="paper-issue">
       <div class="paper-masthead">
-        <div><div class="paper-date">Week ${issue.week} - ${issue.publishedAt}</div><h3>${issue.title}</h3></div>
-        <div class="phase-badge">${String(issue.metrics.phase).replace(/\b\w/g,c=>c.toUpperCase())}</div>
+        <div><div class="paper-date">Week ${htmlEscape(issue.week)} - ${htmlEscape(issue.publishedAt)}</div><h3>${htmlEscape(issue.title)}</h3></div>
+        <div class="phase-badge">${htmlEscape(titleCase(issue.metrics.phase))}</div>
       </div>
-      <h3 class="paper-headline">${issue.headline}</h3>
-      <p class="paper-summary">${issue.storyLead||""} ${issue.summary}</p>
+      <h3 class="paper-headline">${htmlEscape(issue.headline)}</h3>
+      <p class="paper-summary">${htmlEscape(issue.summary||"No major strategic events occurred. Departments continued executing existing plans, and no new CEO decision was required.")}</p>
       <div class="paper-columns">
-        <section class="paper-section"><h4>This Week</h4><ul>${issue.events.length?issue.events.map(e=>`<li>${e.text}</li>`).join(""):"<li>No major incidents were recorded.</li>"}</ul></section>
+        <section class="paper-section"><h4>This Week</h4><p><strong>Major Decisions</strong></p><ul>${majorDecisions.length?majorDecisions.slice(0,3).map(e=>`<li>${htmlEscape(e.text)}</li>`).join(""):"<li>No CEO decision was required this week.</li>"}</ul><p><strong>Notable Events</strong></p><ul>${notableEvents.length?notableEvents.slice(0,(issue.events||[]).length>8?3:5).map(e=>`<li>${htmlEscape(e.text)}</li>`).join(""):"<li>Departments continued executing existing plans without a major incident.</li>"}</ul></section>
         <section class="paper-section"><h4>Company at a Glance</h4><ul>
           <li>Cash: $${Number(issue.metrics.cash).toFixed(1)}M</li>
           <li>Customers: ${Math.round(issue.metrics.customers)}</li>
           <li>Daily revenue: $${Number(issue.metrics.revenue).toFixed(2)}M</li>
           <li>Board confidence: ${Math.round(issue.metrics.board)}</li>
           <li>Morale: ${Math.round(issue.metrics.morale)}</li>
-        </ul></section>
-        <section class="paper-section"><h4>People to Watch</h4><ul>${issue.people.length?issue.people.map(p=>`<li>${p}</li>`).join(""):"<li>No standout employee this week.</li>"}</ul></section>
-        <section class="paper-section"><h4>Story Chain</h4><ul>${issue.storyThread?`<li>${issue.storyThread.subject}</li>${issue.storyThread.beats.map(b=>`<li>Day ${(b.day??0)+1}: ${b.text}</li>`).join("")}`:"<li>No connected chain dominated the week.</li>"}</ul></section>
-        <section class="paper-section"><h4>Risk Desk</h4><ul>
-          <li>Trust: ${Math.round(issue.metrics.trust)}</li>
-          ${issue.intelligence?.risk?`<li>${issue.intelligence.risk}</li>`:""}
-          ${issue.intelligence?.trend?`<li>${issue.intelligence.trend}</li>`:""}
-          ${issue.intelligence?.opportunity?`<li>Opportunity: ${issue.intelligence.opportunity}</li>`:""}
-          <li>Stress: ${Math.round(issue.metrics.stress)}</li>
-          <li>Current phase: ${issue.metrics.phase}</li>
+        </ul><p>${htmlEscape(issue.glanceInterpretation||weeklyMetricInterpretation({cash:0,customers:0,board:0,morale:0,phaseBefore:issue.metrics.phase},issue.metrics,issue.intelligence))}</p>${metricExplanations.length?`<ul>${metricExplanations.slice(0,4).map(m=>`<li>${htmlEscape(m)}</li>`).join("")}</ul>`:""}</section>
+        <section class="paper-section"><h4>People to Watch</h4><ul>${people.length?people.map(p=>`<li>${htmlEscape(p)}</li>`).join(""):"<li>No employee required executive attention this week.</li>"}</ul></section>
+        <section class="paper-section"><h4>Story Chain</h4><ul>${issue.storyThread&&storyBeats.length?`<li>${htmlEscape(issue.storyThread.subject)}</li>${storyBeats.map(b=>`<li>Day ${(b.day??0)+1}: ${htmlEscape(b.text)}</li>`).join("")}`:"<li>No connected chain dominated the week.</li>"}</ul></section>
+        <section class="paper-section"><h4>Risk Desk</h4><p>${htmlEscape(riskNarrative)}</p><ul>
+          <li>Trust: ${htmlEscape(qualitativeLevel(issue.metrics.trust,{low:45,high:75,lowText:"Weak",midText:"Mixed",highText:"Strong"}))}</li>
+          <li>Stress: ${htmlEscape(qualitativeLevel(issue.metrics.stress,{low:42,high:68,lowText:"Manageable",midText:"Elevated",highText:"High"}))}</li>
+          ${issue.intelligence?.risk?`<li>Primary risk: ${htmlEscape(issue.intelligence.risk)}</li>`:""}
+          ${issue.intelligence?.trend?`<li>Trend: ${htmlEscape(issue.intelligence.trend)}</li>`:""}
+          ${issue.intelligence?.opportunity?`<li>Opportunity: ${htmlEscape(issue.intelligence.opportunity)}</li>`:""}
+          <li>Current phase: ${htmlEscape(issue.metrics.phase)}</li>
         </ul></section>
       </div>
     </article>`;
