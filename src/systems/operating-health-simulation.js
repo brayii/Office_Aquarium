@@ -2,6 +2,7 @@ function updatePortfolioHealth(){
   ensureProjectPortfolio();
   const active=activeProjects(),proposed=company.projectProposals.filter(p=>p.status==="proposal"),paused=company.projects.filter(p=>p.status==="paused"),atRisk=active.filter(p=>(p.performance?.riskTrend||0)>70||p.status==="at risk"),spend=active.reduce((s,p)=>s+p.estimatedCost/Math.max(30,p.estimatedDuration)*(p.scope||1),0);
   ensureProjectAllocations();
+  if(typeof updateStaffingModel==="function")updateStaffingModel();
   const demand=Math.round(active.reduce((s,p)=>s+Object.values(p.requiredHeadcount||{}).reduce((a,b)=>a+b,0)*projectExecutionModifiers(p).staffingDemand,0)),primaryCounts={};
   const missingFte=active.reduce((s,p)=>s+Object.entries(p.requiredHeadcount||{}).reduce((a,[dept,need])=>a+Math.max(0,(Number(need)||0)-projectAllocatedFte(p,dept)),0),0)+(company.projectCapacity?.totalOverload||0);
   active.forEach(p=>primaryCounts[p.proposingDepartment]=(primaryCounts[p.proposingDepartment]||0)+1);

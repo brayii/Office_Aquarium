@@ -205,6 +205,42 @@ async function main() {
     assert(completedTiming.short.includes("Completed on day 157"), `Completed project timing should show completion day, got ${completedTiming.short}`);
     assert(!/\d+-\d+ day/.test(completedTiming.short), `Completed project should not show a future estimate, got ${completedTiming.short}`);
 
+    const frictionProject = makeControlledProject({
+      id: "friction-regression",
+      title: "Project Friction: Regression",
+      family: "AI accelerator",
+      requiredDepartments: ["hardware", "software", "quality"],
+      requiredHeadcount: { hardware: 3, software: 2, quality: 2 },
+      staffAllocations: {},
+      createdDay: company.day - 80,
+      deadlineDay: company.day - 3,
+      progress: 42,
+      quality: 38,
+      visibleRisk: 86,
+      hiddenReality: { trueTechnicalDifficulty: 88, trueStrategicValue: 70, hiddenObsolescenceRate: 10 }
+    });
+    company.projects = [frictionProject];
+    company.workItems = [];
+    company.randomState = 2463534242;
+    company.quality = 36;
+    company.integration = 28;
+    employees.forEach(e => {
+      e.role = "Finance Analyst";
+      e.stress = 84;
+      e.focus = 45;
+      e.workload = null;
+    });
+    for (let i = 0; i < 45; i++) {
+      company.day += 1;
+      projectPerformanceUpdate();
+    }
+    const frictionItems = company.workItems.filter(w => w.projectId === frictionProject.id && w.status === "open");
+    const frictionBlockers = frictionItems.reduce((sum, work) => sum + ((work.blockedBy || []).length), 0);
+    assert((frictionProject.performance?.backlogCount || 0) >= 3, `Stressed project should accumulate open work/backlog, got ${frictionProject.performance?.backlogCount || 0}`);
+    assert(frictionBlockers > 0 || (frictionProject.performance?.blockerCount || 0) > 0, "Stressed project should produce at least one development blocker");
+    assert(projectPortfolioHtml().includes("open work"), "Portfolio should display open work/backlog count");
+    assert(projectPortfolioHtml().includes("blockers"), "Portfolio should display blocker count");
+
     validationMode = false;
     return {
       ok: failures.length === 0,
