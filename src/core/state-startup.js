@@ -109,6 +109,11 @@ function emotionalCapDelta(e,kind,delta){
   }
   return 0;
 }
+// EMPLOYEE AI BOUNDARY:
+// Work/Institutional AI decides and performs work.
+// Social Personality AI only recommends stress and morale changes.
+// Do not allow this system to directly modify project, task, skill,
+// hiring, staffing, learning, productivity, customer, or company-risk state.
 function evaluateEmployeeEmotionalReaction({employee,event={},relationshipContext={},workloadContext={},roomContext={}}={}){
   const e=employee;if(!e)return {moraleDelta:0,stressDelta:0,reasonCode:"missing-employee",sourceEventId:event?.id||null,relatedEmployeeIds:[]};
   ensureEmployeePersonality(e);

@@ -12,7 +12,7 @@ Office Aquarium is a standalone offline organization simulation. Open `Office_Aq
 - `src/facades/` - OOP system facades used by newer code
 - `src/bootstrap/` - browser event bindings and startup wiring
 - `assets/audio/` - optional music and message-alert audio files
-- `docs/` - product bible, master spec, and player manual
+- `docs/` - product bible, master spec, architecture notes, and player manual
 - `tests/` - browser and simulation regression tests
 - `dist/` - generated web and desktop frontend packages; safe to delete and rebuild
 - `src-tauri/` - Tauri Windows desktop wrapper and generated release build output
@@ -48,6 +48,7 @@ The suite checks:
 - project health, backlog, blocker, archive, and timing behavior
 - organizational friction, risk pillars, and loss/crisis paths
 - customer/product exposure and hidden-state access boundaries
+- employee personality boundaries, stress/morale-only reactions, and hidden social-state UI separation
 - isolated balance validation that cannot mutate the live company save
 - executive memo context and weekly newspaper clarity
 - absence of recorded simulation errors during the regression run
@@ -63,7 +64,10 @@ npm run test:workforce
 npm run test:loss-paths
 npm run test:validation-isolation
 npm run test:regression
+npm run test:personality
 ```
+
+The employee work AI and social/personality AI boundary is documented in `docs/architecture/employee_ai_boundaries.md`. Future changes that touch personality, relationships, morale, stress, or employee drama should preserve that boundary unless the design is explicitly revised.
 
 Balance projection tools are developer validation tools, not CEO gameplay controls. In normal play they are hidden. To expose the Developer Tools validation panel in a local browser session, open the game with `?dev=1` or set `officeAquariumDeveloperMode` to `true` in browser storage. These tools run isolated companies in memory and must not reset, save, or mutate the active company.
 
