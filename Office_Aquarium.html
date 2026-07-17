@@ -196,8 +196,9 @@
     .employee-card.clickable{cursor:pointer}.employee-card.clickable:hover{border-color:var(--aqua)}
     .detail-modal{position:fixed;inset:0;background:rgba(10,20,32,.66);display:grid;place-items:center;z-index:100;padding:18px}
     .detail-card{width:min(520px,100%);max-height:85vh;overflow:auto;background:white;border-radius:16px;padding:20px;box-shadow:var(--shadow)}
-    .guide-card{width:min(760px,100%);max-height:min(88vh,calc(100dvh - 36px));overflow:auto;background:white;border-radius:16px;padding:20px;box-shadow:var(--shadow)}
-    .guide-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+    .guide-card{width:min(980px,100%);max-height:min(88vh,calc(100dvh - 36px));overflow:auto;background:white;border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+    .guide-intro{margin:8px 0 0;color:#465668;line-height:1.5}
+    .guide-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
     .guide-section{border:1px solid var(--line);border-radius:10px;background:#f8fbfb;padding:12px;line-height:1.42}
     .guide-section strong{display:block;margin-bottom:5px}
     .guide-section p{margin:0;color:#465668}
@@ -376,6 +377,7 @@
     .lesson-tag{padding:4px 7px;border-radius:999px;background:#edf8f6;border:1px solid #bfe5df;font-size:.65rem;font-weight:800;color:#286c65}
 
 @media(max-width:980px){.briefing-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:900px){.guide-body{grid-template-columns:repeat(2,minmax(0,1fr))}}
     @media(max-width:560px){.briefing-grid,.guide-body{grid-template-columns:1fr}}
         @media(max-width:560px){.detail-card{width:96vw;max-height:92vh;overflow:auto}.modal-actions{justify-content:flex-start}.small-btn{flex:1 1 42%;min-width:112px}.story-thread{padding:9px}.story-beats{padding-left:16px}.insight-grid,.release-grid,.market-strip{grid-template-columns:1fr}}
 .debug-panel{margin-top:14px;padding:12px;border:1px dashed #9fb4c0;border-radius:12px;background:#f7fbfc}
@@ -668,17 +670,28 @@
     <div class="panel-heading">
       <div>
         <p class="eyebrow">Player Guide</p>
-        <h2>How to Read Office Aquarium</h2>
+        <h2>Game Instructions</h2>
       </div>
       <button id="closeGuide" class="small-btn">Close</button>
     </div>
+    <p class="guide-intro">Lead the company like a CEO. You do not assign every task. Employees work, learn, report problems, and handle routine issues on their own. Your job is to read the signals, open messages that need leadership, and make strategic choices.</p>
     <div class="guide-body">
-      <div class="guide-section"><strong>You are the CEO</strong><p>Employees choose their own work, ask for help, learn from outcomes, and escalate only the decisions that need executive authority.</p></div>
-      <div class="guide-section"><strong>Watch the office</strong><p>The Live Office shows what people are doing now. Quiet moments usually mean teams are handling work without needing you.</p></div>
-      <div class="guide-section"><strong>Use the CEO Inbox</strong><p>Email and memos are where you make decisions. Read the situation, compare the choices, and remember that advice can be imperfect.</p></div>
-      <div class="guide-section"><strong>Read Company views</strong><p>Overview is the daily dashboard. Projects shows portfolio pressure. Workforce shows hiring and staffing. Story shows history and consequences.</p></div>
-      <div class="guide-section"><strong>Lead indirectly</strong><ul><li>Set priorities through decisions.</li><li>Approve or delay headcount.</li><li>Protect quality, cash, people, or speed.</li><li>Let departments execute the details.</li></ul></div>
-      <div class="guide-section"><strong>Success is balance</strong><p>Cash matters, but so do trust, product health, customers, morale, board confidence, and the company's ability to recover from mistakes.</p></div>
+      <div class="guide-section"><strong>Time Controls</strong><ul><li><b>II</b> pauses or resumes the simulation.</li><li><b>1x, 4x, 12x</b> change speed.</li><li>The game keeps running unless paused, lost, or stopped by an error.</li></ul></div>
+      <div class="guide-section"><strong>Gear Menu</strong><ul><li><b>Sound</b> chooses Muted, Alerts Only, Music Only, or Music + Alerts.</li><li><b>Game Instructions</b> opens this guide.</li><li><b>Restart Company</b> asks for confirmation before replacing the save.</li></ul></div>
+      <div class="guide-section"><strong>Mobile Tabs</strong><p>On smaller screens, use Office, Employees, CEO Inbox, Company, and Paper tabs to move between the main areas.</p></div>
+      <div class="guide-section"><strong>Live Office</strong><p>Shows what employees are doing now. Click an employee to open details. Quiet periods usually mean teams are handling work locally.</p></div>
+      <div class="guide-section"><strong>Employees</strong><p>Shows role, current work, stress, morale, focus, thoughts, and learning signals. Employees are autonomous; you influence them indirectly.</p></div>
+      <div class="guide-section"><strong>CEO Communications</strong><ul><li><b>Inbox</b> holds unread and active emails or memos.</li><li>Click a message to read it.</li><li>Decision messages show choices below the office area.</li><li>Choose one option, then apply the decision.</li></ul></div>
+      <div class="guide-section"><strong>Old Messages</strong><p>Read messages move to Old Messages. Deleted messages are hidden from the normal archive but can be viewed with the Deleted filter.</p></div>
+      <div class="guide-section"><strong>Company View</strong><p>The View dropdown filters the company screen. Overview shows current health, Projects shows portfolio work, Workforce shows staffing and hiring, Story shows history, and All shows everything.</p></div>
+      <div class="guide-section"><strong>Project Portfolio</strong><p>Project buttons request formal CEO memos. Review, pause, resume, cancel, and new initiative buttons do not act instantly; they route through the Inbox.</p></div>
+      <div class="guide-section"><strong>Workforce</strong><p>Review Hiring Policy creates a CEO memo. Hiring requests approve positions, not individual candidates. HR handles recruiting and onboarding after approval.</p></div>
+      <div class="guide-section"><strong>Reports Tab</strong><p>Reports is the main company dashboard. Use it for operating health, department briefings, project portfolio, workforce pressure, hiring pipeline, and internal employee reports.</p></div>
+      <div class="guide-section"><strong>Internal Reports</strong><p>Internal Reports are employee and department signals. They show what the organization has noticed before, during, or after escalation.</p></div>
+      <div class="guide-section"><strong>History Tab</strong><p>History shows Company Story, Organizational Dynamics, Story Threads, Lessons, and Company History. Use it to understand why the company is changing.</p></div>
+      <div class="guide-section"><strong>Weekly Report Tab</strong><p>Office Aquarium Weekly is the newspaper. It summarizes major decisions, risks, people, customers, money, and lessons from recent company life.</p></div>
+      <div class="guide-section"><strong>Winning</strong><p>Success means balancing cash, quality, customers, employees, trust, board confidence, and recovery from mistakes.</p></div>
+      <div class="guide-section"><strong>How You Lose</strong><p>You can lose your CEO role if the Board loses confidence in your leadership. The company can fail from insolvency, unpaid payroll, collapsed product capability, customer collapse, or an unrecovered crisis.</p></div>
     </div>
   </div>
 </div>
