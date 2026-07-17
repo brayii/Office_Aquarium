@@ -77,6 +77,9 @@ async function main() {
     assert(company.escalationQueue.length === 0, "Opened memo should be removed from queue");
     assert(company.paused === true, "Opening a CEO decision should pause for review");
     assert(!document.getElementById("memoContainer").classList.contains("hidden"), "Opened memo should render message body");
+    assert(!document.getElementById("decisionGrid").classList.contains("hidden"), "Opened decision memo should show the choice area");
+    assert(getComputedStyle(document.getElementById("decisionGrid")).display !== "none", "Opened decision memo choice area should be visible");
+    assert(document.getElementById("decisionGrid").children.length === 3, "Opened decision memo should render exactly three choices");
     assert(document.getElementById("decisionGrid").innerText.includes("Approve one critical hire"), "Opened memo should render choices");
 
     const selectedIndex = company.pendingEvent.choices.findIndex(choice => choice.title === "Approve one critical hire");
@@ -158,6 +161,22 @@ async function main() {
     assert(company.pendingEvent === null, "Filing informational update should clear pending event");
     assert(company.communications.length === 1, "Filing informational update should create one old message");
     assert(company.communications[0].decision === "Filed after review", "Filed informational update should show that the CEO opened it before archiving");
+
+    company.communications = [];
+    company.escalationQueue = [prepareStrategicDecision({ ...event, id: "mislabeled-decision-regression", informationalOnly: true, choices: event.choices.map(choice => ({ ...choice })) })];
+    company.pendingEvent = null;
+    company.pendingCommunication = null;
+    renderDecisionEvent();
+    const openedMislabeledDecision = openQueuedMemoAt(0);
+    assert(openedMislabeledDecision, "Mislabeled decision memo should open from inbox");
+    assert(company.pendingEvent?.informationalOnly === true, "Regression fixture should remain mislabeled internally");
+    assert(!document.getElementById("decisionGrid").classList.contains("hidden"), "Decision memo with three choices should not hide choices even if informational flag is set");
+    assert(document.getElementById("decisionGrid").children.length === 3, "Mislabeled decision memo should still render exactly three choices");
+    assert(document.getElementById("applyDecision").innerText.includes("Record CEO Decision"), "Mislabeled decision memo should still use the decision action");
+    company.selected = company.pendingEvent.choices.findIndex(choice => choice.title === "Approve one critical hire");
+    assert(company.selected >= 0, "Mislabeled decision memo should keep the approve-hire choice available");
+    applyDecision();
+    assert(company.communications[0]?.decision === "Approve one critical hire", "Mislabeled decision memo should archive the selected CEO choice, not file as informational");
 
     return { ok: failures.length === 0, failures, beforeReload, afterReload };
   });
