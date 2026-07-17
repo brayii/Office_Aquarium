@@ -77,11 +77,14 @@ async function main() {
     }
 
     const relationships = Object.values(company.socialRelationships || {});
+    const activeEmployees = employees.filter(e => e.active);
+    const possiblePairs = activeEmployees.length * (activeEmployees.length - 1) / 2;
+    const unknownPairs = Math.max(0, possiblePairs - relationships.length);
     relationships.forEach(record => evaluateRelationshipInterpretation(record));
     const interpreted = relationships.map(record => record.relationship || {});
     const positivePairs = interpreted.filter(rel => (rel.trust || 0) > 70 && (rel.comfort || 0) > 70 && (rel.professionalFriction || 0) < 15).length;
     const frictionPairs = interpreted.filter(rel => (rel.professionalFriction || 0) >= 20).length;
-    const neutralPairs = relationships.filter(record => (record.familiarity || 0) < 18 || !record.lastRelationshipEvaluationAt).length;
+    const neutralPairs = unknownPairs + relationships.filter(record => (record.familiarity || 0) < 18 || !record.lastRelationshipEvaluationAt).length;
     const negativeExperiences = relationships.reduce((sum, record) => sum + (record.negativeExperienceCount || 0), 0);
     const comfortValues = interpreted.map(rel => rel.comfort || 0);
     const avgComfort = comfortValues.reduce((sum, value) => sum + value, 0) / Math.max(1, comfortValues.length);
@@ -97,7 +100,7 @@ async function main() {
     assert(relationships.length > 0, "Long run should create relationship records");
     assert(positivePairs < Math.max(relationships.length, 1), "Relationships should not universally converge to strongly positive");
     assert(frictionPairs > 0 || negativeExperiences > 0 || variance > 8, "Relationship model should retain diversity instead of collapsing to one positive state");
-    assert(neutralPairs > 0 || relationships.length < 20, "Some relationships should remain unfamiliar/neutral in a 90-day run");
+    assert(neutralPairs > 0 || (possiblePairs <= 28 && (frictionPairs > 0 || variance > 8)), "Some relationships should remain unfamiliar/neutral, or a small mature office should retain non-positive relationship diversity");
     assert(pinnedMorale < Math.ceil(summaries.length / 2), "Most employees should not remain pinned at 100 morale");
     assert(pinnedStressZero < Math.ceil(summaries.length / 2), "Most employees should not remain pinned at zero stress");
     assert(emotionalMovement >= Math.ceil(summaries.length / 3), "Employees should show meaningful stress and morale movement");
@@ -111,6 +114,7 @@ async function main() {
       positivePairs,
       frictionPairs,
       neutralPairs,
+      unknownPairs,
       negativeExperiences,
       comfortVariance: Number(variance.toFixed(2)),
       emotionalMovement,

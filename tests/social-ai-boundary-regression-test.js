@@ -77,6 +77,31 @@ async function main() {
     const latestTrace = (company.socialEmotionTraces || [])[0];
     assert(latestTrace?.ownerSystem === AI_SYSTEM_OWNERS.social, "Social emotional trace should identify Social AI owner");
 
+    const cohesionBeforeHiddenRelationship = derivedCohesion();
+    const stayBeforeHiddenRelationship = employeeStayScore(a);
+    company.socialRelationships[makeRelationshipKey(a.id, c.id)] = {
+      employeeAId: Math.min(a.id, c.id),
+      employeeBId: Math.max(a.id, c.id),
+      familiarity: 100,
+      interactionCount: 10,
+      firstMetAt: simulationTimestamp(),
+      lastInteractionAt: simulationTimestamp(),
+      positiveExperienceCount: 10,
+      neutralExperienceCount: 0,
+      negativeExperienceCount: 0,
+      recentExperiences: [],
+      experienceSummary: {},
+      relationship: { trust: 100, respect: 100, comfort: 100, professionalFriction: 0 },
+      relationshipInputs: {},
+      lastRelationshipEvaluationAt: simulationTimestamp(),
+      recentInteractionTypes: [],
+      cooldowns: {},
+      stressHistory: 0,
+      moraleHistory: 0
+    };
+    assert(derivedCohesion() === cohesionBeforeHiddenRelationship, "Hidden relationship interpretation must not directly change company cohesion");
+    assert(employeeStayScore(a) === stayBeforeHiddenRelationship, "Hidden relationship interpretation must not directly change retention scoring");
+
     const work = (company.workItems || []).find(w => w.status === "open");
     if (work) {
       const target = availableCollaborator(a);

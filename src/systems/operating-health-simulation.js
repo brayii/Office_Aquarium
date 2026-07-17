@@ -147,10 +147,10 @@ function derivedCompanyMorale(){
   return Math.round(clamp(raw,0,98));
 }
 function derivedCohesion(){
-  const active=employees.filter(e=>e.active),relationships=active.length?active.reduce((s,e)=>s+averageRelationship(e),0)/active.length:0;
-  const relScore=clamp(50+relationships,0,100),collab=clamp((company.simulationMetrics?.counters?.collaborations||0)/Math.max(1,company.day+1)*12+45,0,100);
+  const active=employees.filter(e=>e.active),moraleScore=active.reduce((s,e)=>s+(e.morale||50),0)/Math.max(1,active.length),stressScore=100-avgStress();
+  const collab=clamp((company.simulationMetrics?.counters?.collaborations||0)/Math.max(1,company.day+1)*12+45,0,100);
   const layoffPenalty=(company.layoffHistory||[]).filter(x=>company.day-(x.day||0)<45).length*8,resignPenalty=(company.history||[]).filter(h=>/resigned|retired|terminated|layoff/i.test(h.text||"")&&company.day-(h.day||0)<45).length*3;
-  return Math.round(clamp(relScore*.25+collab*.20+company.trust*.15+averageTeamCohesion()*.15+(company.culture?.communication??50)*.10+(100-avgStress())*.15-layoffPenalty-resignPenalty,0,100));
+  return Math.round(clamp(moraleScore*.18+collab*.20+company.trust*.15+averageTeamCohesion()*.15+(company.culture?.communication??50)*.12+stressScore*.20-layoffPenalty-resignPenalty,0,100));
 }
 function derivedTrust(){
   const active=employees.filter(e=>e.active),ceo=active.reduce((s,e)=>s+(e.opinionOfCEO?.trust??company.trust),0)/Math.max(1,active.length),fair=active.reduce((s,e)=>s+(e.opinionOfCEO?.fairness??55),0)/Math.max(1,active.length);
@@ -574,7 +574,7 @@ function utility(e){
     work:e.focus*.46+e.morale*.22-e.stress*.32+g.mastery*24+g.promotion*12+g.recognition*10+intent.work,
     lab:(rolePrimaryRoom(e.role)==="hardware-lab"||roleProjectCapabilities(e.role).quality>.6?42:12)+e.focus*.3+g.mastery*20+intent.lab,
     break:(100-e.energy)*.78+e.stress*.55+g.stability*18+memoryBias(e,"OVERTIME")*.5,
-    socialize:(e.traits.includes("social")?44:16)+g.friendship*32+(averageRelationship(e)<0?16:0),
+    socialize:(e.traits.includes("social")?44:16)+g.friendship*32+(e.morale<45?10:0)+Math.max(0,(e.emotionalState?.needForSocialInteraction||0)-55)*.18,
     collaborate:24+g.mastery*16+g.friendship*18+g.recognition*8+intent.collaborate,
     meeting:(e.role==="Product Manager"?50:18)+intent.meeting,
     complain:e.stress*.66+(company.directive==="cuts"?20:0)+memoryBias(e,"CEO_CUTS")*.55,

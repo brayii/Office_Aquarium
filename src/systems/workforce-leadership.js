@@ -1544,11 +1544,10 @@ function employeeStayScore(e){
   const ceo=e.opinionOfCEO||{};
   const team=company.teams?.[employeeTeam(e)]||{};
   const tenure=Math.max(0,company.day-(e.joinedDay||0));
-  const relationship=averageRelationship(e);
   const growth=(e.careerLevel||1)*7+(e.achievements||0)*2+(e.recognitionSatisfaction||60)*.18;
   const pressure=e.stress*.34+(team.pressure||30)*.16+(company.organizationalMomentum.burnout||0)*.12;
   const leadership=(ceo.trust||55)*.18+(ceo.fairness||55)*.13+(ceo.support||55)*.13+(company.leadership.employeeWellbeing||50)*.12;
-  const belonging=clamp(relationship+50,0,100)*.12+(team.cohesion||55)*.1;
+  const belonging=clamp(e.emotionalState?.belonging??e.morale??50,0,100)*.12+(team.cohesion||55)*.1;
   const security=(e.salarySatisfaction||65)*.08+(company.board||50)*.06+(company.organizationalMomentum.financial||0)*.05;
   const ambitionPenalty=(e.goals?.promotion||.5)*Math.max(0,(e.promotionExpectation||45)-growth)*.22;
   const ageFit=e.age>=60?-(e.age-59)*1.4:0;
