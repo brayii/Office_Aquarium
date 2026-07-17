@@ -605,7 +605,7 @@ Goals include:
 
 - mastery
 - promotion
-- friendship
+- social connection
 - stability
 - recognition
 
@@ -669,14 +669,15 @@ When a work item is blocked, the department briefing and related reports name th
 
 ## Relationships
 
-Relationships track:
+Relationships are professional, not a friendship mini-game. The current social AI has three layers:
 
-- trust
-- respect
-- friendship
-- rivalry
+- familiarity from real encounters
+- shared experience history from work, meetings, breaks, help, pressure, and milestones
+- hidden relationship interpretation: trust, respect, comfort, and professional friction
 
-Employees choose collaborators partly from technical usefulness and partly from social compatibility.
+These hidden values affect how stressful or encouraging future interactions feel. They do not directly change project progress, quality, productivity, hiring, or company learning.
+
+Employees choose collaborators mainly from project need, role usefulness, skill fit, availability, focus, stress, and social compatibility. A coworker can be trusted but still difficult to work with, or comfortable to talk to but not the most useful collaborator for a technical problem.
 
 ## Memories
 

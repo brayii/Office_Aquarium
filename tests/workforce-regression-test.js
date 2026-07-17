@@ -64,6 +64,50 @@ async function main() {
     ensureBibleSystems();
     ensureWorkforceEconomySystems();
 
+    // Growth hiring must append new capacity even if an inactive person with the same role exists.
+    const inactiveSlot = employees.length;
+    employees[inactiveSlot] = { ...employees[0], id: inactiveSlot, name: "Former Firmware Engineer", role: "Firmware Engineer", active: false, offsite: true, relationship: {}, social: {} };
+    const beforeGrowthHire = activeCount();
+    const growthItem = startRecruiting("Firmware Engineer", "specialist", "software", { backfill: false, source: "approved-headcount" });
+    completeRecruitingHire(growthItem, makeStrongCandidate());
+    const growthHire = employees.find(e => e.active && e.role === "Firmware Engineer" && e.joinedDay === company.day && e.id !== inactiveSlot);
+    assert(activeCount() === beforeGrowthHire + 1, `Approved growth hire should increase active count from ${beforeGrowthHire} to ${beforeGrowthHire + 1}, got ${activeCount()}`);
+    assert(growthHire, "Approved growth hire should create a new employee instead of overwriting an inactive same-role slot");
+    assert(employees[inactiveSlot] && employees[inactiveSlot].active === false, "Growth hire should leave inactive historical employee inactive");
+
+    // Explicit backfills may reuse an inactive slot, but they still become visible active employees and survive refresh.
+    company.openRoles.push("Firmware Engineer");
+    const beforeBackfill = activeCount();
+    const backfillItem = startRecruiting("Firmware Engineer", "specialist", "software", { backfill: true, source: "vacancy" });
+    completeRecruitingHire(backfillItem, makeStrongCandidate());
+    const backfillHire = employees[inactiveSlot];
+    assert(activeCount() === beforeBackfill + 1, "Backfill should restore one active employee");
+    assert(backfillHire && backfillHire.active && backfillHire.performanceManagement?.stage === "onboarding", "Backfill should become an onboarding employee in the reused slot");
+    saveGame();
+    assert(loadGame(), "Save/load should succeed after an onboarding backfill");
+    const loadedBackfill = employees.find(e => e.id === inactiveSlot);
+    assert(loadedBackfill && loadedBackfill.active && loadedBackfill.performanceManagement?.stage === "onboarding", "Onboarding employee should survive refresh/save-load");
+    company.day = (loadedBackfill.onboarding.startDay || loadedBackfill.joinedDay || company.day) + loadedBackfill.onboarding.duration;
+    completeDueOnboarding();
+    saveGame();
+    assert(loadGame(), "Save/load should succeed after onboarding completion");
+    const completedBackfill = employees.find(e => e.id === inactiveSlot);
+    assert(completedBackfill && completedBackfill.active && completedBackfill.performanceManagement?.stage !== "onboarding", "Completed onboarding employee should stay active after refresh");
+
+    // Completed recruiting history must not evict slow active searches from the pipeline.
+    const slowSearch = { id: "slow-active-search", role: "Software Engineer", department: "software", status: "searching", stage: "searching", day: company.day - 40, searchStartedDay: company.day - 40, dueDay: company.day + 12 };
+    company.recruitingPipeline = Array.from({ length: 32 }, (_, i) => ({ id: `accepted-history-${i}`, role: "Finance Analyst", department: "finance", status: "accepted", filledDay: company.day - i })).concat([slowSearch]);
+    pruneRecruitingPipeline();
+    assert(company.recruitingPipeline.some(r => r.id === "slow-active-search" && r.status === "searching"), "Pipeline pruning should keep active searches even when completed history is long");
+
+    // Existing saves with old bad states should repair instead of leaving hiring permanently stuck.
+    company.recruitingPipeline = [{ id: "old-contractor-state", role: "Finance Analyst", department: "finance", status: "contractor", stage: "contractor", day: company.day - 4, dueDay: company.day - 1 }];
+    ensureWorkforceEconomySystems();
+    assert(company.recruitingPipeline[0].status === "searching" && company.recruitingPipeline[0].contractorCoverage, "Old contractor coverage should resume recruiting instead of killing the search");
+    company.recruitingPipeline = [{ id: "accepted-without-hire", role: "Product Manager", department: "product", status: "accepted", stage: "offer", day: company.day - 6, filledDay: company.day - 5, dueDay: company.day - 5 }];
+    ensureWorkforceEconomySystems();
+    assert(company.recruitingPipeline[0].status === "searching" && company.recruitingPipeline[0].repairedMissingHire, "Accepted record without a matching hire should be repaired back to active search");
+
     // No-hidden-cap and forced-success hiring: fill enough approved roles to exceed 20 active employees.
     company.cash = 80;
     company.finance.runwayDays = 999;

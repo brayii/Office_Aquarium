@@ -49,7 +49,7 @@ The HTML file and ordered JavaScript source files are the runtime source of trut
 - Browser/mobile release packages are generated under `dist/`.
 - Desktop release packages are generated under `src-tauri/target/`.
 - `misc/` is user-managed and must not be cleaned, moved, or committed automatically.
-- The canonical documentation set lives in `docs/`, with convenience copies restored in the project home directory.
+- The canonical documentation set lives in `docs/`. The project home keeps `README.md`; older root-level specification copies should not be treated as canonical unless explicitly restored and tracked.
 - Private implementation prompts matching `OFFICE_AQUARIUM_CODEX_*.md` and `OFFICE_AQUARIUM_V*_*.md` remain ignored unless explicitly tracked as a canonical project document.
 
 Current simulation integrity rules:
@@ -132,7 +132,7 @@ They should:
 - react differently to the same company policy
 - have persistent personalities and goals
 - remember important events
-- form trust, respect, friendship, and rivalry
+- form professional familiarity, trust, respect, comfort, and friction
 - collaborate or complain
 - become sick
 - recover
@@ -712,11 +712,11 @@ Current goal dimensions:
 
 - mastery
 - promotion
-- friendship
+- friendship / social connection
 - stability
 - recognition
 
-These goals influence action selection.
+These legacy goal keys influence action selection. The `friendship` key is used as a social-connection drive, not as a guarantee that employees become friends.
 
 ## 5.6 Employee Memories
 
@@ -747,7 +747,9 @@ Memories decay over time.
 
 ## 5.7 Social Relationships
 
-Current social state contains:
+Current social state is split between legacy compatibility data and the newer staged Social Personality AI.
+
+The legacy per-employee social record remains load-compatible and may contain:
 
 ```js
 {
@@ -758,15 +760,23 @@ Current social state contains:
 }
 ```
 
-A legacy aggregate relationship score remains for compatibility.
+These legacy fields are still used as a lightweight social compatibility score. They should not be confused with the newer Stage 3 professional relationship interpretation.
+
+The current pair-level Social Personality AI stores hidden professional relationship records in `company.socialRelationships[pairKey]`:
+
+- Stage 1: familiarity from real encounters
+- Stage 2: shared experience history with tone, intensity, dedupe keys, and source events
+- Stage 3: derived trust, respect, comfort, and professional friction
+
+Relationship interpretation is derived from accumulated history, recency, and personality compatibility. It must not directly write work output, project progress, hiring, Institutional Learning, or task selection.
 
 Relationships influence:
 
-- social targeting
-- collaboration
-- morale effects
-- culture events
-- employee detail views
+- stress and morale reactions through the central emotional system
+- debug visibility in AI Debug
+- natural-language employee profile summaries
+
+Project collaboration matching may still consider legacy social compatibility, but project need, role fit, skills, focus, stress, and availability remain the primary work-facing criteria.
 
 ## 5.8 Utility AI
 
@@ -1436,8 +1446,8 @@ Codex must preserve these unless explicitly instructed otherwise:
 1. The player remains the CEO.
 2. Employees remain autonomous.
 3. The office runs without direct micromanagement.
-4. CEO events pause the simulation.
-5. CEO decisions resume the simulation.
+4. CEO emails and memos wait in the Inbox until the player opens them.
+5. Opening or deciding a memo must not create duplicate timers or lose the archived choice.
 6. Only one timer exists.
 7. Game over stops simulation updates.
 8. Save/load remains compatible.
@@ -1736,8 +1746,9 @@ Test:
 - archived memos retain original advice and later outcome
 - result is archived
 - archive survives save/load
-- active event pauses the sim
-- decision resumes the sim
+- unread messages remain in the Inbox until opened
+- opening, archiving, deleting, and revisiting old messages preserves the chosen decision
+- decisions do not create duplicate timers or stale pending events
 
 ## 20.6 Newspaper
 

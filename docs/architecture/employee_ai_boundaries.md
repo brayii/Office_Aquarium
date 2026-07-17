@@ -47,9 +47,8 @@ The social side is responsible for:
 
 - getting to know coworkers
 - tracking familiarity
-- tracking trust and respect
+- deriving trust, respect, comfort, and professional friction from history
 - remembering shared social experiences
-- choosing social interactions
 - reacting emotionally to events
 - recommending stress changes
 - recommending morale changes
@@ -123,11 +122,11 @@ Institutional Learning remains authoritative for how employees perform work.
 
 The Social Personality AI does not teach employees how to work. It may only change how employees emotionally experience work.
 
-Institutional Learning may later observe team-level patterns, but it must not read hidden friendship values as objective truth or directly manipulate relationships.
+Institutional Learning may later observe team-level patterns, but it must not read hidden relationship values as objective truth or directly manipulate relationships.
 
 ## Hidden State
 
-Social and emotional state such as familiarity, trust, respect, interaction count, social battery, frustration, belonging, recognition satisfaction, psychological safety, recovery debt, conflict fatigue, need for quiet focus, and need for social interaction must stay hidden from normal CEO-facing UI.
+Social and emotional state such as familiarity, trust, respect, comfort, professional friction, interaction count, shared-experience history, social battery, frustration, belonging, recognition satisfaction, psychological safety, recovery debt, conflict fatigue, need for quiet focus, and need for social interaction must stay hidden from normal CEO-facing UI.
 
 These values may appear in AI Debug.
 
@@ -145,4 +144,4 @@ Any future change touching employee AI should verify:
 - Duplicate events cannot stack repeatedly.
 - Stress and morale remain bounded.
 
-The dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`.
+Dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`, `tests/social-ai-familiarity-test.js`, `tests/social-ai-shared-experiences-test.js`, and `tests/social-ai-relationship-interpretation-test.js`.

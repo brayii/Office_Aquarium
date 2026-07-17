@@ -51,6 +51,7 @@ The suite checks:
 - employee personality boundaries, stress/morale-only reactions, and hidden social-state UI separation
 - Stage 1 Social Personality AI familiarity records and pair-level encounter boundaries
 - Stage 2 Social Personality AI shared-experience history, dedupe, tone, and intensity boundaries
+- Stage 3 Social Personality AI relationship interpretation, hidden UI boundaries, and stress/morale-only output
 - isolated balance validation that cannot mutate the live company save
 - executive memo context and weekly newspaper clarity
 - absence of recorded simulation errors during the regression run
@@ -64,7 +65,11 @@ npm run test:staffing-crisis
 npm run test:project
 npm run test:workforce
 npm run test:loss-paths
+npm run test:risk
+npm run test:crisis
+npm run test:recovery
 npm run test:validation-isolation
+npm run test:long-run
 npm run test:regression
 npm run test:personality
 npm run test:social-ai

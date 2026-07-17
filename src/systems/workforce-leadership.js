@@ -24,6 +24,28 @@ function updateLaborMarketDaily(){
   });
 }
 function laborMarketForDepartment(dept){ensureLaborMarket();return company.laborMarket?.[dept]||defaultLaborMarketSegment(dept);}
+function repairRecruitingPipelineIntegrity(){
+  if(!company||!Array.isArray(company.recruitingPipeline)||!Array.isArray(employees))return;
+  company.recruitingPipeline.forEach(item=>{
+    const role=canonicalRole(item.role);
+    if(!roleDefinition(role))return;
+    if(item.status==="contractor"){
+      item.contractorCoverage=true;
+      item.contractorCoverageUntil=Number(item.contractorCoverageUntil)||company.day+14;
+      item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.dueDay=Math.max(company.day+3,Number(item.dueDay)||company.day+7);
+      item.repairedFromContractorStatus=true;
+      company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"repaired-contractor-search"});
+    }
+    if(item.status==="accepted"){
+      const filledDay=Number.isFinite(item.filledDay)?item.filledDay:null;
+      const matchingHire=filledDay!==null&&employees.some(e=>e&&e.active&&canonicalRole(e.role)===role&&Math.abs((Number(e.joinedDay)||0)-filledDay)<=1&&(e.careerHistory||[]).some(h=>/Hired as|Backfilled as|Selected by HR/i.test(String(h))));
+      if(!matchingHire&&company.day-(filledDay??item.day??company.day)<60){
+        item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.dueDay=company.day+stageDaysForRecruiting(item,"searching");item.repairedMissingHire=true;
+        company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"repaired-missing-hire"});
+      }
+    }
+  });
+}
 function ensureWorkforceEconomySystems(){
   if(!company||!Array.isArray(employees))return;
   company.finance={payrollDaily:0,facilitiesDaily:0,manufacturingDaily:0,supportDaily:0,contractorDaily:0,growthOverhead:0,debtOrFundingCost:0,crisisCost:0,totalDailyCost:.24,grossRevenueDaily:0,netCashFlowDaily:0,runwayDays:90,unpaidPayrollDays:0,...(company.finance||{})};
@@ -38,6 +60,7 @@ function ensureWorkforceEconomySystems(){
   company.terminationNotifications=Array.isArray(company.terminationNotifications)?company.terminationNotifications:[];
   company.successionRisks=Array.isArray(company.successionRisks)?company.successionRisks:[];
   company.recruitingPipeline=Array.isArray(company.recruitingPipeline)?company.recruitingPipeline:[];
+  repairRecruitingPipelineIntegrity();
   company.restructuringRequests=Array.isArray(company.restructuringRequests)?company.restructuringRequests:[];
   company.hiringExceptions=Array.isArray(company.hiringExceptions)?company.hiringExceptions:[];
   ensureLaborMarket();
@@ -1045,13 +1068,16 @@ function onboardingQualityForHire(candidate,item){
   const quality=clamp(48+(mentor?.skills?.leadership||45)*.18+(team.cohesion||55)*.18+(company.culture?.communication||50)*.16+(lesson.score||0)*1.4-(team.pressure||50)*.12+(candidate?.cultureFit||60)*.12,20,95);
   return {quality,mentor};
 }
-function startRecruiting(role,mode="specialist",department=roleDepartment(role)){
+function startRecruiting(role,mode="specialist",department=null,options={}){
   ensureWorkforceEconomySystems();
+  if(!role)role=(company.openRoles||[])[0]||roleForDepartmentHire(department||"software");
   role=canonicalRole(role);
+  if(!roleDefinition(role))return null;
   department=department||roleDepartment(role);
   const markets=["excellent","healthy","average","tight","very tight"],market=markets[Math.floor(simulationRandom()*markets.length)];
   const labor=laborMarketForDepartment(department);
-  const item={id:`recruit-${company.day}-${role.replace(/\W/g,"-")}`,day:company.day,searchStartedDay:company.day,stageStartedDay:company.day,dueDay:company.day+1,role,department,mode,status:"requisition",stage:"requisition",costPaid:.18,attempts:0,market,competition:Math.round(clamp(labor.competition+rand(-9,9),5,100)),salaryInflation:Math.round(clamp((labor.salaryPressure-45)*.35+rand(0,8),0,35)),salaryCompetitiveness:Math.round(rand(48,82)),talentAvailability:Math.round(clamp(labor.candidateSupply+rand(-10,10),5,100)),laborMarketSnapshot:{...labor},exceptionQueued:false,candidate:null,project:recruitingProjectFor(department,role),expectedFillDays:null,declines:0};
+  const backfill=!!options.backfill;
+  const item={id:nextSimulationId("recruit"),day:company.day,searchStartedDay:company.day,stageStartedDay:company.day,dueDay:company.day+1,role,department,mode,status:"requisition",stage:"requisition",source:options.source||(backfill?"vacancy-backfill":"approved-headcount"),backfill,costPaid:.18,attempts:0,market,competition:Math.round(clamp(labor.competition+rand(-9,9),5,100)),salaryInflation:Math.round(clamp((labor.salaryPressure-45)*.35+rand(0,8),0,35)),salaryCompetitiveness:Math.round(rand(48,82)),talentAvailability:Math.round(clamp(labor.candidateSupply+rand(-10,10),5,100)),laborMarketSnapshot:{...labor},exceptionQueued:false,candidate:null,project:recruitingProjectFor(department,role),expectedFillDays:null,declines:0};
   item.expectedFillDays=expectedRecruitingDays(item);
   item.dueDay=company.day+stageDaysForRecruiting(item,"requisition");
   company.recruitingPipeline.unshift(item);
@@ -1063,6 +1089,7 @@ function startRecruiting(role,mode="specialist",department=roleDepartment(role))
   reinforceWorkforceLesson("hiringTiming",1,`Recruiting started for ${role}`,6);
   reinforceWorkforceLesson("successionPlanning",.5,`${department} added hiring depth`,4);
   createOrReinforceLesson({key:"hiring-starts-before-crisis",title:"Hiring works best when recruiting starts before capacity fully breaks.",department,vector:workforceLearningVector("hiring"),outcome:"positive",confidence:60,evidence:`Recruiting started for ${role}`,importance:3});
+  return item;
 }
 function generateRecruitingCandidate(item){
   if(validationMode&&company.forceRecruitingCandidateForTest)return {role:item.role,skills:baseSkillsForRole(item.role),experience:company.forceRecruitingCandidateForTest.experience||40,salaryExpectation:defaultEmploymentForRole(item.role).annualSalary,personality:"test candidate",strengths:["controlled validation"],weaknesses:company.forceRecruitingCandidateForTest.mediocre?["weak fit"]:[],availability:"immediate",hiringDifficulty:roleRecruitingDifficulty(item.role),cultureFit:company.forceRecruitingCandidateForTest.cultureFit||50,growthPotential:company.forceRecruitingCandidateForTest.leadership||45,...company.forceRecruitingCandidateForTest};
@@ -1101,10 +1128,52 @@ function queueHiringExceptionEvent(item,type,candidate=null){
   company.hiringExceptions.unshift({day:company.day,id:item.id,role:item.role,department:item.department,type,status:"queued"});
   company.escalationQueue.push({id:`hiring-exception-${item.id}-${type}-${company.day}`,repeatable:false,category:"people",title,copy:message,generatedCommunication:{type:"HR Exception",priority:"Decision Needed",sender:{name:"People Operations",role:"HR"},subject:`${title} - ${item.role}`,message,recs:[["People",type==="salary"?"Approve only if the role is critical":"Resolve the exception without turning hiring into micromanagement",76],["Finance",company.finance?.runwayDays<75?"Protect runway and salary discipline":"Exception is fundable if strategically important",68],["Department",`The ${teamDisplayName(item.department)} need remains active`,72]],impacts:["CEO approves strategic exceptions only","HR still owns candidate selection","The role may fill, continue, convert, or close"]},choices});
 }
+function createRecruitingHireEmployee(item,candidate=null){
+  const role=canonicalRole(item.role);
+  if(!roleDefinition(role))return null;
+  const backfill=!!item.backfill;
+  const inactiveSlot=backfill?employees.find(e=>!e.active&&canonicalRole(e.role)===role):null;
+  const slot=Number.isFinite(inactiveSlot?.id)?inactiveSlot.id:employees.length;
+  const replacement=makeEmployee(Math.min(slot,names.length-1));
+  replacement.id=slot;
+  replacement.name=generateHireName(role);
+  replacement.role=role;
+  replacement.traits=[...traits[Math.floor(simulationRandom()*traits.length)]];
+  replacement.morale=70+simulationRandom()*10;
+  replacement.focus=68+simulationRandom()*12;
+  replacement.stress=18+simulationRandom()*10;
+  replacement.relationship={};replacement.social={};replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`${backfill?"Backfilled":"Hired"} as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.communication={reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:-999,lastHelpRequestDay:-999,rumorsShared:0};replacement.knownMessages=[];replacement.actionOutcomeContext=null;replacement.activeCollaboration=null;replacement.activeMeeting=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:-999,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;normalizeEmployeeRoleProfile(replacement);ensureEmployeePersonality(replacement,{force:true,salt:`hire-${company.day}-${role}-${slot}-${item.id||"manual"}`});inheritInstitutionalLearning(replacement);
+  employees.forEach(other=>{
+    if(other&&other.id!==replacement.id){
+      replacement.relationship[other.id]=Math.round(simulationRandom()*18-4);
+      other.relationship=other.relationship||{};
+      other.relationship[replacement.id]=Math.round(simulationRandom()*18-4);
+    }
+  });
+  employees[slot]=replacement;
+  if(backfill){
+    const idx=company.openRoles.indexOf(role);
+    if(idx>=0)company.openRoles.splice(idx,1);
+  }
+  company.log.push(`${replacement.name} joined as ${articleFor(role)} ${role}.`);
+  if(!validationMode)buildOffice();
+  return replacement;
+}
+function pruneRecruitingPipeline(){
+  const activeStatuses=new Set(["requisition","searching","interviewing","offer","exception","paused-policy"]);
+  const active=[],history=[];
+  (company.recruitingPipeline||[]).forEach(item=>(activeStatuses.has(item.status)?active:history).push(item));
+  company.recruitingPipeline=[...active.slice(0,48),...history.slice(0,16)];
+}
 function completeRecruitingHire(item,candidate=null){
-  const before=employees.length;
-  resolveHiring("specialist",item.role);
-  const hire=employees.find(e=>e.active&&e.role===item.role&&e.joinedDay===company.day&&e.id>=before-1)||employees.find(e=>e.active&&e.role===item.role&&e.joinedDay===company.day);
+  ensureWorkforceEconomySystems();
+  const hire=createRecruitingHireEmployee(item,candidate);
+  if(!hire){
+    item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.dueDay=company.day+stageDaysForRecruiting(item,"searching");
+    company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"hire-create-failed"});
+    recordHistory(`HR could not complete the ${item.role||"unknown role"} hire because the role record was invalid; recruiting continued.`,"people",3);
+    return;
+  }
   if(hire){
     const onboard=onboardingQualityForHire(candidate,item),duration=Math.round(clamp(34-onboard.quality*.18+roleRecruitingDifficulty(item.role)*.05,18,36));
     hire.performanceManagement={stage:"onboarding",coachingAttempts:0,pipAttempts:0,pipStartDay:null,pipDueDay:null,lastActionDay:company.day,documentedIssues:0,improvementScore:0,hrReviewed:false,terminationEligible:false};
@@ -1117,6 +1186,7 @@ function completeRecruitingHire(item,candidate=null){
   item.status="accepted";item.filledDay=company.day;item.candidate=candidate||item.candidate;
   recordWeeklyEvent(`HR hired a ${item.role} after recruiting.`,"people",4);
   recordHistory(`HR filled the approved ${item.role} role from a ${item.market} market.`,"people",4);
+  pruneRecruitingPipeline();
 }
 function processRecruitingPipeline(){
   ensureWorkforceEconomySystems();
@@ -1151,7 +1221,7 @@ function processRecruitingPipeline(){
       else{item.declines=(item.declines||0)+1;item.candidate=null;advanceRecruitingStage(item,"searching");recordHistory(`A ${item.role} candidate declined or stalled; HR restarted search.`,"people",3);}
     }
   }
-  company.recruitingPipeline=company.recruitingPipeline.slice(0,24);
+  pruneRecruitingPipeline();
 }
 function maybeQueueHiringFreezeException(){
   ensureWorkforceEconomySystems();
@@ -1185,7 +1255,7 @@ function applyHiringExceptionDecision(x){
     item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.salaryCompetitiveness=clamp((item.salaryCompetitiveness||60)+12,0,100);item.salaryInflation=clamp((item.salaryInflation||0)+8,0,35);item.dueDay=company.day+stageDaysForRecruiting(item,"searching");
     company.cash=clamp(company.cash-.12,0,999);recordHistory(`CEO increased the salary band for ${item.role}.`,"people",4);
   }else if(x.action==="contractor"){
-    item.status="contractor";company.finance.contractorDaily=Number(company.finance.contractorDaily||0)+.018;
+    item.contractorCoverageUntil=company.day+30;item.contractorCoverage=true;item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.dueDay=company.day+stageDaysForRecruiting(item,"searching");company.finance.contractorDaily=Number(company.finance.contractorDaily||0)+.018;
     employees.filter(e=>e.active&&roleDepartment(e.role)===item.department).forEach(e=>{e.stress=clamp(e.stress-4,0,100);e.morale=clamp(e.morale+1,0,100);});
     recordHistory(`Contractor coverage was approved while HR continued ${item.role} recruiting.`,"people",4);
   }else if(x.action==="cancel-role"){
