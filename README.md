@@ -49,6 +49,7 @@ The suite checks:
 - organizational friction, risk pillars, and loss/crisis paths
 - customer/product exposure and hidden-state access boundaries
 - employee personality boundaries, stress/morale-only reactions, and hidden social-state UI separation
+- Stage 1 Social Personality AI familiarity records and pair-level encounter boundaries
 - isolated balance validation that cannot mutate the live company save
 - executive memo context and weekly newspaper clarity
 - absence of recorded simulation errors during the regression run
@@ -65,9 +66,12 @@ npm run test:loss-paths
 npm run test:validation-isolation
 npm run test:regression
 npm run test:personality
+npm run test:social-ai
 ```
 
 The employee work AI and social/personality AI boundary is documented in `docs/architecture/employee_ai_boundaries.md`. Future changes that touch personality, relationships, morale, stress, or employee drama should preserve that boundary unless the design is explicitly revised.
+
+Stage 1 social familiarity behavior is documented in `docs/specs/social_ai_stage_1_familiarity.md`.
 
 Balance projection tools are developer validation tools, not CEO gameplay controls. In normal play they are hidden. To expose the Developer Tools validation panel in a local browser session, open the game with `?dev=1` or set `officeAquariumDeveloperMode` to `true` in browser storage. These tools run isolated companies in memory and must not reset, save, or mutate the active company.
 

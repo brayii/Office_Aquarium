@@ -600,6 +600,7 @@ function ensureBibleSystems(){
   company.learningEpisodes=Array.isArray(company.learningEpisodes)?company.learningEpisodes:[];
   company.nextLearningEpisodeId=Math.max(1,Number(company.nextLearningEpisodeId)||1);
   company.actionOutcomes=Array.isArray(company.actionOutcomes)?company.actionOutcomes:[];
+  ensureSocialAISystems?.();
   company.communicationOutcomes=Array.isArray(company.communicationOutcomes)?company.communicationOutcomes:[];
   company.investorRelationsForecasts=Array.isArray(company.investorRelationsForecasts)?company.investorRelationsForecasts:[];
   company.lastInvestorUpdateDay=Number.isFinite(company.lastInvestorUpdateDay)?company.lastInvestorUpdateDay:-999;

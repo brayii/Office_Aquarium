@@ -29,7 +29,8 @@
     "test:newspaper": "node tests/newspaper-clarity-test.js",
     "test:release-messages": "node tests/release-message-clarity-test.js",
     "test:personality": "node tests/personality-foundation-test.js",
-    "test": "npm run test:static && npm run test:smoke && npm run test:regression && npm run test:workforce && npm run test:rooms-roles && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:loss-paths && npm run test:customer && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:newspaper && npm run test:release-messages && npm run test:personality",
+    "test:social-ai": "node tests/social-ai-familiarity-test.js",
+    "test": "npm run test:static && npm run test:smoke && npm run test:regression && npm run test:workforce && npm run test:rooms-roles && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:loss-paths && npm run test:customer && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:newspaper && npm run test:release-messages && npm run test:personality && npm run test:social-ai",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

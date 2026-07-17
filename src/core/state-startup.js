@@ -5,7 +5,7 @@ const names=["Maya","Leo","Aisha","Noah","Priya","Ethan","Sofia","Marcus"];
 const roles=FOUNDING_ROLES;
 const colors=["#4a78c2","#ef6f6c","#2ab7a9","#d9972b","#7a5af8","#5f9f64","#d65b9e","#52606d"];
 const traits=[["perfectionist","ambitious"],["social","creative"],["focused","introverted"],["cautious","loyal"],["ambitious","social"],["skeptical","focused"],["creative","independent"],["cautious","analytical"]];
-const initialCompany={day:0,minute:480,randomState:2463534242,nextRuntimeId:1,cash:18,board:72,trust:68,chip:22,software:31,quality:38,integration:15,customers:0,dailyRevenue:0,valuation:42,phase:"prototype",marketSentiment:50,marketConfidence:50,leadershipReputation:50,valuationQuality:50,investorAppetite:50,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-999,lastValuationMemoDay:-999,lastFundraisingMemoDay:-999,lastValuationStoryDay:-999,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:"both",soundEnabled:true,pendingEvent:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-999,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,capabilityNeeds:{...DEFAULT_COMPANY_CAPABILITY_NEEDS},capabilityCoverage:{},capabilityGaps:[],capabilityConsequences:{},capabilityPromotionCandidates:[],capabilityFulfillmentOptions:{},capabilityAudit:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-999},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
+const initialCompany={day:0,minute:480,randomState:2463534242,nextRuntimeId:1,cash:18,board:72,trust:68,chip:22,software:31,quality:38,integration:15,customers:0,dailyRevenue:0,valuation:42,phase:"prototype",marketSentiment:50,marketConfidence:50,leadershipReputation:50,valuationQuality:50,investorAppetite:50,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-999,lastValuationMemoDay:-999,lastFundraisingMemoDay:-999,lastValuationStoryDay:-999,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:"both",soundEnabled:true,pendingEvent:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-999,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,capabilityNeeds:{...DEFAULT_COMPANY_CAPABILITY_NEEDS},capabilityCoverage:{},capabilityGaps:[],capabilityConsequences:{},capabilityPromotionCandidates:[],capabilityFulfillmentOptions:{},capabilityAudit:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},socialRelationships:{},socialMemories:[],roomPresenceCounters:{},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-999},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
 let company,employees,timer=null,debugMode=false,selectedEmployeeId=null,validationMode=false,currentSimulationContext=null,lastValidationReport=null,lastInboxSoundCount=null,musicUnavailable=false,alertsUnavailable=false,pausedBeforeResetPrompt=false;
 function updatePauseButton(){
   const button=document.getElementById("pauseBtn");
@@ -141,6 +141,132 @@ function applyEmployeeEmotionalReaction(args){
   state.belonging=clamp((state.belonging||55)+Math.max(0,moraleDelta)*.8-Math.max(0,-moraleDelta)*.9,0,100);
   state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressDelta)*.8-Math.max(0,-stressDelta)*1.2,0,100);
   return e.lastEmotionalReaction;
+}
+function makeRelationshipKey(employeeAId,employeeBId){
+  return [Number(employeeAId),Number(employeeBId)].sort((a,b)=>a-b).join(":");
+}
+function simulationTimestamp(day=company?.day||0,minute=company?.minute||0){
+  return {day,minute,absoluteMinute:day*1440+minute};
+}
+function ensureSocialAISystems(){
+  if(!company)return;
+  company.socialRelationships=company.socialRelationships&&typeof company.socialRelationships==="object"?company.socialRelationships:{};
+  company.socialMemories=Array.isArray(company.socialMemories)?company.socialMemories:[];
+  company.roomPresenceCounters=company.roomPresenceCounters&&typeof company.roomPresenceCounters==="object"?company.roomPresenceCounters:{};
+  Object.entries(company.socialRelationships).forEach(([key,record])=>{
+    const ids=key.split(":").map(Number);
+    if(ids.length!==2||ids.some(id=>!Number.isFinite(id))){delete company.socialRelationships[key];return;}
+    record.employeeAId=Number.isFinite(record.employeeAId)?record.employeeAId:ids[0];
+    record.employeeBId=Number.isFinite(record.employeeBId)?record.employeeBId:ids[1];
+    record.familiarity=clamp(Number(record.familiarity)||0,0,100);
+    record.interactionCount=Math.max(0,Number(record.interactionCount)||0);
+    record.recentInteractionTypes=Array.isArray(record.recentInteractionTypes)?record.recentInteractionTypes.slice(0,12):[];
+    record.cooldowns=record.cooldowns&&typeof record.cooldowns==="object"?record.cooldowns:{};
+    record.stressHistory=Number(record.stressHistory)||0;
+    record.moraleHistory=Number(record.moraleHistory)||0;
+  });
+}
+function socialRelationshipRecord(aId,bId,{create=false}={}){
+  ensureSocialAISystems();
+  if(!Number.isFinite(Number(aId))||!Number.isFinite(Number(bId))||Number(aId)===Number(bId))return null;
+  const key=makeRelationshipKey(aId,bId);
+  if(!company.socialRelationships[key]&&create){
+    const [employeeAId,employeeBId]=key.split(":").map(Number);
+    company.socialRelationships[key]={employeeAId,employeeBId,familiarity:0,interactionCount:0,firstMetAt:null,lastInteractionAt:null,recentInteractionTypes:[],cooldowns:{},stressHistory:0,moraleHistory:0};
+  }
+  return company.socialRelationships[key]||null;
+}
+function socialEncounterEmotion(employee,coworker,type,gain){
+  ensureEmployeePersonality(employee);
+  const p=employee.personality||{};
+  let moraleDelta=0,stressDelta=0,reasonCode=`social_${type}`;
+  if(type==="same_room_presence"){moraleDelta=(p.sociability||0)>.45?.12:0;stressDelta=(p.sociability||0)<-.45?.18:0;}
+  else if(type==="shared_break"){moraleDelta=.25+(p.sociability||0)*.22;stressDelta=-(.12+(p.empathy||0)*.06);}
+  else if(type==="same_meeting"){moraleDelta=.12+(p.collaboration||0)*.16;stressDelta=(p.structureNeed||0)>.35?-.04:.08-(p.collaboration||0)*.08;}
+  else if(type==="shared_work_event"){moraleDelta=.22+(p.collaboration||0)*.22;stressDelta=-(p.collaboration||0)*.08;}
+  else if(type==="direct_help"){moraleDelta=.35+(p.empathy||0)*.24+(p.collaboration||0)*.18;stressDelta=-(p.empathy||0)*.08;}
+  else if(type==="first_meeting"){moraleDelta=(p.sociability||0)>.5?.35:0;stressDelta=(p.sociability||0)<-.45?.35:0;}
+  const scale=clamp(gain/3,.25,1.1);
+  return {moraleDelta:Number(clamp(moraleDelta*scale,-1.2,1.2).toFixed(3)),stressDelta:Number(clamp(stressDelta*scale,-1.2,1.2).toFixed(3)),reasonCode,sourceEventId:null,relatedEmployeeIds:[coworker.id]};
+}
+function applySocialEncounterEmotion(employee,coworker,type,sourceEventId,gain){
+  const reaction=socialEncounterEmotion(employee,coworker,type,gain);
+  reaction.sourceEventId=sourceEventId;
+  resetEmployeeEmotionalDay(employee);
+  const code=`${reaction.reasonCode}:${sourceEventId||"local"}`;
+  if(employee.emotionalCooldowns[code]>0)return {...reaction,moraleDelta:0,stressDelta:0,capped:true};
+  const moraleDelta=emotionalCapDelta(employee,"morale",reaction.moraleDelta),stressDelta=emotionalCapDelta(employee,"stress",reaction.stressDelta);
+  employee.morale=clamp((employee.morale||0)+moraleDelta,0,100);
+  employee.stress=clamp((employee.stress||0)+stressDelta,0,100);
+  employee.emotionalCooldowns[code]=1;
+  employee.lastEmotionalReaction={moraleDelta,stressDelta,reasonCode:reaction.reasonCode,sourceEventId,relatedEmployeeIds:[coworker.id]};
+  employee.recentEmotionalEvents=[{day:company.day,minute:company.minute,reasonCode:reaction.reasonCode,moraleDelta,stressDelta,sourceEventId},...(employee.recentEmotionalEvents||[])].slice(0,12);
+  const state=employee.emotionalState||{};
+  state.frustration=clamp((state.frustration||20)+Math.max(0,stressDelta)*2-Math.max(0,-stressDelta),0,100);
+  state.belonging=clamp((state.belonging||55)+Math.max(0,moraleDelta)*.8-Math.max(0,-moraleDelta)*.9,0,100);
+  state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressDelta)*.8-Math.max(0,-stressDelta)*1.2,0,100);
+  return employee.lastEmotionalReaction;
+}
+function recordSocialEncounter(a,b,{type="same_room_presence",gain=.25,sourceEventId=null,roomId=null,cooldownMinutes=120}={}){
+  if(!a?.active||!b?.active||a.offsite||b.offsite||a.id===b.id)return null;
+  ensureSocialAISystems();
+  const record=socialRelationshipRecord(a.id,b.id,{create:true}),now=simulationTimestamp(),cooldownKey=`${type}:${sourceEventId||roomId||"local"}`;
+  const last=Number(record.cooldowns[cooldownKey])||-999999;
+  if(now.absoluteMinute-last<cooldownMinutes)return record;
+  const first=record.interactionCount===0;
+  const appliedGain=clamp(Number(gain)||0,0,5);
+  record.cooldowns[cooldownKey]=now.absoluteMinute;
+  record.familiarity=clamp((record.familiarity||0)+appliedGain,0,100);
+  record.interactionCount++;
+  if(first){
+    record.firstMetAt=now;
+    company.socialMemories.unshift({type:"first_met",employeeIds:[a.id,b.id],timestamp:now,roomId:roomId||null,sourceEventId:sourceEventId||null});
+    record.familiarity=clamp(Math.max(record.familiarity,appliedGain),0,100);
+  }
+  record.lastInteractionAt=now;
+  record.recentInteractionTypes=[{type,day:company.day,minute:company.minute,sourceEventId:sourceEventId||null,gain:appliedGain},...(record.recentInteractionTypes||[])].slice(0,12);
+  const reactionA=applySocialEncounterEmotion(a,b,first?"first_meeting":type,sourceEventId||`${type}-${makeRelationshipKey(a.id,b.id)}-${company.day}-${company.minute}`,appliedGain);
+  const reactionB=applySocialEncounterEmotion(b,a,first?"first_meeting":type,sourceEventId||`${type}-${makeRelationshipKey(a.id,b.id)}-${company.day}-${company.minute}`,appliedGain);
+  record.stressHistory=Number(((record.stressHistory||0)+(reactionA?.stressDelta||0)+(reactionB?.stressDelta||0)).toFixed(3));
+  record.moraleHistory=Number(((record.moraleHistory||0)+(reactionA?.moraleDelta||0)+(reactionB?.moraleDelta||0)).toFixed(3));
+  return record;
+}
+function observeRoomFamiliarity(minutes=5){
+  ensureSocialAISystems();
+  const present=employees.filter(e=>e.active&&!e.offsite&&(e.currentRoom||roomForZone?.(e.zone))).map(e=>({employee:e,room:e.currentRoom||roomForZone(e.zone)}));
+  const seen=new Set();
+  for(let i=0;i<present.length;i++)for(let j=i+1;j<present.length;j++){
+    if(present[i].room!==present[j].room)continue;
+    const a=present[i].employee,b=present[j].employee,key=`${makeRelationshipKey(a.id,b.id)}:${present[i].room}`;
+    seen.add(key);
+    company.roomPresenceCounters[key]=(company.roomPresenceCounters[key]||0)+minutes;
+    const threshold=present[i].room==="break-area"?20:60;
+    if(company.roomPresenceCounters[key]>=threshold){
+      recordSocialEncounter(a,b,{type:present[i].room==="break-area"?"shared_break":"same_room_presence",gain:present[i].room==="break-area"?.8:.35,roomId:present[i].room,cooldownMinutes:present[i].room==="break-area"?90:120});
+      company.roomPresenceCounters[key]=0;
+    }
+  }
+  Object.keys(company.roomPresenceCounters).forEach(key=>{if(!seen.has(key))company.roomPresenceCounters[key]=0;});
+}
+function familiaritySummaryForEmployee(e){
+  ensureSocialAISystems();
+  const records=Object.values(company.socialRelationships).filter(r=>r.employeeAId===e.id||r.employeeBId===e.id);
+  if(!records.length)return "Still getting to know the team";
+  const known=records.filter(r=>r.familiarity>=15).length,well=records.filter(r=>r.familiarity>=60).length;
+  const top=records.slice().sort((a,b)=>(b.familiarity||0)-(a.familiarity||0))[0],otherId=top?.employeeAId===e.id?top.employeeBId:top?.employeeAId,other=employees.find(x=>x.id===otherId);
+  if(well>0)return `Knows ${well} coworker${well===1?"":"s"} well; most familiar with ${other?.name||"a coworker"}`;
+  if(known>0)return `Recognizes several coworkers; most familiar with ${other?.name||"a coworker"}`;
+  return "Has met coworkers, but most relationships are still new";
+}
+function socialFamiliarityDebugHtml(e){
+  ensureSocialAISystems();
+  const rows=Object.entries(company.socialRelationships).filter(([,r])=>r.employeeAId===e.id||r.employeeBId===e.id).sort((a,b)=>(b[1].familiarity||0)-(a[1].familiarity||0)).slice(0,8);
+  if(!rows.length)return "No recorded pair familiarity yet.";
+  return rows.map(([key,r])=>{
+    const otherId=r.employeeAId===e.id?r.employeeBId:r.employeeAId,other=employees.find(x=>x.id===otherId);
+    const recent=(r.recentInteractionTypes||[]).slice(0,3).map(x=>`${x.type} day ${x.day} source ${x.sourceEventId||"local"}`).join("; ")||"none";
+    return `Pair ${key} (${other?.name||"missing employee"})<br>Familiarity ${Number(r.familiarity||0).toFixed(2)}; interactions ${r.interactionCount||0}<br>First met ${r.firstMetAt?`day ${r.firstMetAt.day}, minute ${r.firstMetAt.minute}`:"not recorded"}; last ${r.lastInteractionAt?`day ${r.lastInteractionAt.day}, minute ${r.lastInteractionAt.minute}`:"none"}<br>Recent ${recent}<br>Stress history ${Number(r.stressHistory||0).toFixed(2)}; morale history ${Number(r.moraleHistory||0).toFixed(2)}<br>Cooldowns ${Object.keys(r.cooldowns||{}).length}`;
+  }).join("<br><br>");
 }
 function applyDailyPersonalityEmotion(e){
   if(!e?.active)return null;
