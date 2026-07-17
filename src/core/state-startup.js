@@ -158,6 +158,8 @@ function ensureSocialAISystems(){
   company.socialRelationships=company.socialRelationships&&typeof company.socialRelationships==="object"?company.socialRelationships:{};
   company.socialMemories=Array.isArray(company.socialMemories)?company.socialMemories:[];
   company.roomPresenceCounters=company.roomPresenceCounters&&typeof company.roomPresenceCounters==="object"?company.roomPresenceCounters:{};
+  company.socialPreferenceHistory=Array.isArray(company.socialPreferenceHistory)?company.socialPreferenceHistory.slice(0,80):[];
+  company.socialPreferenceDebug=Array.isArray(company.socialPreferenceDebug)?company.socialPreferenceDebug.slice(0,24):[];
   Object.entries(company.socialRelationships).forEach(([key,record])=>{
     const ids=key.split(":").map(Number);
     if(ids.length!==2||ids.some(id=>!Number.isFinite(id))){delete company.socialRelationships[key];return;}
@@ -354,6 +356,112 @@ function socialEncounterEmotion(employee,coworker,type,gain){
   else if(type==="first_meeting"){moraleDelta=(p.sociability||0)>.5?.35:0;stressDelta=(p.sociability||0)<-.45?.35:0;}
   const scale=clamp(gain/3,.25,1.1);
   return {moraleDelta:Number(clamp(moraleDelta*scale,-1.2,1.2).toFixed(3)),stressDelta:Number(clamp(stressDelta*scale,-1.2,1.2).toFixed(3)),reasonCode,sourceEventId:null,relatedEmployeeIds:[coworker.id]};
+}
+function socialPreferenceOpportunityRoom(employee,opportunity={}){
+  return opportunity.roomId||employee?.currentRoom||roomForZone?.(employee?.zone)||null;
+}
+function socialPreferenceSocialBattery(employee){
+  ensureEmployeePersonality(employee);
+  const p=employee?.personality||{},state=employee?.emotionalState||{};
+  if(Number.isFinite(Number(state.socialBattery)))return clamp(Number(state.socialBattery),0,100);
+  return clamp(55+(p.sociability||0)*22-(employee?.stress||50)*.22+(employee?.morale||50)*.12,0,100);
+}
+function socialPreferenceCandidates(employee,opportunity={}){
+  ensureSocialAISystems();
+  const room=socialPreferenceOpportunityRoom(employee,opportunity);
+  const allowed=Array.isArray(opportunity.participantIds)?new Set(opportunity.participantIds.map(Number)):null;
+  const candidates=(employees||[]).filter(other=>{
+    if(!other?.active||other.offsite||other.id===employee?.id)return false;
+    if(allowed&&!allowed.has(other.id))return false;
+    const otherRoom=other.currentRoom||roomForZone?.(other.zone)||null;
+    return room&&otherRoom===room;
+  });
+  const allowAlone=opportunity.allowAlone!==false&&["break","hallway","waiting","waiting_for_equipment","conversation","meeting_before_after","project_discussion","mentoring"].includes(opportunity.type||"conversation");
+  return {room,candidates,allowAlone};
+}
+function recentSocialPreferencePenalty(employeeId,candidateId){
+  ensureSocialAISystems();
+  const recent=(company.socialPreferenceHistory||[]).filter(x=>x.employeeId===employeeId).slice(0,8);
+  const matches=recent.filter(x=>String(x.selectedEmployeeId??"alone")===String(candidateId??"alone")).length;
+  return Math.max(0,matches)*7;
+}
+function socialPreferenceWeight(employee,candidate,opportunity={}){
+  ensureSocialAISystems();ensureEmployeePersonality(employee);
+  const p=employee.personality||{},battery=socialPreferenceSocialBattery(employee),stress=Number(employee.stress)||50,morale=Number(employee.morale)||50,type=opportunity.type||"conversation";
+  if(candidate?.type==="alone"){
+    let weight=18+(50-battery)*.38+Math.max(0,stress-62)*.22+(p.sociability<0?Math.abs(p.sociability)*18:0)+(type==="break"?8:0);
+    weight-=Math.max(0,p.sociability)*10;
+    weight-=recentSocialPreferencePenalty(employee.id,null);
+    return clamp(weight,4,85);
+  }
+  const coworker=candidate,record=socialRelationshipRecord(employee.id,coworker.id,{create:false}),rel=record?.relationship||emptyRelationshipInterpretation();
+  const familiarity=Number(record?.familiarity)||0,trust=Number(rel.trust)||0,respect=Number(rel.respect)||0,comfort=Number(rel.comfort)||0,friction=Number(rel.professionalFriction)||0;
+  const compatibility=personalityCompatibility(employee,coworker),teamMatch=employeeTeam?.(employee)===employeeTeam?.(coworker)?1:0;
+  let weight=24+familiarity*.22+trust*.18+respect*.14+comfort*.20-friction*.24+compatibility*18+teamMatch*5;
+  weight+=(p.sociability||0)*12+(p.collaboration||0)*10+(p.empathy||0)*6;
+  weight+=Math.max(0,morale-55)*.08-Math.max(0,stress-72)*.12;
+  if(type==="mentoring"||type==="project_discussion")weight+=(respect-45)*.12+(p.collaboration||0)*6;
+  if(familiarity<18)weight+=clamp((company.culture?.communication||50)-45,0,14)*.35+4;
+  weight-=recentSocialPreferencePenalty(employee.id,coworker.id);
+  return clamp(weight,3,100);
+}
+function socialPreferenceReasonCode(employee,selected,opportunity={}){
+  if(!selected||selected.type==="alone"){
+    const battery=socialPreferenceSocialBattery(employee);
+    return battery<42||employee?.stress>70?"social_preference_recovery_alone":"social_preference_alone";
+  }
+  const record=socialRelationshipRecord(employee.id,selected.id,{create:false}),rel=record?.relationship||emptyRelationshipInterpretation();
+  if((rel.professionalFriction||0)>65)return "social_preference_friction";
+  if((rel.trust||0)>60||(rel.comfort||0)>60)return "social_preference_trusted_coworker";
+  if((record?.familiarity||0)<18)return "social_preference_new_contact";
+  if((rel.respect||0)>60)return "social_preference_respected_coworker";
+  return `social_preference_${opportunity.type||"conversation"}`;
+}
+function chooseSocialPreference(employee,opportunity={},options={}){
+  ensureSocialAISystems();
+  const {room,candidates,allowAlone}=socialPreferenceCandidates(employee,opportunity);
+  const weighted=candidates.map(candidate=>({employeeId:candidate.id,name:candidate.name,type:"coworker",weight:Number(socialPreferenceWeight(employee,candidate,opportunity).toFixed(3)),reasonCode:socialPreferenceReasonCode(employee,candidate,opportunity)}));
+  if(allowAlone)weighted.push({employeeId:null,name:"Spend time alone",type:"alone",weight:Number(socialPreferenceWeight(employee,{type:"alone"},opportunity).toFixed(3)),reasonCode:socialPreferenceReasonCode(employee,{type:"alone"},opportunity)});
+  const total=weighted.reduce((sum,c)=>sum+Math.max(0,c.weight),0);
+  let roll=simulationRandom()*Math.max(1,total),selected=weighted[weighted.length-1]||null;
+  for(const candidate of weighted){roll-=Math.max(0,candidate.weight);if(roll<=0){selected=candidate;break;}}
+  const decision={day:company.day,minute:company.minute,employeeId:employee?.id,employeeName:employee?.name,opportunityType:opportunity.type||"conversation",roomId:room,selectedEmployeeId:selected?.employeeId??null,selectedName:selected?.name||"No interaction",selectedType:selected?.type||"none",reasonCode:selected?.reasonCode||"social_preference_none",candidates:weighted};
+  if(options.record!==false){
+    company.socialPreferenceHistory=[decision,...(company.socialPreferenceHistory||[])].slice(0,80);
+    company.socialPreferenceDebug=[decision,...(company.socialPreferenceDebug||[])].slice(0,24);
+  }
+  return decision;
+}
+function socialPreferenceEmotion(employee,preference,opportunity={}){
+  ensureEmployeePersonality(employee);
+  const selectedId=preference?.selectedEmployeeId??null,p=employee?.personality||{};
+  let stressDelta=0,moraleDelta=0,reasonCode=preference?.reasonCode||"social_preference_none";
+  if(selectedId==null){
+    const battery=socialPreferenceSocialBattery(employee);
+    stressDelta=battery<50?-.22:employee?.stress>70?-.16:0;
+    moraleDelta=(p.sociability||0)>.45?-.04:.05;
+  }else{
+    const coworker=(employees||[]).find(x=>x.id===selectedId),record=socialRelationshipRecord(employee.id,selectedId,{create:false}),rel=record?.relationship||emptyRelationshipInterpretation();
+    const trust=Number(rel.trust)||0,comfort=Number(rel.comfort)||0,friction=Number(rel.professionalFriction)||0,respect=Number(rel.respect)||0;
+    moraleDelta=(comfort-45)/180+(trust-45)/220+(respect-50)/260+(p.sociability||0)*.04;
+    stressDelta=Math.max(0,friction-55)/150-Math.max(0,comfort-60)/180-Math.max(0,trust-65)/220;
+    if(coworker&&socialPreferenceOpportunityRoom(employee,opportunity)!==(coworker.currentRoom||roomForZone?.(coworker.zone)||null)){moraleDelta=0;stressDelta=0;reasonCode="social_preference_invalid_opportunity";}
+  }
+  return {stressDelta:Number(clamp(stressDelta,-.45,.45).toFixed(3)),moraleDelta:Number(clamp(moraleDelta,-.45,.45).toFixed(3)),reasonCode};
+}
+function applySocialPreferenceOpportunity(employee,opportunity={}){
+  const preference=chooseSocialPreference(employee,opportunity);
+  const emotion=socialPreferenceEmotion(employee,preference,opportunity);
+  const reaction={...emotion,sourceEventId:`social-pref-${company.day}-${company.minute}-${employee.id}`,relatedEmployeeIds:preference.selectedEmployeeId!=null?[preference.selectedEmployeeId]:[]};
+  applySocialReaction(employee,reaction);
+  employee.socialPreferenceContext={...preference,emotion};
+  return preference;
+}
+function socialPreferenceDebugHtml(e){
+  ensureSocialAISystems();
+  const decisions=(company.socialPreferenceDebug||[]).filter(d=>d.employeeId===e?.id).slice(0,5);
+  if(!decisions.length)return "No social preference decisions yet.";
+  return decisions.map(d=>`Day ${d.day}, minute ${d.minute}: ${d.opportunityType} in ${d.roomId||"unknown room"} selected ${d.selectedName} (${d.reasonCode}).<br>Candidates: ${(d.candidates||[]).map(c=>`${c.name} ${Number(c.weight||0).toFixed(1)} ${c.reasonCode}`).join("; ")||"none"}`).join("<br><br>");
 }
 function applySocialEncounterEmotion(employee,coworker,type,sourceEventId,gain){
   const reaction=socialEncounterEmotion(employee,coworker,type,gain);

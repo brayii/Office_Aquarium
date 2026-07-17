@@ -816,8 +816,7 @@ function chooseAction(e){
   }else if(a==="break"){
     const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="taking a break";e.thought=thoughtFor("break",e,ctx);e.actionMinutes=rand(20,40);e.cooldowns.break=75;
   }else if(a==="socialize"){
-    target=socialTarget(e);const room=roomForAction(e,a,{...ctx,collaborator:target});moveToZone(e,zoneForRoom(room));e.action=`talking with ${target?.name||"coworkers"}`;e.thought=thoughtFor("socialize",e,ctx);e.actionMinutes=rand(25,50);e.cooldowns.socialize=70;
-    if(target){adjustSocial(e,target,{friendship:3,trust:1});addMemory(e,"SOCIAL_HELP",`I had a good conversation with ${target.name}.`,"positive",6,target.name);}
+    const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="talking with coworkers";e.thought=thoughtFor("socialize",e,ctx);e.actionMinutes=rand(25,50);e.cooldowns.socialize=70;
   }else if(a==="collaborate"){
     target=availableCollaborator(e);const room=roomForAction(e,a,{...ctx,collaborator:target});moveToZone(e,zoneForRoom(room));e.action=`collaborating with ${target?.name||"a teammate"}`;e.thought=thoughtFor("collaborate",e,ctx);e.actionMinutes=rand(35,70);e.cooldowns.collaborate=90;
     if(target){startCollaborationSession(e,target,ctx);adjustSocial(e,target,{respect:3,trust:2});addMemory(e,"COLLABORATION",`${target.name} helped move the work forward.`,"positive",8,target.name);}
@@ -830,6 +829,20 @@ function chooseAction(e){
   }
   const chosenRoom=roomForZone(e.zone);
   if(chosenRoom){e.currentRoom=chosenRoom;e.roomSelectionReason=`${a} selected ${chosenRoom} from role, work, and activity context.`;e.roomEffect=roomEffectFor(e,a,chosenRoom);}
+  if((a==="break"||a==="socialize"||a==="meeting")&&typeof applySocialPreferenceOpportunity==="function"){
+    const opportunityType=a==="break"?"break":a==="meeting"?"meeting_before_after":"conversation";
+    const preference=applySocialPreferenceOpportunity(e,{type:opportunityType,roomId:chosenRoom,allowAlone:true});
+    if(a==="socialize"&&preference?.selectedEmployeeId!=null){
+      target=employees.find(x=>x.id===preference.selectedEmployeeId)||null;
+      if(target){
+        e.action=`talking with ${target.name}`;
+        adjustSocial(e,target,{friendship:2,trust:1});
+        addMemory(e,"SOCIAL_HELP",`I had a good conversation with ${target.name}.`,"positive",5,target.name);
+      }
+    }else if(a==="socialize"&&preference?.selectedType==="alone"){
+      e.action="taking a quiet social pause";
+    }
+  }
   e.actionOutcomeContext=actionSnapshot(e,a);
 }
 function roleThought(e){return({
