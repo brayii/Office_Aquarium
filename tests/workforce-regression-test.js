@@ -136,6 +136,16 @@ async function main() {
     assert((counts.statuses["Candidate Search"] || 0) === counts.searching, "Visible candidate search count should match records");
     assert((counts.statuses["Onboarding"] || 0) === counts.onboarding, "Visible onboarding count should match active onboarding employees");
 
+    // Onboarding completion should not make the hire disappear from workforce visibility.
+    const onboardingHire = employees.find(e => e.active && e.performanceManagement?.stage === "onboarding");
+    assert(onboardingHire, "Expected an onboarding hire before completion visibility check");
+    const activeBeforeCompletion = activeCount();
+    company.day = (onboardingHire.onboarding.startDay || onboardingHire.joinedDay || company.day) + onboardingHire.onboarding.duration;
+    completeDueOnboarding();
+    const completedRows = hiringPipelineRows();
+    assert(activeCount() === activeBeforeCompletion, "Completing onboarding should not remove the employee");
+    assert(completedRows.some(row => row.status === "Onboarding Complete" && row.role === onboardingHire.role), "Completed onboarding should remain visible as a recent hire");
+
     // Hiring explanations should use the same assessment that created the signal, not raw zero-value debug fields.
     employees.forEach(e => {
       e.stress = 86;

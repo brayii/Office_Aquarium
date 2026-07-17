@@ -714,6 +714,14 @@ function hiringPipelineRows(){
   employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||21)).forEach(e=>{
     rows.push({dept:roleDepartment(e.role),role:e.role,count:1,status:"Onboarding",reason:`${e.name} is ramping into the role.`,evidence:[`joined on day ${e.joinedDay}`,`productivity ${e.onboarding?.productivity||Math.round(onboardingProductivity(e)*100)}%`,`mentor ${employees.find(m=>m.id===e.onboarding?.mentorId)?.name||"none"}`],confidence:80});
   });
+  employees.filter(e=>{
+    if(!e.active||e.performanceManagement?.stage==="onboarding")return false;
+    const recent=company.day-(e.joinedDay||0)<=45;
+    const hired=(e.careerHistory||[]).some(h=>/Hired as|Selected by HR|Completed onboarding/i.test(String(h)));
+    return recent&&hired;
+  }).forEach(e=>{
+    rows.push({dept:roleDepartment(e.role),role:e.role,count:1,status:"Onboarding Complete",reason:`${e.name} is now active as ${articleFor(e.role)} ${e.role}.`,evidence:[`joined on day ${e.joinedDay}`,`completed onboarding${e.onboarding?.duration?` after about ${e.onboarding.duration} days`:""}`,`current productivity ${Math.round(onboardingProductivity(e)*100)}%`],confidence:82});
+  });
   return rows;
 }
 function hiringPipelineHtml(){
@@ -753,7 +761,7 @@ function workforceFinancialPressureHtml(){
   const pipeline=hiringPipelineRows();
   const identified=pipeline.filter(r=>["Need Identified","Department Review","Finance/HR Review"].includes(r.status)).reduce((s,r)=>s+r.count,0),preparing=pipeline.filter(r=>r.status==="Preparing CEO Memo").reduce((s,r)=>s+r.count,0),queuedMemos=pipeline.filter(r=>r.status==="Memo Queued for CEO").reduce((s,r)=>s+r.count,0);
   const suppressed=pipeline.filter(r=>r.status==="Suppressed by Hiring Policy").reduce((s,r)=>s+r.count,0);
-  const coaching=employees.filter(e=>e.active&&["informal-coaching","formal-coaching"].includes(e.performanceManagement?.stage)).length,pips=employees.filter(e=>e.active&&e.performanceManagement?.stage==="pip").length,onboarding=employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||21)).length;
+  const coaching=employees.filter(e=>e.active&&["informal-coaching","formal-coaching"].includes(e.performanceManagement?.stage)).length,pips=employees.filter(e=>e.active&&e.performanceManagement?.stage==="pip").length,onboarding=employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||21)).length,recentHires=employees.filter(e=>e.active&&company.day-(e.joinedDay||0)<=45&&(e.careerHistory||[]).some(h=>/Hired as|Selected by HR|Completed onboarding/i.test(String(h)))).length;
   const burnout=employees.filter(e=>e.active&&e.stress>=75).length,terminations=(company.terminationNotifications||[]).filter(n=>company.day-(n.day||0)<45).length,layoffs=(company.layoffHistory||[]).filter(n=>company.day-(n.day||0)<60).reduce((s,n)=>s+(n.count||0),0);
   return `<strong>Workforce and Financial Pressure</strong><br><small>
     Employees ${activeEmployees} (${inOffice} in office); vacancies/backfills ${(company.openRoles||[]).length}; payroll $${f.payrollDaily.toFixed(3)}M/day; total cost $${f.totalDailyCost.toFixed(3)}M/day<br>
@@ -762,7 +770,7 @@ function workforceFinancialPressureHtml(){
     ${staffingShortageSummary()}<br>
     Project allocation gap ${allocation.totals.missingAssignments} assignment(s), ${allocation.totals.missingProjectFte} FTE; reported blockers ${allocation.totals.observedBlockedWork}<br>
     Hiring policy: ${hiringPolicyLabel()}${company.hiringPolicy?.reviewDay?`; review day ${company.hiringPolicy.reviewDay}`:""} <button class="small-btn" onclick="requestHiringPolicyReview()">Review Hiring Policy</button><br>
-    Staffing signals ${identified}; preparing CEO memo ${preparing}; memo queued ${queuedMemos}; recent hiring decisions ${recentHiringActions}; requisitions ${requisitions}; searching ${recruiting}; interviewing ${interviewing}; offers ${offers}; paused ${pausedRecruiting}; suppressed ${suppressed}; onboarding ${onboarding}; coaching ${coaching}; PIP ${pips}; burnout watch ${burnout}<br>
+    Staffing signals ${identified}; preparing CEO memo ${preparing}; memo queued ${queuedMemos}; recent hiring decisions ${recentHiringActions}; requisitions ${requisitions}; searching ${recruiting}; interviewing ${interviewing}; offers ${offers}; paused ${pausedRecruiting}; suppressed ${suppressed}; onboarding ${onboarding}; recent hires ${recentHires}; coaching ${coaching}; PIP ${pips}; burnout watch ${burnout}<br>
     Average expected time to fill ${avgFill?`${avgFill} ${avgFill===1?"day":"days"}`:"n/a"}. Hiring flow: department signal -> finance/HR review -> CEO Inbox memo -> approve position -> HR recruits and hires.<br>
     Retention risk ${employees.filter(e=>e.active&&(e.retentionRisk||0)>=60).length}; searching ${searching}; retirement watch ${retiring}; terminations ${terminations}; layoffs ${layoffs}; board strikes ${company.boardGovernance?.strikes||0}; CEO PIP ${company.boardGovernance?.pipActive?"active":"none"}<br>
     Company risk: ${company.companyRiskComponents.label} (${Math.round(company.companyRiskComponents.total)})
