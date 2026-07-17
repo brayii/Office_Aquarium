@@ -757,6 +757,7 @@ function applyCollaborationOutcome(e){
       addStoryBeat(item.storyId,`${e.name} and ${partner.name} resolved ${blocker} through collaboration.`,"unblocked");
       recordWeeklyEvent(`${e.name} and ${partner.name} unblocked ${item.title}.`,"work",2);
       if(item.projectId)recordProjectLedger(item.projectId,"collaboration","blocker",-1,`Resolved ${blocker}`);
+      recordSharedExperience?.(e,partner,{type:"blocker_resolved_together",sourceEventId:`blocker-${item.id}-${blocker}-${company.day}-${company.minute}`,projectId:item.projectId||null,participants:[e.id,partner.id],tone:"positive",intensity:3,requireSource:true});
       recordLearningEvidence({domain:"workforce",eventType:"collaboration",action:"resolve-blocker",outcome:"positive",magnitude:gain,confidence:76,department:item.assignedTeam,employeeIds:[e.id,partner.id],evidence:`Collaboration resolved ${blocker}`,contributors:[{type:"employee",id:e.id,weight:.45},{type:"employee",id:partner.id,weight:.45},{type:"workItem",id:item.id,weight:.1}]});
     }
   }

@@ -21,6 +21,7 @@ const validationSession=new ValidationSession(saveRepository,simulationTimer);
 const musicAudio=soundController.music,messageAudio=soundController.alert;
 function createSafeAudio(src,options={}){return soundController.create(src,options);}
 const PERSONALITY_KEYS=["workPace","sociability","collaboration","riskTolerance","adaptability","initiative","resilience","detailOrientation","empathy","structureNeed"];
+const SOCIAL_EXPERIENCE_TYPES=new Set(["shared_work_activity","shared_meeting","shared_break","direct_help","blocker_resolved_together","deadline_pressure_together","milestone_success_together","milestone_failure_together","recognition_shared","interruption_shared","conflict_observed","crisis_response_together","onboarding_support","mentoring_interaction"]);
 function hashText32(text){
   let h=2166136261>>>0;
   for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}
@@ -160,6 +161,11 @@ function ensureSocialAISystems(){
     record.employeeBId=Number.isFinite(record.employeeBId)?record.employeeBId:ids[1];
     record.familiarity=clamp(Number(record.familiarity)||0,0,100);
     record.interactionCount=Math.max(0,Number(record.interactionCount)||0);
+    record.positiveExperienceCount=Math.max(0,Number(record.positiveExperienceCount)||0);
+    record.neutralExperienceCount=Math.max(0,Number(record.neutralExperienceCount)||0);
+    record.negativeExperienceCount=Math.max(0,Number(record.negativeExperienceCount)||0);
+    record.recentExperiences=Array.isArray(record.recentExperiences)?record.recentExperiences.slice(0,20):[];
+    record.experienceSummary=record.experienceSummary&&typeof record.experienceSummary==="object"?record.experienceSummary:{};
     record.recentInteractionTypes=Array.isArray(record.recentInteractionTypes)?record.recentInteractionTypes.slice(0,12):[];
     record.cooldowns=record.cooldowns&&typeof record.cooldowns==="object"?record.cooldowns:{};
     record.stressHistory=Number(record.stressHistory)||0;
@@ -172,9 +178,87 @@ function socialRelationshipRecord(aId,bId,{create=false}={}){
   const key=makeRelationshipKey(aId,bId);
   if(!company.socialRelationships[key]&&create){
     const [employeeAId,employeeBId]=key.split(":").map(Number);
-    company.socialRelationships[key]={employeeAId,employeeBId,familiarity:0,interactionCount:0,firstMetAt:null,lastInteractionAt:null,recentInteractionTypes:[],cooldowns:{},stressHistory:0,moraleHistory:0};
+    company.socialRelationships[key]={employeeAId,employeeBId,familiarity:0,interactionCount:0,firstMetAt:null,lastInteractionAt:null,positiveExperienceCount:0,neutralExperienceCount:0,negativeExperienceCount:0,recentExperiences:[],experienceSummary:{},recentInteractionTypes:[],cooldowns:{},stressHistory:0,moraleHistory:0};
   }
   return company.socialRelationships[key]||null;
+}
+function normalizeSocialExperienceType(type){
+  if(SOCIAL_EXPERIENCE_TYPES.has(type))return type;
+  return {
+    same_room_presence:"shared_work_activity",
+    shared_work_event:"shared_work_activity",
+    shared_break:"shared_break",
+    same_meeting:"shared_meeting",
+    direct_help:"direct_help",
+    first_meeting:"shared_work_activity"
+  }[type]||"shared_work_activity";
+}
+function socialExperienceTone(reactions={},fallback="neutral"){
+  const values=Object.values(reactions||{});
+  if(!values.length)return fallback;
+  const positive=values.filter(r=>(r.moraleDelta||0)>0.15&&(r.stressDelta||0)<0.8).length;
+  const negative=values.filter(r=>(r.stressDelta||0)>0.6||(r.moraleDelta||0)<-0.15).length;
+  if(positive&&negative)return "mixed";
+  if(positive)return "positive";
+  if(negative)return "negative";
+  return fallback;
+}
+function socialExperienceReaction(employee,coworker,type,intensity,tone){
+  ensureEmployeePersonality(employee);
+  const p=employee.personality||{};
+  let moraleDelta=0,stressDelta=0,reasonCode=`experience_${type}`;
+  if(type==="shared_break"){moraleDelta=.18+(p.sociability||0)*.18;stressDelta=-(.08+(p.empathy||0)*.04);}
+  else if(type==="shared_meeting"){moraleDelta=(p.collaboration||0)*.14;stressDelta=(p.structureNeed||0)>.35?-.03:.08-(p.collaboration||0)*.06;}
+  else if(type==="direct_help"){moraleDelta=.28+(p.empathy||0)*.20+(p.collaboration||0)*.12;stressDelta=-(p.empathy||0)*.08+(p.sociability||0)<-.6?.10:0;}
+  else if(type==="blocker_resolved_together"){moraleDelta=.35+(p.collaboration||0)*.18;stressDelta=.05-(p.resilience||0)*.08;}
+  else if(type==="deadline_pressure_together"){moraleDelta=(p.resilience||0)*.12;stressDelta=.25-(p.resilience||0)*.12;}
+  else if(type==="milestone_success_together"||type==="recognition_shared"){moraleDelta=.38+(p.sociability||0)*.10;stressDelta=-.08;}
+  else if(type==="milestone_failure_together"){moraleDelta=-.18;stressDelta=.32-(p.resilience||0)*.10;}
+  else {moraleDelta=.08+(p.collaboration||0)*.08;stressDelta=(tone==="negative"?.18:0)-(tone==="positive"?.05:0);}
+  if(tone==="negative"){moraleDelta-=.12;stressDelta+=.18;}
+  if(tone==="positive"){moraleDelta+=.12;stressDelta-=.06;}
+  if(tone==="mixed"){moraleDelta+=.04;stressDelta+=.10;}
+  const scale=clamp((Number(intensity)||1)/3,.25,1.35);
+  return {moraleDelta:Number(clamp(moraleDelta*scale,-1.5,1.5).toFixed(3)),stressDelta:Number(clamp(stressDelta*scale,-1.5,1.5).toFixed(3)),reasonCode,sourceEventId:null,relatedEmployeeIds:[coworker.id]};
+}
+function applySocialReaction(employee,reaction){
+  resetEmployeeEmotionalDay(employee);
+  const code=`${reaction.reasonCode}:${reaction.sourceEventId||"local"}`;
+  if(employee.emotionalCooldowns[code]>0)return {...reaction,moraleDelta:0,stressDelta:0,capped:true};
+  const moraleDelta=emotionalCapDelta(employee,"morale",reaction.moraleDelta),stressDelta=emotionalCapDelta(employee,"stress",reaction.stressDelta);
+  employee.morale=clamp((employee.morale||0)+moraleDelta,0,100);
+  employee.stress=clamp((employee.stress||0)+stressDelta,0,100);
+  employee.emotionalCooldowns[code]=1;
+  employee.lastEmotionalReaction={...reaction,moraleDelta,stressDelta};
+  employee.recentEmotionalEvents=[{day:company.day,minute:company.minute,reasonCode:reaction.reasonCode,moraleDelta,stressDelta,sourceEventId:reaction.sourceEventId},...(employee.recentEmotionalEvents||[])].slice(0,12);
+  const state=employee.emotionalState||{};
+  state.frustration=clamp((state.frustration||20)+Math.max(0,stressDelta)*2-Math.max(0,-stressDelta),0,100);
+  state.belonging=clamp((state.belonging||55)+Math.max(0,moraleDelta)*.8-Math.max(0,-moraleDelta)*.9,0,100);
+  state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressDelta)*.8-Math.max(0,-stressDelta)*1.2,0,100);
+  return employee.lastEmotionalReaction;
+}
+function recordSharedExperience(a,b,{type="shared_work_activity",sourceEventId=null,roomId=null,projectId=null,participants=null,tone=null,intensity=1,requireSource=false}={}){
+  if(!a?.active||!b?.active||a.id===b.id)return null;
+  const experienceType=normalizeSocialExperienceType(type);
+  if((requireSource||experienceType==="direct_help"||experienceType==="blocker_resolved_together")&&!sourceEventId)return null;
+  const record=socialRelationshipRecord(a.id,b.id,{create:true}),pairKey=makeRelationshipKey(a.id,b.id),id=`${sourceEventId||`local-${company.day}-${company.minute}`}:${experienceType}:${pairKey}`;
+  if((record.recentExperiences||[]).some(x=>x.id===id))return record;
+  const boundedIntensity=clamp(Math.round(Number(intensity)||1),1,5);
+  const reactionA=socialExperienceReaction(a,b,experienceType,boundedIntensity,tone||"neutral");
+  const reactionB=socialExperienceReaction(b,a,experienceType,boundedIntensity,tone||"neutral");
+  reactionA.sourceEventId=id;reactionB.sourceEventId=id;
+  const appliedA=applySocialReaction(a,reactionA),appliedB=applySocialReaction(b,reactionB);
+  const reactions={[a.id]:{stressDelta:appliedA?.stressDelta||0,moraleDelta:appliedA?.moraleDelta||0,reasonCode:appliedA?.reasonCode||reactionA.reasonCode},[b.id]:{stressDelta:appliedB?.stressDelta||0,moraleDelta:appliedB?.moraleDelta||0,reasonCode:appliedB?.reasonCode||reactionB.reasonCode}};
+  const emotionalTone=tone||socialExperienceTone(reactions,"neutral");
+  const now=simulationTimestamp();
+  const experience={id,type:experienceType,timestamp:now,sourceEventId:sourceEventId||null,roomId:roomId||null,projectId:projectId||null,participants:participants||[a.id,b.id],emotionalTone,intensity:boundedIntensity,employeeReactions:reactions,dedupeKey:id};
+  record.recentExperiences=[experience,...(record.recentExperiences||[])].slice(0,20);
+  const summary=record.experienceSummary[experienceType]||{count:0,positive:0,neutral:0,negative:0,mixed:0,lastAt:null};
+  summary.count++;summary[emotionalTone]=(summary[emotionalTone]||0)+1;summary.lastAt=now.absoluteMinute;record.experienceSummary[experienceType]=summary;
+  if(emotionalTone==="positive")record.positiveExperienceCount++;else if(emotionalTone==="negative")record.negativeExperienceCount++;else record.neutralExperienceCount++;
+  record.stressHistory=Number(((record.stressHistory||0)+(reactions[a.id].stressDelta||0)+(reactions[b.id].stressDelta||0)).toFixed(3));
+  record.moraleHistory=Number(((record.moraleHistory||0)+(reactions[a.id].moraleDelta||0)+(reactions[b.id].moraleDelta||0)).toFixed(3));
+  return record;
 }
 function socialEncounterEmotion(employee,coworker,type,gain){
   ensureEmployeePersonality(employee);
@@ -192,20 +276,7 @@ function socialEncounterEmotion(employee,coworker,type,gain){
 function applySocialEncounterEmotion(employee,coworker,type,sourceEventId,gain){
   const reaction=socialEncounterEmotion(employee,coworker,type,gain);
   reaction.sourceEventId=sourceEventId;
-  resetEmployeeEmotionalDay(employee);
-  const code=`${reaction.reasonCode}:${sourceEventId||"local"}`;
-  if(employee.emotionalCooldowns[code]>0)return {...reaction,moraleDelta:0,stressDelta:0,capped:true};
-  const moraleDelta=emotionalCapDelta(employee,"morale",reaction.moraleDelta),stressDelta=emotionalCapDelta(employee,"stress",reaction.stressDelta);
-  employee.morale=clamp((employee.morale||0)+moraleDelta,0,100);
-  employee.stress=clamp((employee.stress||0)+stressDelta,0,100);
-  employee.emotionalCooldowns[code]=1;
-  employee.lastEmotionalReaction={moraleDelta,stressDelta,reasonCode:reaction.reasonCode,sourceEventId,relatedEmployeeIds:[coworker.id]};
-  employee.recentEmotionalEvents=[{day:company.day,minute:company.minute,reasonCode:reaction.reasonCode,moraleDelta,stressDelta,sourceEventId},...(employee.recentEmotionalEvents||[])].slice(0,12);
-  const state=employee.emotionalState||{};
-  state.frustration=clamp((state.frustration||20)+Math.max(0,stressDelta)*2-Math.max(0,-stressDelta),0,100);
-  state.belonging=clamp((state.belonging||55)+Math.max(0,moraleDelta)*.8-Math.max(0,-moraleDelta)*.9,0,100);
-  state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressDelta)*.8-Math.max(0,-stressDelta)*1.2,0,100);
-  return employee.lastEmotionalReaction;
+  return applySocialReaction(employee,reaction);
 }
 function recordSocialEncounter(a,b,{type="same_room_presence",gain=.25,sourceEventId=null,roomId=null,cooldownMinutes=120}={}){
   if(!a?.active||!b?.active||a.offsite||b.offsite||a.id===b.id)return null;
@@ -225,10 +296,7 @@ function recordSocialEncounter(a,b,{type="same_room_presence",gain=.25,sourceEve
   }
   record.lastInteractionAt=now;
   record.recentInteractionTypes=[{type,day:company.day,minute:company.minute,sourceEventId:sourceEventId||null,gain:appliedGain},...(record.recentInteractionTypes||[])].slice(0,12);
-  const reactionA=applySocialEncounterEmotion(a,b,first?"first_meeting":type,sourceEventId||`${type}-${makeRelationshipKey(a.id,b.id)}-${company.day}-${company.minute}`,appliedGain);
-  const reactionB=applySocialEncounterEmotion(b,a,first?"first_meeting":type,sourceEventId||`${type}-${makeRelationshipKey(a.id,b.id)}-${company.day}-${company.minute}`,appliedGain);
-  record.stressHistory=Number(((record.stressHistory||0)+(reactionA?.stressDelta||0)+(reactionB?.stressDelta||0)).toFixed(3));
-  record.moraleHistory=Number(((record.moraleHistory||0)+(reactionA?.moraleDelta||0)+(reactionB?.moraleDelta||0)).toFixed(3));
+  recordSharedExperience(a,b,{type:normalizeSocialExperienceType(type),sourceEventId:sourceEventId||`${type}-${makeRelationshipKey(a.id,b.id)}-${company.day}-${company.minute}`,roomId,participants:[a.id,b.id],tone:null,intensity:type==="direct_help"?2:type==="shared_break"?1:1});
   return record;
 }
 function observeRoomFamiliarity(minutes=5){
@@ -242,7 +310,8 @@ function observeRoomFamiliarity(minutes=5){
     company.roomPresenceCounters[key]=(company.roomPresenceCounters[key]||0)+minutes;
     const threshold=present[i].room==="break-area"?20:60;
     if(company.roomPresenceCounters[key]>=threshold){
-      recordSocialEncounter(a,b,{type:present[i].room==="break-area"?"shared_break":"same_room_presence",gain:present[i].room==="break-area"?.8:.35,roomId:present[i].room,cooldownMinutes:present[i].room==="break-area"?90:120});
+      const encounterType=present[i].room==="break-area"?"shared_break":present[i].room==="meeting-room"?"same_meeting":"same_room_presence";
+      recordSocialEncounter(a,b,{type:encounterType,gain:present[i].room==="break-area"?.8:.35,roomId:present[i].room,cooldownMinutes:present[i].room==="break-area"?90:120});
       company.roomPresenceCounters[key]=0;
     }
   }
@@ -254,6 +323,8 @@ function familiaritySummaryForEmployee(e){
   if(!records.length)return "Still getting to know the team";
   const known=records.filter(r=>r.familiarity>=15).length,well=records.filter(r=>r.familiarity>=60).length;
   const top=records.slice().sort((a,b)=>(b.familiarity||0)-(a.familiarity||0))[0],otherId=top?.employeeAId===e.id?top.employeeBId:top?.employeeAId,other=employees.find(x=>x.id===otherId);
+  const recentHelp=records.find(r=>(r.recentExperiences||[]).some(x=>x.type==="direct_help"||x.type==="blocker_resolved_together"));
+  if(recentHelp)return `Recently shared meaningful work with ${employees.find(x=>x.id===(recentHelp.employeeAId===e.id?recentHelp.employeeBId:recentHelp.employeeAId))?.name||"a coworker"}`;
   if(well>0)return `Knows ${well} coworker${well===1?"":"s"} well; most familiar with ${other?.name||"a coworker"}`;
   if(known>0)return `Recognizes several coworkers; most familiar with ${other?.name||"a coworker"}`;
   return "Has met coworkers, but most relationships are still new";
@@ -265,7 +336,8 @@ function socialFamiliarityDebugHtml(e){
   return rows.map(([key,r])=>{
     const otherId=r.employeeAId===e.id?r.employeeBId:r.employeeAId,other=employees.find(x=>x.id===otherId);
     const recent=(r.recentInteractionTypes||[]).slice(0,3).map(x=>`${x.type} day ${x.day} source ${x.sourceEventId||"local"}`).join("; ")||"none";
-    return `Pair ${key} (${other?.name||"missing employee"})<br>Familiarity ${Number(r.familiarity||0).toFixed(2)}; interactions ${r.interactionCount||0}<br>First met ${r.firstMetAt?`day ${r.firstMetAt.day}, minute ${r.firstMetAt.minute}`:"not recorded"}; last ${r.lastInteractionAt?`day ${r.lastInteractionAt.day}, minute ${r.lastInteractionAt.minute}`:"none"}<br>Recent ${recent}<br>Stress history ${Number(r.stressHistory||0).toFixed(2)}; morale history ${Number(r.moraleHistory||0).toFixed(2)}<br>Cooldowns ${Object.keys(r.cooldowns||{}).length}`;
+    const experiences=(r.recentExperiences||[]).slice(0,3).map(x=>`${x.type} ${x.emotionalTone} intensity ${x.intensity} source ${x.sourceEventId||"local"} dedupe ${x.dedupeKey}`).join("; ")||"none";
+    return `Pair ${key} (${other?.name||"missing employee"})<br>Familiarity ${Number(r.familiarity||0).toFixed(2)}; interactions ${r.interactionCount||0}<br>First met ${r.firstMetAt?`day ${r.firstMetAt.day}, minute ${r.firstMetAt.minute}`:"not recorded"}; last ${r.lastInteractionAt?`day ${r.lastInteractionAt.day}, minute ${r.lastInteractionAt.minute}`:"none"}<br>Recent ${recent}<br>Shared Experiences ${experiences}<br>Aggregate Counts +${r.positiveExperienceCount||0} / ${(r.neutralExperienceCount||0)} / -${r.negativeExperienceCount||0}<br>Stress history ${Number(r.stressHistory||0).toFixed(2)}; morale history ${Number(r.moraleHistory||0).toFixed(2)}<br>Cooldowns ${Object.keys(r.cooldowns||{}).length}`;
   }).join("<br><br>");
 }
 function applyDailyPersonalityEmotion(e){
