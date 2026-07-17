@@ -583,6 +583,51 @@
       body.old-message-review-active #commArchiveView .ceo-mail-scroll{display:block;overflow:auto}
       body.old-message-review-active #memoArchiveList{max-height:none}
     }
+
+    /* Release readability pass: lift the smallest UI text without changing layout density. */
+    body{font-size:15px}
+    .eyebrow,.pill span,.zone,.metric small,.employee-head span,.mini,.track-top span,
+    .inbox-badge,.office-alert,.archive-summary,.memo-type,.memo-priority,.memo-meta,
+    .memo-block h4,.recommendation span,.memo-audit,.memo-signature,.paper-date,
+    .paper-section h4,.newspaper-badge,.market-range-btn,.debug-panel code,
+    .debug-section-content,.ceo-mail-item small,.ceo-mail-item.unread strong::before,
+    .ceo-mail-item.read strong::before,.lesson-tag{
+      font-size:max(.82rem,12.5px);
+      line-height:1.42;
+    }
+    .agent small{font-size:max(.7rem,11px);line-height:1.25}
+    .thought{font-size:max(.76rem,12px);line-height:1.35}
+    .employee-head strong,.track-top strong,.ceo-mail-item strong{font-size:max(.96rem,14px)}
+    .log li,.save-summary,.paper-section li,.archive-item small,.briefing-card small,
+    .insight-card small,.report-item small,.release-check small,.history-era small,
+    .lesson-card small,.decision small,.market-strip small,.event-copy,.impact-list,
+    .evidence-list,.paper-summary,.story-thread,.intelligence-card{
+      font-size:max(.92rem,13.5px);
+      line-height:1.5;
+    }
+    .small-btn,.comm-tab,.market-select,.company-view-select,.archive-toolbar select,
+    .workspace-tab,.icon-btn,.speed-btn{
+      font-size:max(.92rem,13.5px);
+    }
+    #workforcePressure,#projectPortfolio,#organizationalDynamics{
+      font-size:max(1rem,15px);
+      line-height:1.58;
+    }
+    #workforcePressure small,#projectPortfolio small,#organizationalDynamics small,
+    #workforcePressure .briefing-card small,#projectPortfolio .briefing-card small,
+    #organizationalDynamics .briefing-card small{
+      font-size:inherit;
+      line-height:inherit;
+    }
+    #workforcePressure .briefing-card,#projectPortfolio .briefing-card,
+    #organizationalDynamics .briefing-card{
+      font-size:max(.96rem,14.5px);
+      line-height:1.52;
+    }
+    @media(max-width:430px){
+      .zone{font-size:max(.74rem,11.5px)}
+      .agent small{font-size:max(.66rem,10.5px)}
+    }
   </style>
 </head>
 <body>

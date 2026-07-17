@@ -1873,7 +1873,7 @@ function renderWorkforcePressure(){
   const el=document.getElementById("workforcePressure");if(!el)return;
   ensureWorkforceEconomySystems?.();
   const hasSignals=(company.staffingNeeds||[]).length||(company.recruitingPipeline||[]).length||(company.hiringRequests||[]).length||employees.some(e=>e.active&&((e.retentionRisk||0)>=55||e.performanceManagement?.stage!=="none"))||Number(company.finance?.runwayDays||999)<180;
-  el.innerHTML=hasSignals?`<strong>Workforce and Financial Pressure</strong><br><small>${workforceFinancialPressureHtml()}</small>`:"";
+  el.innerHTML=hasSignals?workforceFinancialPressureHtml():"";
   toggleSectionVisibility(el,!!hasSignals);
 }
 function pruneLongRunCollections(){
