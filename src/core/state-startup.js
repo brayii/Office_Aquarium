@@ -2,7 +2,7 @@ const SAVE_KEY="office-aquarium-living-office-v3";
 const SAVE_VERSION=38;
 const zones={dev:{x:[9,41],y:[14,40]},lab:{x:[58,91],y:[14,40]},meet:{x:[9,29],y:[64,88]},break:{x:[42,58],y:[64,88]},exec:{x:[72,91],y:[64,88]}};
 const names=["Maya","Leo","Aisha","Noah","Priya","Ethan","Sofia","Marcus"];
-const roles=["Chip Architect","Firmware Engineer","Software Lead","Verification Engineer","Product Manager","QA Engineer","Industrial Designer","Finance Analyst"];
+const roles=FOUNDING_ROLES;
 const colors=["#4a78c2","#ef6f6c","#2ab7a9","#d9972b","#7a5af8","#5f9f64","#d65b9e","#52606d"];
 const traits=[["perfectionist","ambitious"],["social","creative"],["focused","introverted"],["cautious","loyal"],["ambitious","social"],["skeptical","focused"],["creative","independent"],["cautious","analytical"]];
 const initialCompany={day:0,minute:480,randomState:2463534242,nextRuntimeId:1,cash:18,board:72,trust:68,chip:22,software:31,quality:38,integration:15,customers:0,dailyRevenue:0,valuation:42,phase:"prototype",marketSentiment:50,marketConfidence:50,leadershipReputation:50,valuationQuality:50,investorAppetite:50,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-999,lastValuationMemoDay:-999,lastFundraisingMemoDay:-999,lastValuationStoryDay:-999,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:"both",soundEnabled:true,pendingEvent:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-999,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-999},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
@@ -31,22 +31,7 @@ const eventLibrary=[
 {id:"market-shift",repeatable:true,title:"Market pressure shifts",copy:"Customers and competitors are changing expectations faster than the roadmap can comfortably absorb.",trigger:()=>company.day>8&&(company.market.competitorHeat>62||company.market.aiDemand>68||company.market.supplyPressure>62),choices:[{title:"Lean into demand",detail:"Increase market momentum while adding execution stress.",effect:{cash:-1.1,board:5,trust:4,customers:8},directive:"speed",days:9,people:{stress:7,morale:-2},culture:{riskTolerance:5,innovation:4},opinion:{competence:3,fear:2}},{title:"Protect reliability",detail:"Slow growth and use discipline to preserve trust.",effect:{cash:-.7,trust:7,quality:7,board:-2},directive:"quality",days:10,people:{stress:-3,morale:4},culture:{qualityDiscipline:6,workLife:2},opinion:{trust:4,competence:2,support:2}},{title:"Reposition sales",detail:"Focus customer promises on what the company can actually deliver.",effect:{cash:-.4,trust:5,customers:3,board:1},directive:"revenue",days:8,people:{stress:2,morale:1},culture:{communication:5,politics:-2},opinion:{fairness:2,competence:2}}]},
 {id:"performance",repeatable:true,title:"Performance review escalation",copy:"A sustained performance gap has become visible. Leadership must decide whether to invest, reorganize, or remove the role.",trigger:()=>false,choices:[{title:"Coach the employee",detail:"Spend management time to recover capability and trust.",effect:{cash:-.4,board:-1},directive:"people",days:8,people:{stress:-6,morale:7},performance:"coach",culture:{support:4,communication:4},opinion:{support:7,fairness:4,trust:3}},{title:"Reassign responsibilities",detail:"Reduce immediate risk but create coordination strain.",effect:{board:2,quality:2},directive:"quality",days:7,people:{stress:3,morale:-1},performance:"reassign",culture:{qualityDiscipline:3,politics:2},opinion:{competence:2,fairness:-1}},{title:"Fire and backfill",detail:"Remove the role holder, create a vacancy, and damage psychological safety.",effect:{cash:-.2,board:4,trust:-2},directive:"cuts",days:6,people:{stress:8,morale:-8},performance:"fire",culture:{workLife:-4,politics:5},opinion:{fear:10,fairness:-8,trust:-5,support:-5}}]}
 ];
-function baseSkillsForRole(role){
-  const common={architecture:35,verification:35,firmware:35,software:35,hardware:35,leadership:35,communication:45,finance:25,product:30};
-  const byRole={
-    "Chip Architect":{architecture:82,hardware:78,verification:48,leadership:48},
-    "Firmware Engineer":{firmware:82,software:58,hardware:64,verification:46},
-    "Software Lead":{software:84,firmware:56,leadership:62,communication:58},
-    "Verification Engineer":{verification:86,hardware:58,software:42,communication:44},
-    "Product Manager":{product:84,communication:78,leadership:62,software:38},
-    "QA Engineer":{verification:78,software:56,communication:48,product:35},
-    "Industrial Designer":{hardware:64,product:58,communication:55,architecture:46},
-    "Finance Analyst":{finance:86,communication:54,leadership:42,product:36}
-  };
-  return {...common,...(byRole[role]||{})};
-}
 function makeEmployee(i){
-  const base=i===7?"exec":i<4?(i===0||i===3?"lab":"dev"):(i===4?"meet":i===5?"dev":i===6?"lab":"exec");
   const goalProfiles=[
     {mastery:.92,promotion:.72,friendship:.28,stability:.45,recognition:.62},
     {mastery:.66,promotion:.48,friendship:.76,stability:.42,recognition:.55},
@@ -57,8 +42,8 @@ function makeEmployee(i){
     {mastery:.74,promotion:.56,friendship:.58,stability:.48,recognition:.68},
     {mastery:.62,promotion:.64,friendship:.32,stability:.82,recognition:.58}
   ];
-  const role=roles[i]||"Product Manager",traitSet=traits[i%traits.length]||traits[0],goalProfile=goalProfiles[i%goalProfiles.length]||goalProfiles[0];
-  return{
+  const role=roles[i]||"Product Manager",traitSet=traits[i%traits.length]||traits[0],goalProfile=goalProfiles[i%goalProfiles.length]||goalProfiles[0],base=zoneForRoom(rolePrimaryRoom(role));
+  return normalizeEmployeeRoleProfile({
     id:i,name:names[i]||`Employee ${i+1}`,role,traits:[...traitSet],zone:base,homeZone:base,x:50,y:50,
     energy:72+simulationRandom()*18,stress:18+simulationRandom()*22,morale:65+simulationRandom()*20,
     focus:55+simulationRandom()*30,relationship:{},social:{},goals:{...goalProfile},
@@ -66,7 +51,7 @@ function makeEmployee(i){
     actionMinutes:0,active:true,offsite:false,sickDays:0,daysAtRisk:0,achievements:0,
     lastAction:null,repeatCount:0,cooldowns:{break:0,meeting:0,socialize:0,collaborate:0,complain:0},
     decisionTrace:{chosen:"arriving",scores:{},reasons:[]},opinionOfCEO:{trust:62,fairness:58,competence:64,support:56,fear:12},careerLevel:1,careerHistory:["Founding team"],beliefs:{},dailyBriefing:null,currentIntention:null,skills:baseSkillsForRole(role),performance:{recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999},learning:{caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}},communication:{reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:-999,lastHelpRequestDay:-999,rumorsShared:0},knownMessages:[],actionOutcomeContext:null,activeCollaboration:null,activeMeeting:null,learnedLessons:{testing:0,collaboration:0,documentation:0,escalation:0,innovation:0,riskTaking:0,planning:0,mentoring:0,recovery:0},lessonAcceptance:null,joinedDay:company?.day||0,age:28+i*4+Math.floor(simulationRandom()*4),stayScore:72,retentionRisk:28,jobSearchDays:0,retirementReadiness:0,quarterlyReview:null,promotionExpectation:45,salarySatisfaction:65,recognitionSatisfaction:60
-  };
+  });
 }
 function resetCommunicationUi(){
   lastInboxSoundCount=null;
@@ -93,7 +78,7 @@ function loadGame(){try{const data=saveRepository.read();if(!data)return false;c
       learnedLessons:{...fresh.learnedLessons,...(saved.learnedLessons||{})},
       lessonAcceptance:saved.lessonAcceptance??fresh.lessonAcceptance,
       joinedDay:Number.isFinite(saved.joinedDay)?saved.joinedDay:(fresh.joinedDay||0),age:Number.isFinite(saved.age)?saved.age:fresh.age,stayScore:Number.isFinite(saved.stayScore)?saved.stayScore:72,retentionRisk:Number.isFinite(saved.retentionRisk)?saved.retentionRisk:28,jobSearchDays:Number(saved.jobSearchDays)||0,retirementReadiness:Number(saved.retirementReadiness)||0,quarterlyReview:saved.quarterlyReview||null,promotionExpectation:Number.isFinite(saved.promotionExpectation)?saved.promotionExpectation:45,salarySatisfaction:Number.isFinite(saved.salarySatisfaction)?saved.salarySatisfaction:65,recognitionSatisfaction:Number.isFinite(saved.recognitionSatisfaction)?saved.recognitionSatisfaction:60
-    };});company.randomState=loadedRandomState;employees.forEach(a=>employees.forEach(b=>{if(a!==b&&typeof a.relationship[b.id]!=="number")a.relationship[b.id]=0;}));company.completedEvents=Array.isArray(company.completedEvents)?company.completedEvents:[];company.costEfficiency=clamp(Number(company.costEfficiency)||1,.72,1.08);company.pilotDays=Number(company.pilotDays)||0;
+    };});company.randomState=loadedRandomState;employees.forEach(e=>normalizeEmployeeRoleProfile(e));employees.forEach(a=>employees.forEach(b=>{if(a!==b&&typeof a.relationship[b.id]!=="number")a.relationship[b.id]=0;}));company.completedEvents=Array.isArray(company.completedEvents)?company.completedEvents:[];company.costEfficiency=clamp(Number(company.costEfficiency)||1,.72,1.08);company.pilotDays=Number(company.pilotDays)||0;
 company.openRoles=Array.isArray(company.openRoles)?company.openRoles:[];
 company.newspapers=Array.isArray(company.newspapers)?company.newspapers:[];
 company.weeklyEvents=Array.isArray(company.weeklyEvents)?company.weeklyEvents:[];
@@ -297,19 +282,21 @@ function weightedChoice(scoreMap){
 }
 
 function projectNeedFor(e){
-  if(company.integration<55&&["Firmware Engineer","Software Lead","Product Manager"].includes(e.role))return "integration";
-  if(company.quality<58&&["Verification Engineer","QA Engineer","Industrial Designer"].includes(e.role))return "quality";
-  if(company.chip<company.software&&["Chip Architect","Firmware Engineer","Verification Engineer"].includes(e.role))return "hardware";
-  if(company.software<=company.chip&&["Software Lead","Firmware Engineer","QA Engineer"].includes(e.role))return "software";
+  const role=canonicalRole(e.role),cap=roleProjectCapabilities(role);
+  if(company.integration<55&&(cap.integration>.55||role==="Product Manager"))return "integration";
+  if(company.quality<58&&(cap.quality>.5||role==="Industrial Designer"))return "quality";
+  if(company.chip<company.software&&(cap.hardware>.55||role==="Firmware Engineer"))return "hardware";
+  if(company.software<=company.chip&&(cap.software>.55||role==="Firmware Engineer"))return "software";
   if(company.cash<10||company.shareholders?.pressure>65)return "finance";
   return "general";
 }
 function roleCompatibility(a,b,need=projectNeedFor(a)){
-  const pair=[a.role,b.role].sort().join("|");
+  const pair=[canonicalRole(a.role),canonicalRole(b.role)].sort().join("|");
   const strong={
-    "Chip Architect|Firmware Engineer":24,"Firmware Engineer|Software Lead":26,"Product Manager|Software Lead":22,
-    "QA Engineer|Software Lead":22,"QA Engineer|Verification Engineer":24,"Chip Architect|Verification Engineer":24,
-    "Finance Analyst|Product Manager":18,"Industrial Designer|Product Manager":18,"Firmware Engineer|Verification Engineer":18
+    "Chip Architect|Firmware Engineer":24,"Firmware Engineer|Technical Lead":26,"Product Manager|Technical Lead":22,
+    "Software QA Engineer|Technical Lead":22,"Chip Architect|Software QA Engineer":24,
+    "Finance Analyst|Product Manager":18,"Industrial Designer|Product Manager":18,"Firmware Engineer|Software QA Engineer":18,
+    "Hardware Engineer|Software QA Engineer":18,"Hardware Engineer|Firmware Engineer":20
   };
   const skill=b.skills||baseSkillsForRole(b.role);
   const needSkill={integration:(skill.firmware+skill.software+skill.product)/3,quality:skill.verification,hardware:(skill.hardware+skill.architecture)/2,software:skill.software,finance:skill.finance,general:(skill.communication+skill.leadership)/2}[need]||45;

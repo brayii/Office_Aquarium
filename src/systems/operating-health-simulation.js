@@ -562,7 +562,7 @@ function utility(e){
   const ceo={trust:62,fairness:58,competence:64,support:56,fear:12,...(e.opinionOfCEO||{})},culture={...initialCompany.culture,...(company.culture||{})};
   const scores={
     work:e.focus*.46+e.morale*.22-e.stress*.32+g.mastery*24+g.promotion*12+g.recognition*10+intent.work,
-    lab:(["Chip Architect","Verification Engineer","Industrial Designer","QA Engineer"].includes(e.role)?42:12)+e.focus*.3+g.mastery*20+intent.lab,
+    lab:(rolePrimaryRoom(e.role)==="hardware-lab"||roleProjectCapabilities(e.role).quality>.6?42:12)+e.focus*.3+g.mastery*20+intent.lab,
     break:(100-e.energy)*.78+e.stress*.55+g.stability*18+memoryBias(e,"OVERTIME")*.5,
     socialize:(e.traits.includes("social")?44:16)+g.friendship*32+(averageRelationship(e)<0?16:0),
     collaborate:24+g.mastery*16+g.friendship*18+g.recognition*8+intent.collaborate,
@@ -574,7 +574,7 @@ function utility(e){
   if(ctx.work){scores.work+=ctx.work.priority*.16+ctx.deadlineRisk*.18+ctx.skillFit*12;scores.lab+=ctx.qualityConcern*.18;scores.collaborate+=ctx.blockerRisk*.22+ctx.uncertainty*.08;scores.meeting+=ctx.uncertainty*.08+(ctx.t.pressure||0)*.05;scores.break-=Math.min(10,ctx.deadlineRisk*.08);}else{scores.socialize+=4;scores.meeting+=2;}
   if(ctx.brief?.knownBlockers?.length)scores.collaborate+=12;
   if((ctx.t.pressure||0)>70){scores.break+=8;scores.complain+=5;}
-  if(ctx.qualityConcern>70&&["Verification Engineer","QA Engineer","Chip Architect"].includes(e.role))scores.lab+=14;
+  if(ctx.qualityConcern>70&&(roleProjectCapabilities(e.role).quality>.5||e.role==="Chip Architect"))scores.lab+=14;
   if(ctx.skillFit<.62&&ctx.work)scores.collaborate+=10;
   if(company.directive==="speed"){scores.work+=22;scores.lab+=10;scores.break-=8;}
   if(company.directive==="revenue"&&["Product Manager","Finance Analyst"].includes(e.role))scores.work+=26;
@@ -797,6 +797,7 @@ function chooseAction(e){
   if(!e.active||e.sickDays>0)return;
   const ctx=workContext(e);
   const a=utility(e);
+  let target=null;
   advanceIntention(e,a,ctx);
   e.offsite=false;
   recordMetricEvent("action",a);
@@ -805,28 +806,46 @@ function chooseAction(e){
   e.lastAction=a;
 
   if(a==="work"){
-    moveToZone(e,["Chip Architect","Verification Engineer","Industrial Designer"].includes(e.role)?"lab":e.role==="Finance Analyst"?"exec":"dev");
+    const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));
     e.action="working";e.thought=thoughtFor("work",e,ctx)||workThought(e,ctx);e.actionMinutes=rand(45,105);
   }else if(a==="lab"){
-    moveToZone(e,"lab");e.action="testing hardware";e.thought=thoughtFor("lab",e,ctx)||labThought(e,ctx);e.actionMinutes=rand(40,90);
+    const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="testing hardware";e.thought=thoughtFor("lab",e,ctx)||labThought(e,ctx);e.actionMinutes=rand(40,90);
   }else if(a==="break"){
-    moveToZone(e,"break");e.action="taking a break";e.thought=thoughtFor("break",e,ctx);e.actionMinutes=rand(20,40);e.cooldowns.break=75;
+    const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="taking a break";e.thought=thoughtFor("break",e,ctx);e.actionMinutes=rand(20,40);e.cooldowns.break=75;
   }else if(a==="socialize"){
-    const target=socialTarget(e);moveToZone(e,"break");e.action=`talking with ${target?.name||"coworkers"}`;e.thought=thoughtFor("socialize",e,ctx);e.actionMinutes=rand(25,50);e.cooldowns.socialize=70;
+    target=socialTarget(e);const room=roomForAction(e,a,{...ctx,collaborator:target});moveToZone(e,zoneForRoom(room));e.action=`talking with ${target?.name||"coworkers"}`;e.thought=thoughtFor("socialize",e,ctx);e.actionMinutes=rand(25,50);e.cooldowns.socialize=70;
     if(target){adjustSocial(e,target,{friendship:3,trust:1});addMemory(e,"SOCIAL_HELP",`I had a good conversation with ${target.name}.`,"positive",6,target.name);}
   }else if(a==="collaborate"){
-    const target=availableCollaborator(e);moveToZone(e,"meet");e.action=`collaborating with ${target?.name||"a teammate"}`;e.thought=thoughtFor("collaborate",e,ctx);e.actionMinutes=rand(35,70);e.cooldowns.collaborate=90;
+    target=availableCollaborator(e);const room=roomForAction(e,a,{...ctx,collaborator:target});moveToZone(e,zoneForRoom(room));e.action=`collaborating with ${target?.name||"a teammate"}`;e.thought=thoughtFor("collaborate",e,ctx);e.actionMinutes=rand(35,70);e.cooldowns.collaborate=90;
     if(target){startCollaborationSession(e,target,ctx);adjustSocial(e,target,{respect:3,trust:2});addMemory(e,"COLLABORATION",`${target.name} helped move the work forward.`,"positive",8,target.name);}
   }else if(a==="meeting"){
-    moveToZone(e,"meet");e.action="leading a meeting";e.thought=thoughtFor("meeting",e,ctx);e.actionMinutes=rand(35,65);e.cooldowns.meeting=110;e.activeMeeting={workItemId:ctx.work?.id||null,purpose:meetingPurposeFor(e,ctx),startedDay:company.day,startedMinute:company.minute};
+    const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="leading a meeting";e.thought=thoughtFor("meeting",e,ctx);e.actionMinutes=rand(35,65);e.cooldowns.meeting=110;e.activeMeeting={workItemId:ctx.work?.id||null,purpose:meetingPurposeFor(e,ctx),startedDay:company.day,startedMinute:company.minute};
   }else if(a==="complain"){
-    moveToZone(e,"break");e.action="venting";e.thought=thoughtFor("complain",e,ctx);e.actionMinutes=rand(20,45);e.cooldowns.complain=100;
+    const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="venting";e.thought=thoughtFor("complain",e,ctx);e.actionMinutes=rand(20,45);e.cooldowns.complain=100;
   }else{
     e.offsite=true;e.action="at home";e.thought=thoughtFor("home",e,ctx);e.actionMinutes=999;
   }
+  const chosenRoom=roomForZone(e.zone);
+  if(chosenRoom){e.currentRoom=chosenRoom;e.roomSelectionReason=`${a} selected ${chosenRoom} from role, work, and activity context.`;e.roomEffect=roomEffectFor(e,a,chosenRoom);}
   e.actionOutcomeContext=actionSnapshot(e,a);
 }
-function roleThought(e){return({"Chip Architect":"The architecture must survive the next revision.","Firmware Engineer":"Hardware and software need to agree.","Software Lead":"I need a clean integration path.","Verification Engineer":"I am looking for the failure nobody expects.","Product Manager":"Customers need a product, not just progress.","QA Engineer":"Every defect found now saves trust later.","Industrial Designer":"The prototype should feel intentional.","Finance Analyst":"Runway is a design constraint too."})[e.role];}
+function roleThought(e){return({
+  "Software Engineer":"I need to keep the software path clean enough to build on.",
+  "Firmware Engineer":"Hardware and software need to agree.",
+  "Hardware Engineer":"The prototype has to survive real constraints.",
+  "Chip Architect":"The architecture must survive the next revision.",
+  "Software QA Engineer":"Every defect found now saves trust later.",
+  "Technical Lead":"I need a clean integration path.",
+  "Software Architect":"The architecture should reduce future rework.",
+  "Electrical Engineer":"The board needs evidence before it is trusted.",
+  "Industrial Designer":"The prototype should feel intentional.",
+  "Manufacturing Engineer":"A design is not ready until it can be built reliably.",
+  "Product Manager":"Customers need a product, not just progress.",
+  "Finance Analyst":"Runway is a design constraint too.",
+  "Manager":"I need to keep people aligned without creating more meetings.",
+  "Director":"The operating plan needs enough structure to hold.",
+  "Vice President":"The company needs strategic clarity before it scales."
+})[canonicalRole(e.role)];}
 function roleOutput(e,output){
   e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
   const team=company.teams?.[employeeTeam?.(e)]||{cohesion:55};
@@ -837,11 +856,19 @@ function roleOutput(e,output){
   output*=onboard;
   output=output*(.85+(team.cohesion||55)/360+skillBoost);
   e.performance.recentOutput=clamp(e.performance.recentOutput*.92+output*16,0,30);
-  switch(e.role){
-    case "Verification Engineer":company.trust+=output*.025;break;
+  switch(canonicalRole(e.role)){
+    case "Software QA Engineer":company.trust+=output*.025;break;
+    case "Software Engineer":company.software=clamp(company.software+output*.018,0,100);break;
+    case "Firmware Engineer":company.integration=clamp(company.integration+output*.012,0,100);break;
+    case "Hardware Engineer":company.chip=clamp(company.chip+output*.016,0,100);break;
+    case "Technical Lead":company.integration=clamp(company.integration+output*.012,0,100);break;
+    case "Software Architect":company.quality=clamp(company.quality+output*.012,0,100);break;
+    case "Electrical Engineer":company.chip=clamp(company.chip+output*.012,0,100);break;
+    case "Manufacturing Engineer":company.manufacturing.readiness=clamp((company.manufacturing.readiness||0)+output*.02,0,100);break;
     case "Product Manager":ensureCustomerMarketSystems?.();Object.values(company.customerSegments||{}).forEach(seg=>{seg.roadmapConfidence=clamp((seg.roadmapConfidence||50)+output*.035,0,100);seg.supportSatisfaction=clamp((seg.supportSatisfaction||50)+output*.015,0,100);});syncCustomerSummaryFromSegments?.();company.trust+=output*.05;break;
     case "Industrial Designer":company.trust+=output*.025;break;
     case "Finance Analyst":company.board=clamp(company.board+output*.004*(company.board<92?1:.25),0,100);applyInvestorEffect({confidence:output*.01});const efficiencyGain=output*.00012*Math.max(0.25,(company.costEfficiency-.78)/.30);company.costEfficiency=clamp(company.costEfficiency-efficiencyGain,.78,1.08);break;
+    case "Manager":case "Director":case "Vice President":company.trust=clamp(company.trust+output*.012,0,100);break;
   }
   updateEmployeeWorkContribution(e,output);
 }
@@ -849,17 +876,10 @@ function simulateMinute(renderNow=true){
   try{return simulateMinuteCore(renderNow);}
   catch(error){recordSimulationError(error,"simulateMinute");if(renderNow&&!validationMode){renderDecisionEvent();render();}}
 }
-function simulateMinuteCore(renderNow=true){if(company.gameOver)return;company.minute+=5;if(company.minute>=1200){company.day++;company.minute=480;dailyClose();if(company.paused||company.gameOver)return;}employees.forEach(e=>{if(company.paused||company.gameOver)return;if(!e.active)return;tickCooldowns(e,5);if(e.sickDays>0){finishAction(e);e.offsite=true;e.action="out sick";e.thought="I need time to recover before returning.";return;}if(e.offsite&&company.minute<1020){finishAction(e);e.offsite=false;moveToZone(e,e.homeZone);e.actionMinutes=0;}e.actionMinutes-=5;if(e.actionMinutes<=0){finishAction(e);chooseAction(e);}const working=e.action==="working"||e.action==="testing hardware";if(working){e.energy-=.37;e.stress+=company.directive==="speed" ? .44 : .23;e.focus-=.09;const output=(e.focus/100)*(e.morale/100)*.075*(company.directive==="speed"?1.20:1);roleOutput(e,output);e.taskProgress+=output;const mistakeRisk=(company.directive==="speed"?.0032:.0011)+(e.focus<36?.004:0)+(e.stress>78?.003:0)+((100-(company.culture?.qualityDiscipline||50))*.00004);if(simulationRandom()<mistakeRisk)recordQualityMistake(e,e.action==="testing hardware"?"a failed verification pass":"rushed technical work",e.action==="testing hardware"?.45:.55);}else if(e.action.includes("break")){e.energy+=.45;e.stress-=.35;e.focus+=.18;}else if(e.action.includes("talking")){e.morale+=.06;e.stress-=.12;}else if(e.action.includes("collaborating")){e.morale+=.04;e.stress+=.04;applyCollaborationOutcome(e);}else if(e.action==="leading a meeting"){e.stress+=.025;e.focus-=.035;applyMeetingOutcome(e);}else if(e.action==="venting"){e.morale-=.08;e.stress-=.08;}if(company.directive==="people")e.morale+=.014;if(company.directive==="cuts"){e.stress+=.055;e.morale-=.035;}if(company.directive==="quality"){e.stress-=.012;company.quality+=.003;}e.energy=clamp(e.energy,0,100);e.stress=clamp(e.stress,0,100);e.morale=clamp(e.morale,0,100);e.focus=clamp(e.focus,0,100);});if(company.paused||company.gameOver)return;clampCompany();maybePhaseAdvance();if(company.eventCooldown>0)company.eventCooldown--;const periodic=company.minute%30===0;if(periodic)maybeCreateDecisionEvent();if(company.minute%60===0)maybeEmergentEvent();if(periodic||company.cash<=0||company.board<20)evaluateFailure();if(renderNow&&!validationMode){renderDecisionEvent();render();}}
+function simulateMinuteCore(renderNow=true){if(company.gameOver)return;company.minute+=5;if(company.minute>=1200){company.day++;company.minute=480;dailyClose();if(company.paused||company.gameOver)return;}employees.forEach(e=>{if(company.paused||company.gameOver)return;if(!e.active)return;tickCooldowns(e,5);if(e.sickDays>0){finishAction(e);e.offsite=true;e.action="out sick";e.thought="I need time to recover before returning.";return;}if(e.offsite&&company.minute<1020){finishAction(e);e.offsite=false;moveToZone(e,e.homeZone);e.actionMinutes=0;}e.actionMinutes-=5;if(e.actionMinutes<=0){finishAction(e);chooseAction(e);}const roomEffect=e.offsite?{productivity:1,stress:0,focus:0,congestion:0}:applyRoomTickEffects(e);const working=e.action==="working"||e.action==="testing hardware";if(working){e.energy-=.37;e.stress+=company.directive==="speed" ? .44 : .23;e.focus-=.09;const output=(e.focus/100)*(e.morale/100)*.075*(company.directive==="speed"?1.20:1)*(roomEffect.productivity||1);roleOutput(e,output);e.taskProgress+=output;const mistakeRisk=(company.directive==="speed"?.0032:.0011)+(e.focus<36?.004:0)+(e.stress>78?.003:0)+((100-(company.culture?.qualityDiscipline||50))*.00004)+(Math.max(0,(roomEffect.congestion||0)-1)*.0012);if(simulationRandom()<mistakeRisk)recordQualityMistake(e,e.action==="testing hardware"?"a failed verification pass":"rushed technical work",e.action==="testing hardware"?.45:.55);}else if(e.action.includes("break")){const recovery=roomEffect.room==="break-area"?clamp(1.05-Math.max(0,(roomEffect.congestion||0)-1)*.22,.65,1.12):.75;e.energy+=.45*recovery;e.stress-=.35*recovery;e.focus+=.18*recovery;}else if(e.action.includes("talking")){e.morale+=.06;e.stress-=.12;}else if(e.action.includes("collaborating")){e.morale+=.04;e.stress+=.04;applyCollaborationOutcome(e);}else if(e.action==="leading a meeting"){const penalty=Math.max(0,(roomEffect.congestion||0)-1);e.stress+=.025+penalty*.05;e.focus-=.035+penalty*.05;applyMeetingOutcome(e);}else if(e.action==="venting"){e.morale-=.08;e.stress-=.08;}if(company.directive==="people")e.morale+=.014;if(company.directive==="cuts"){e.stress+=.055;e.morale-=.035;}if(company.directive==="quality"){e.stress-=.012;company.quality+=.003;}e.energy=clamp(e.energy,0,100);e.stress=clamp(e.stress,0,100);e.morale=clamp(e.morale,0,100);e.focus=clamp(e.focus,0,100);});if(company.paused||company.gameOver)return;clampCompany();maybePhaseAdvance();if(company.eventCooldown>0)company.eventCooldown--;const periodic=company.minute%30===0;if(periodic)maybeCreateDecisionEvent();if(company.minute%60===0)maybeEmergentEvent();if(periodic||company.cash<=0||company.board<20)evaluateFailure();if(renderNow&&!validationMode){renderDecisionEvent();render();}}
 function clampCompany(){["chip","software","quality","integration","board","trust"].forEach(k=>company[k]=clamp(company[k],0,100));company.customers=Math.max(0,company.customers);company.valuation=Math.max(0,company.valuation);}
 function maybePhaseAdvance(){let next=company.phase;if(company.phase==="prototype"&&company.chip>=45&&company.software>=45)next="integration";if(company.phase==="integration"&&company.integration>=48&&company.quality>=50)next="customer trial";if(next!==company.phase){company.phase=next;company.log.push(`Product phase advanced to ${next}.`);recordWeeklyEvent(`Product phase advanced to ${next}.`,"product",4);}}
 
-function salaryBandForRole(role){
-  return {
-    "Chip Architect":[.19,.27],"Firmware Engineer":[.14,.20],"Software Lead":[.18,.25],
-    "Verification Engineer":[.13,.19],"Product Manager":[.15,.22],"QA Engineer":[.11,.16],
-    "Industrial Designer":[.12,.18],"Finance Analyst":[.12,.18]
-  }[role]||[.11,.18];
-}
 function defaultEmploymentForRole(role){
   const band=salaryBandForRole(role),annualSalary=rand(band[0],band[1]);
   return {
@@ -871,14 +891,6 @@ function defaultEmploymentForRole(role){
 function dailyEmploymentCost(e){
   const emp=e.employment||defaultEmploymentForRole(e.role),salary=Number(emp.annualSalary)||.15;
   return salary/365+salary*(emp.benefitsRate??.24)/365+salary*(emp.payrollTaxRate??.08)/365+(emp.equipmentAnnual??.018)/365+(emp.trainingAnnual??.012)/365+(emp.officeAnnual??.016)/365+(emp.insuranceAnnual??.009)/365;
-}
-function roleDepartment(role){
-  if(["Chip Architect","Industrial Designer"].includes(role))return "hardware";
-  if(["Firmware Engineer","Software Lead"].includes(role))return "software";
-  if(["Verification Engineer","QA Engineer"].includes(role))return "quality";
-  if(role==="Product Manager")return "product";
-  if(role==="Finance Analyst")return "finance";
-  return "people";
 }
 function activeTechnicalEmployees(){
   return employees.filter(e=>e.active&&["hardware","software","quality"].includes(roleDepartment(e.role))).length;

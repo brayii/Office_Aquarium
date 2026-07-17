@@ -799,9 +799,6 @@ function updateHiringNeedHistory(){
     company.hiringNeedHistory[dept]=hist;
   }
 }
-function roleRecruitingDifficulty(role){
-  return {"Chip Architect":86,"Software Lead":78,"Verification Engineer":70,"Firmware Engineer":66,"Finance Analyst":58,"Product Manager":56,"Industrial Designer":54,"QA Engineer":46}[role]||55;
-}
 function recruitingProjectFor(department,role){
   const direct=projectStaffingDetails().find(x=>x.dept===department&&(x.role===role||roleDepartment(x.role)===department));
   if(direct)return {id:direct.project.id,title:direct.project.title,codename:direct.project.codename};
@@ -866,6 +863,8 @@ function onboardingQualityForHire(candidate,item){
 }
 function startRecruiting(role,mode="specialist",department=roleDepartment(role)){
   ensureWorkforceEconomySystems();
+  role=canonicalRole(role);
+  department=department||roleDepartment(role);
   const markets=["excellent","healthy","average","tight","very tight"],market=markets[Math.floor(simulationRandom()*markets.length)];
   const labor=laborMarketForDepartment(department);
   const item={id:`recruit-${company.day}-${role.replace(/\W/g,"-")}`,day:company.day,searchStartedDay:company.day,stageStartedDay:company.day,dueDay:company.day+1,role,department,mode,status:"requisition",stage:"requisition",costPaid:.18,attempts:0,market,competition:Math.round(clamp(labor.competition+rand(-9,9),5,100)),salaryInflation:Math.round(clamp((labor.salaryPressure-45)*.35+rand(0,8),0,35)),salaryCompetitiveness:Math.round(rand(48,82)),talentAvailability:Math.round(clamp(labor.candidateSupply+rand(-10,10),5,100)),laborMarketSnapshot:{...labor},exceptionQueued:false,candidate:null,project:recruitingProjectFor(department,role),expectedFillDays:null,declines:0};
@@ -882,7 +881,7 @@ function startRecruiting(role,mode="specialist",department=roleDepartment(role))
   createOrReinforceLesson({key:"hiring-starts-before-crisis",title:"Hiring works best when recruiting starts before capacity fully breaks.",department,vector:workforceLearningVector("hiring"),outcome:"positive",confidence:60,evidence:`Recruiting started for ${role}`,importance:3});
 }
 function generateRecruitingCandidate(item){
-  if(validationMode&&company.forceRecruitingCandidateForTest)return {...company.forceRecruitingCandidateForTest};
+  if(validationMode&&company.forceRecruitingCandidateForTest)return {role:item.role,skills:baseSkillsForRole(item.role),experience:company.forceRecruitingCandidateForTest.experience||40,salaryExpectation:defaultEmploymentForRole(item.role).annualSalary,personality:"test candidate",strengths:["controlled validation"],weaknesses:company.forceRecruitingCandidateForTest.mediocre?["weak fit"]:[],availability:"immediate",hiringDifficulty:roleRecruitingDifficulty(item.role),cultureFit:company.forceRecruitingCandidateForTest.cultureFit||50,growthPotential:company.forceRecruitingCandidateForTest.leadership||45,...company.forceRecruitingCandidateForTest};
   const marketBoost={excellent:16,healthy:9,average:0,tight:-8,"very tight":-15}[item.market]||0;
   const labor=laborMarketForDepartment(item.department||roleDepartment(item.role));
   const health=(recruitingHealthScore(item)-50)*.16;
@@ -892,7 +891,9 @@ function generateRecruitingCandidate(item){
   const experience=clamp(Math.round(rand(35,88)+marketBoost*.4+(labor.candidateSupply-50)*.06),25,98);
   const leadership=clamp(Math.round(rand(25,75)+experience*.15),20,95);
   const salaryPremium=clamp(Math.round((item.salaryInflation||0)+(labor.salaryPressure-50)*.12+Math.max(0,skill-78)*.45+Math.max(0,50-(company.marketConfidence??50))*.08+rand(-4,8)),0,30);
-  return {skill,cultureFit,experience,leadership,salaryPremium,exceptional:skill>=86&&cultureFit>=65,mediocre:skill<55||cultureFit<42};
+  const strengths=[skill>78?"strong technical screen":null,cultureFit>72?"strong culture fit":null,experience>72?"relevant experience":null,leadership>68?"mentoring potential":null].filter(Boolean);
+  const weaknesses=[skill<58?"needs technical ramp":null,cultureFit<48?"culture fit risk":null,salaryPremium>12?"above salary band":null,item.market==="very tight"?"high market competition":null].filter(Boolean);
+  return {role:item.role,skills:baseSkillsForRole(item.role),experience,salaryExpectation:Number((defaultEmploymentForRole(item.role).annualSalary*(1+(salaryPremium||0)/100)).toFixed(3)),personality:["careful","ambitious","collaborative","independent"][Math.floor(simulationRandom()*4)],strengths,weaknesses,availability:item.market==="excellent"?"soon":item.market==="very tight"?"slow":"normal",hiringDifficulty:roleRecruitingDifficulty(item.role),cultureFit,growthPotential:leadership,skill,leadership,salaryPremium,exceptional:skill>=86&&cultureFit>=65,mediocre:skill<55||cultureFit<42};
 }
 function queueHiringExceptionEvent(item,type,candidate=null){
   ensureWorkforceEconomySystems();
@@ -1045,10 +1046,6 @@ function maybeQueueHiringPolicyReview(){
 }
 function openRequestExists(kind,key){
   return (company.escalationQueue||[]).some(ev=>ev.id&&String(ev.id).includes(kind)&&String(ev.id).includes(key))||company.pendingEvent?.id&&String(company.pendingEvent.id).includes(kind)&&String(company.pendingEvent.id).includes(key);
-}
-function roleForDepartmentHire(dept){
-  const needs={hardware:["Chip Architect","Industrial Designer"],software:["Firmware Engineer","Software Lead"],quality:["Verification Engineer","QA Engineer"],product:["Product Manager"],finance:["Finance Analyst"],people:["Product Manager"]}[dept]||["Firmware Engineer"];
-  return needs.sort((a,b)=>employees.filter(e=>e.active&&e.role===a).length-employees.filter(e=>e.active&&e.role===b).length)[0];
 }
 function makeHiringRequestEvent(dept,st){
   const role=roleForDepartmentHire(dept),annualCost=defaultEmploymentForRole(role).annualSalary*1.34;
@@ -1773,7 +1770,7 @@ updateManufacturingAndStakeholders?.();runDailyStage("telemetry",()=>collectDail
 applyExecutiveIntelligenceLearning?.();
 if(company.manufacturing?.supplyRisk>82&&simulationRandom()<.18)recordMajorHistory("Supply pressure disrupted manufacturing planning.","manufacturing",4);
 if(company.shareholders?.pressure>78&&simulationRandom()<.16)recordMajorHistory("Investor pressure increased on the board.","board",4);
-if(company.phase==="launched"&&company.manufacturing){const fulfillment=(company.manufacturing.readiness+company.manufacturing.yield+company.manufacturing.capacity)/300;if(fulfillment<.62){const penalty=company.dailyRevenue*(.62-fulfillment)*.45;company.cash=clamp(company.cash-penalty,0,999);company.trust=clamp(company.trust-(.62-fulfillment)*2.4,0,100);recordCustomerExperience?.("enterprise","delivery-delay",Math.round(58+(1-fulfillment)*24),"Manufacturing fulfillment delays affected customer delivery.","manufacturing",true);Object.values(company.customerSegments||{}).forEach(seg=>{seg.sentiment=clamp((seg.sentiment||50)-(0.62-fulfillment)*3,0,100);seg.trust=clamp((seg.trust||50)-(0.62-fulfillment)*2,0,100);});syncCustomerSummaryFromSegments?.();const owner=employees.filter(e=>e.active).find(e=>e.role==="QA Engineer"||e.role==="Verification Engineer")||employees.find(e=>e.active);if(owner)recordQualityMistake(owner,"launched-product fulfillment defects",.6);recordHistory(`Manufacturing fulfillment dragged revenue by $${penalty.toFixed(2)}M.`,"manufacturing",3);}}
+if(company.phase==="launched"&&company.manufacturing){const fulfillment=(company.manufacturing.readiness+company.manufacturing.yield+company.manufacturing.capacity)/300;if(fulfillment<.62){const penalty=company.dailyRevenue*(.62-fulfillment)*.45;company.cash=clamp(company.cash-penalty,0,999);company.trust=clamp(company.trust-(.62-fulfillment)*2.4,0,100);recordCustomerExperience?.("enterprise","delivery-delay",Math.round(58+(1-fulfillment)*24),"Manufacturing fulfillment delays affected customer delivery.","manufacturing",true);Object.values(company.customerSegments||{}).forEach(seg=>{seg.sentiment=clamp((seg.sentiment||50)-(0.62-fulfillment)*3,0,100);seg.trust=clamp((seg.trust||50)-(0.62-fulfillment)*2,0,100);});syncCustomerSummaryFromSegments?.();const owner=employees.filter(e=>e.active).find(e=>canonicalRole(e.role)==="Software QA Engineer")||employees.find(e=>e.active);if(owner)recordQualityMistake(owner,"launched-product fulfillment defects",.6);recordHistory(`Manufacturing fulfillment dragged revenue by $${penalty.toFixed(2)}M.`,"manufacturing",3);}}
 pruneLongRunCollections();
 runDailyStage("save",()=>{if(!validationMode)saveGame();});}
 function maybeEmergentEvent(){if(simulationRandom()>.025)return;const active=employees.filter(e=>e.active);if(!active.length)return;const e=active[Math.floor(simulationRandom()*active.length)];if(e.stress>78){e.morale-=8;company.board-=2;company.log.push(`${e.name} warned that the workload is unsustainable.`);}else if(e.taskProgress>18){e.taskProgress=0;e.achievements++;company.trust+=2;company.valuation+=.8;company.log.push(`${e.name} completed a difficult ${e.role.toLowerCase()} milestone.`);recordWeeklyEvent(`${e.name} completed a major ${e.role.toLowerCase()} milestone.`,"people",3);}else{const other=socialTarget(e);if(other){adjustSocial(e,other,{trust:4,respect:4,friendship:2});addMemory(e,"SOCIAL_HELP",`${other.name} helped me with difficult work.`,"positive",9,other.name);addMemory(other,"SOCIAL_HELP",`I helped ${e.name} with difficult work.`,"positive",7,e.name);company.log.push(`${e.name} helped ${other.name}, strengthening cooperation.`);recordWeeklyEvent(`${e.name} helped ${other.name}, strengthening cooperation.`,"people",2);}}}

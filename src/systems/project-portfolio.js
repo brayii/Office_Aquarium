@@ -377,7 +377,10 @@ function ensureProjectAllocations(){
         if(need<=.05)continue;
         const candidates=employees
           .filter(e=>e.active&&roleDepartment(e.role)===dept&&(remaining[e.id]||0)>.05)
-          .map(e=>({e,score:projectAffinityScore(e,p.id)*1.5+(e.focus||50)*.4+(e.morale||50)*.16-(e.stress||0)*.18+workSkillFit(e,{requiredSkills:p.requiredSkills||{}})*40}))
+          .map(e=>{
+            const caps=roleProjectCapabilities(e.role),capability=Math.max(caps[dept]||0,caps[projectWorkType(p,dept)]||0,caps.integration||0);
+            return {e,score:projectAffinityScore(e,p.id)*1.5+(e.focus||50)*.4+(e.morale||50)*.16-(e.stress||0)*.18+workSkillFit(e,{requiredSkills:p.requiredSkills||{}})*34+capability*18};
+          })
           .sort((a,b)=>b.score-a.score);
         for(const row of candidates){
           if(need<=.05)break;
@@ -409,7 +412,8 @@ function projectQualifiedAllocatedFte(project,dept){
     const e=employees.find(x=>x.active&&x.id===Number(id));
     if(!e||roleDepartment(e.role)!==dept)return sum;
     const fit=typeof workSkillFit==="function"?workSkillFit(e,{requiredSkills}):1;
-    const usable=clamp((Number(value)||0)*clamp((fit-.48)/.52,0,1.05),0,Number(value)||0);
+    const caps=roleProjectCapabilities(e.role),capability=Math.max(caps[dept]||0,caps[workType]||0,caps.integration||0);
+    const usable=clamp((Number(value)||0)*clamp((fit*.7+capability*.3-.48)/.52,0,1.05),0,Number(value)||0);
     return sum+usable;
   },0);
 }

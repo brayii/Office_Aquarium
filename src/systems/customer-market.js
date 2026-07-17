@@ -79,10 +79,10 @@ function segmentProductExperience(seg){
 function updateDepartmentCapabilities(){
   ensureCustomerMarketSystems();
   const active=employees.filter(e=>e.active);
-  const roleValue={ProductManager:{customerSuccess:6,accountManagement:4,onboardingSupport:2},QAEngineer:{technicalSupport:4,support:2},VerificationEngineer:{technicalSupport:3},SoftwareLead:{technicalSupport:3},FinanceAnalyst:{accountManagement:1}};
+  const roleValue={ProductManager:{customerSuccess:6,accountManagement:4,onboardingSupport:2},SoftwareQAEngineer:{technicalSupport:4,support:2},TechnicalLead:{technicalSupport:3},SoftwareEngineer:{technicalSupport:2},FirmwareEngineer:{technicalSupport:2},FinanceAnalyst:{accountManagement:1}};
   const caps={customerSuccess:0,support:0,technicalSupport:0,onboardingSupport:0,accountManagement:0};
   active.forEach(e=>{
-    const key=String(e.role||"").replace(/\s+/g,"");
+    const key=canonicalRole(String(e.role||"")).replace(/\s+/g,"");
     const v=roleValue[key]||{};
     Object.keys(caps).forEach(k=>caps[k]+=Number(v[k])||0);
   });

@@ -301,10 +301,12 @@ function evaluateCommunicationOutcomeRecords(){
     }
   });
 }
-const NON_AUTHORITATIVE_PATHS=new Set(["company.runtime","company.uiCache","company.companyRiskComponents","company.riskPillars","company.staffingModel","company.workforceAllocationSnapshot","company.executiveBriefing","company.executiveIntelligenceSnapshot","company.executiveObservations","company.debugState","company.pendingCommunication.bodyPreview"]);
+const NON_AUTHORITATIVE_PATHS=new Set(["company.runtime","company.uiCache","company.companyRiskComponents","company.riskPillars","company.staffingModel","company.workforceAllocationSnapshot","company.executiveBriefing","company.executiveIntelligenceSnapshot","company.executiveObservations","company.debugState","company.dailyStageStatus","company.pendingCommunication.bodyPreview","company.crisis.currentProgressDetail"]);
 function isNonAuthoritativePath(path){
   if(NON_AUTHORITATIVE_PATHS.has(path))return true;
-  if(/^company\.(dailyStageStatus\.\d+|lastDailyCloseStatus)\.(startedAt|completedAt)$/.test(path))return true;
+  if(/^company\.(dailyStageStatus\.\d+|lastDailyCloseStatus)\.(startedAt|completedAt|hashBefore|hashAfter)$/.test(path))return true;
+  if(/^company\.learningEpisodes\.\d+\.observations$/.test(path))return true;
+  if(/^employees\.\d+\.(currentRoom|roomSelectionReason|roomEffect)$/.test(path))return true;
   return /^company\.(projects|projectArchive|projectProposals)\.\d+\.(commercialReadiness|commercialPotential|projectedDailyRevenue)$/.test(path);
 }
 function canonicalAuthoritativeState(value,path=""){
@@ -484,7 +486,7 @@ function validateLearningBehavior(){
     learnedLessons:emptyLessonVector(),
     stress:78,energy:48,focus:58,morale:55,
     traits:["cautious"],opinionOfCEO:{trust:60},
-    role:"QA Engineer",active:true
+    role:"Software QA Engineer",active:true
   };
   const baseline=institutionalUtilityBias(probe);
   probe.learnedLessons.helpSeeking=8;
@@ -809,8 +811,9 @@ function updateTeamOperationalState(){
 function beliefAccessForRole(e,key){
   const team=employeeTeam(e);
   if(key==="cashRisk")return e.role==="Finance Analyst"?.9:team==="product"?.45:.25;
-  if(key==="qualityRisk")return ["Verification Engineer","QA Engineer","Chip Architect"].includes(e.role)?.9:team==="software"?.65:.42;
-  if(key==="launchReadiness")return ["Product Manager","Software Lead","Chip Architect"].includes(e.role)?.78:.48;
+  const role=canonicalRole(e.role);
+  if(key==="qualityRisk")return ["Software QA Engineer","Chip Architect"].includes(role)?.9:team==="software"?.65:.42;
+  if(key==="launchReadiness")return ["Product Manager","Technical Lead","Chip Architect"].includes(role)?.78:.48;
   if(key==="customerDemand")return e.role==="Product Manager"?.88:e.role==="Finance Analyst"?.58:.38;
   return .5;
 }
@@ -825,7 +828,7 @@ function updateEmployeeBeliefsAndBriefing(e){
   const team=employeeTeam(e),t=company.teams[team]||{};
   updateBelief(e,"launchReadiness",(company.chip+company.software+company.integration+company.quality)/4,"team meeting");
   updateBelief(e,"cashRisk",clamp(100-company.cash*7,0,100),e.role==="Finance Analyst"?"finance report":"office rumor");
-  updateBelief(e,"qualityRisk",Math.max(t.defectRisk||0,100-company.quality),["Verification Engineer","QA Engineer"].includes(e.role)?"personal testing":"team meeting");
+  updateBelief(e,"qualityRisk",Math.max(t.defectRisk||0,100-company.quality),canonicalRole(e.role)==="Software QA Engineer"?"personal testing":"team meeting");
   updateBelief(e,"customerDemand",clamp(company.customerSentiment||company.trust,0,100),e.role==="Product Manager"?"customer feedback":"team meeting");
   const assigned=(company.workItems||[]).filter(w=>w.status==="open"&&(w.ownerId===e.id||w.visibleTo.includes(team))).sort((a,b)=>b.priority-a.priority).slice(0,3);
   e.dailyBriefing={day:company.day,assignedWork:assigned.map(w=>w.id),knownBlockers:assigned.flatMap(w=>w.blockedBy||[]).slice(0,4),teamPressure:Math.round(t.pressure||0),observedQualityRisk:Math.round(e.beliefs.qualityRisk?.estimate||0),customerPriorityKnown:beliefAccessForRole(e,"customerDemand")>.55,cashConcernKnown:beliefAccessForRole(e,"cashRisk")>.55,messages:assigned.slice(0,2).map(w=>({from:team,subject:w.title,reliability:.72,contentCode:w.type})),rumors:(company.cash<8?[{contentCode:"RUNWAY_CONCERN",reliability:.35}]:[])};
@@ -923,7 +926,7 @@ function issueRoleFit(e,issue){
   const team=employeeTeam(e),sources=issue.sourceDepartments||[];
   if(sources.includes(team))return 24;
   if(issue.type==="runway-risk"&&e.role==="Finance Analyst")return 32;
-  if(issue.type==="quality-risk"&&["Verification Engineer","QA Engineer","Chip Architect"].includes(e.role))return 28;
+  if(issue.type==="quality-risk"&&["Software QA Engineer","Chip Architect"].includes(canonicalRole(e.role)))return 28;
   if(issue.type==="market-opportunity"&&e.role==="Product Manager")return 26;
   if(issue.type==="supplier-risk"&&["Chip Architect","Finance Analyst"].includes(e.role))return 22;
   return 0;
@@ -994,7 +997,7 @@ function maybeCreateOpportunityProposal(e,ctx){
   if(!healthy||inventive<66||simulationRandom()>initiativeOdds)return;
   c.lastReportDay=company.day;c.reportsMade++;updateCommunicationLearning(e,"initiative","sent",ctx.work||{contentCode:"initiative",severity:42,confidence:60});
   const subject=ctx.work?contentPick(v23Content.opportunitySubjects,ctx.work.priority):"Proposal for a focused company experiment";
-  createEmployeeMessage({type:"opportunity-proposal",from:e,toIds:employees.filter(x=>x.active&&["Product Manager","Software Lead","Chip Architect","Finance Analyst"].includes(x.role)&&x.id!==e.id).map(x=>x.id).slice(0,3),department:ctx.team,subject,contentCode:ctx.work?.type||"initiative",severity:42,urgency:34,confidence:clamp(58+inventive*.25,45,88),reliability:.64,workItem:ctx.work,evidence:["Employee sees a useful opening",`Innovation culture ${Math.round(company.culture?.innovation||50)}`]});
+  createEmployeeMessage({type:"opportunity-proposal",from:e,toIds:employees.filter(x=>x.active&&["Product Manager","Technical Lead","Chip Architect","Finance Analyst"].includes(canonicalRole(x.role))&&x.id!==e.id).map(x=>x.id).slice(0,3),department:ctx.team,subject,contentCode:ctx.work?.type||"initiative",severity:42,urgency:34,confidence:clamp(58+inventive*.25,45,88),reliability:.64,workItem:ctx.work,evidence:["Employee sees a useful opening",`Innovation culture ${Math.round(company.culture?.innovation||50)}`]});
   addMemory(e,"OPPORTUNITY_PROPOSAL",`I proposed a new initiative.`,"positive",6);
 }
 function maybeShareRumor(e){
@@ -1195,13 +1198,6 @@ function updateCompanyInformationSystem(){
   updateIssueRecords();
   generateEmployeeCommunications();
   processInternalEscalations();
-}
-function employeeTeam(e){
-  if(["Chip Architect","Industrial Designer"].includes(e.role))return "hardware";
-  if(["Firmware Engineer","Software Lead"].includes(e.role))return "software";
-  if(["Verification Engineer","QA Engineer"].includes(e.role))return "quality";
-  if(e.role==="Product Manager")return "product";
-  return "finance";
 }
 function averageTeamCohesion(){ensureBibleSystems();const vals=Object.values(company.teams).map(t=>t.cohesion);return vals.reduce((a,b)=>a+b,0)/Math.max(1,vals.length);}
 function updateTeamsFromEmployees(){

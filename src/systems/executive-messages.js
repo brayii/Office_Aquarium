@@ -39,10 +39,10 @@ function structuredCommunicationForEvent(ev,active,byRole){
     customer:byRole("Product Manager"),
     product:byRole("Product Manager"),
     market:byRole("Product Manager"),
-    operations:byRole("QA Engineer")||byRole("Chip Architect"),
-    quality:byRole("QA Engineer")||byRole("Chip Architect"),
-    project:byRole("Product Manager")||byRole("Software Lead")
-  }[cat]||byRole("Product Manager")||byRole("Software Lead")||active[0]||{name:"Executive Office",role:"Leadership Team"};
+    operations:byRole("Software QA Engineer")||byRole("Chip Architect"),
+    quality:byRole("Software QA Engineer")||byRole("Chip Architect"),
+    project:byRole("Product Manager")||byRole("Technical Lead")
+  }[cat]||byRole("Product Manager")||byRole("Technical Lead")||active[0]||{name:"Executive Office",role:"Leadership Team"};
   const type={
     finance:"Finance Memo",board:"Board Memo",people:"People Memo",customer:"Customer Success Memo",
     product:"Product Memo",market:"Market Memo",operations:"Operations Memo",quality:"Quality Memo",project:"Portfolio Memo"
@@ -96,7 +96,7 @@ function departmentBiasProfile(dept){
   }[dept]||{focus:"department operating priorities",biasStrength:55,overconfidence:16,caution:55};
 }
 function reportManagerFor(dept){
-  const role={hardware:"Chip Architect",software:"Software Lead",quality:"QA Engineer",product:"Product Manager","customer success":"Product Manager",finance:"Finance Analyst",people:"Product Manager",board:"Board Strategy Committee"}[dept];
+  const role={hardware:"Chip Architect",software:"Technical Lead",quality:"Software QA Engineer",product:"Product Manager","customer success":"Product Manager",finance:"Finance Analyst",people:"Manager",board:"Board Strategy Committee"}[dept];
   const e=employees.find(x=>x.active&&x.role===role)||employees.find(x=>x.active&&employeeTeam(x)===dept)||employees.find(x=>x.active);
   return e?{name:e.name,role:e.role,department:dept}:{name:dept==="board"?"Board Strategy Committee":"Operating Council",role:dept==="board"?"Board":"Executive Review",department:dept||"company"};
 }
@@ -2045,7 +2045,7 @@ function openDecisionEvent(ev){
   company.log.push(`CEO attention requested: ${company.pendingEvent.title}.`);
   switchMobileTab("inbox");
 }
-function maybeCreateDecisionEvent(){if(company.pendingEvent)return;ensureBibleSystems?.();company.escalationQueue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];if(company.escalationQueue.length>=4)return;if(company.eventCooldown>0)return;if(simulationRandom()>.004)return;const selected=chooseCEOEvent();if(!selected)return;const ev=prepareStrategicDecision({...selected,choices:(selected.choices||[]).map(c=>({...c}))});recordEventShown(ev);company.escalationQueue.push(ev);company.eventCooldown=360;if(!validationMode){renderDecisionEvent();}}
+function maybeCreateDecisionEvent(){if(company.pendingEvent)return;ensureBibleSystems?.();company.escalationQueue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];if(validationMode&&company.escalationQueue.length){openDecisionEvent(nextEligibleQueuedMemo()||company.escalationQueue.shift());return;}if(company.escalationQueue.length>=4)return;if(company.eventCooldown>0)return;if(simulationRandom()>.004)return;const selected=chooseCEOEvent();if(!selected)return;const ev=prepareStrategicDecision({...selected,choices:(selected.choices||[]).map(c=>({...c}))});recordEventShown(ev);company.escalationQueue.push(ev);company.eventCooldown=360;if(!validationMode){renderDecisionEvent();}}
 function applyDecision(){if(!company.pendingEvent)return;recordMetricEvent("ceoDecisions");const ev=prepareStrategicDecision(company.pendingEvent),d=ev.choices[company.selected],comm=company.pendingCommunication||eventCommunication(ev),archivedMemo=archiveCommunication(ev,d,comm);applyLeadershipFootprint(ev,d);const delayedOutcome=evaluateStrategicOutcome(ev,d),thread=createDecisionThread(ev,d,comm,delayedOutcome,archivedMemo);if(ev.storyId)addStoryBeat(ev.storyId,`CEO chose: ${d.title}.`,"decision");startPolicyTransition(d.directive,d.days||0,d.title);Object.entries(d.effect||{}).forEach(([k,v])=>{if(k==="valuation"){addValuationShock(v*.35,`Market reaction to CEO decision: ${d.title}`,ev.id,20);return;}if(k==="customers"){applyCustomerDelta(v*.35,d.title,ev.id);return;}const systemic=["board","trust","quality","integration"].includes(k);company[k]=(company[k]||0)+v*(systemic?.35:1);});adjustCulture(d.culture||{});employees.forEach(e=>{
     if(d.directive==="cuts")addMemory(e,"CEO_CUTS","Leadership cut costs and increased pressure.","negative",14,"CEO");
     else if(d.directive==="people")addMemory(e,"CEO_SUPPORT","Leadership invested in employees.","positive",12,"CEO");
@@ -2095,7 +2095,7 @@ function generateHireName(role){
 
 function resolveHiring(mode,roleOverride=null){
   if(!Array.isArray(company.openRoles))company.openRoles=[];
-  const role=roleOverride||company.openRoles[0];
+  const role=canonicalRole(roleOverride||company.openRoles[0]);
   if(!role)return;
   const resigned=employees.find(e=>!e.active&&e.role===role);
 
@@ -2109,7 +2109,7 @@ function resolveHiring(mode,roleOverride=null){
     replacement.morale=70+simulationRandom()*10;
     replacement.focus=68+simulationRandom()*12;
     replacement.stress=18+simulationRandom()*10;
-    replacement.relationship={};replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`Hired as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.actionOutcomeContext=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:-999,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;inheritInstitutionalLearning(replacement);
+    replacement.relationship={};replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`Hired as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.actionOutcomeContext=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:-999,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;normalizeEmployeeRoleProfile(replacement);inheritInstitutionalLearning(replacement);
     employees.forEach(other=>{
       if(other.id!==replacement.id){
         replacement.relationship[other.id]=Math.round(simulationRandom()*18-4);
