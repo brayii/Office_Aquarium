@@ -48,15 +48,15 @@ function projectCompanyConditionScore(project){
   const financeHealth=typeof derivedFinanceHealth==="function"?derivedFinanceHealth():50;
   const p=projectDependencyProfile(project);
   const signals={
-    hardware:clamp((company.chip||0)*.35+(company.quality||0)*.28+(company.integration||0)*.20+(100-(company.manufacturing?.supplyRisk||35))*.17,0,100),
-    software:clamp((company.software||0)*.38+(company.integration||0)*.28+(company.quality||0)*.18+(company.culture?.communication||50)*.16,0,100),
-    manufacturing:clamp((company.manufacturing?.readiness||0)*.30+(company.manufacturing?.yield||50)*.25+(100-(company.manufacturing?.supplyRisk||35))*.25+(company.quality||0)*.20,0,100),
-    quality:clamp((company.quality||50)*.55+(100-(company.simulationMetrics?.counters?.qualityMistakes||0)*2)*.20+(company.culture?.qualityDiscipline||50)*.15+(100-(company.manufacturing?.supplyRisk||35))*.10,0,100),
-    customer:clamp((company.customerSentiment??customerSentiment??company.trust??50)*.50+(company.trust||50)*.25+(company.market?.hardwareDemand||50)*.12+(company.market?.aiDemand||50)*.13,0,100),
-    people:clamp(morale*.35+cohesion*.25+(100-avgStress())*.25+(company.culture?.workLife||50)*.15,0,100),
+    hardware:clamp((company.chip||0)*.35+(company.quality||0)*.28+(company.integration||0)*.20+(100-(company.manufacturing?.supplyRisk??OFFICE_AQUARIUM_CONSTANTS.defaults.unknownSupplyRisk))*.17,0,100),
+    software:clamp((company.software||0)*.38+(company.integration||0)*.28+(company.quality||0)*.18+(company.culture?.communication??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.16,0,100),
+    manufacturing:clamp((company.manufacturing?.readiness||0)*.30+(company.manufacturing?.yield??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.25+(100-(company.manufacturing?.supplyRisk??OFFICE_AQUARIUM_CONSTANTS.defaults.unknownSupplyRisk))*.25+(company.quality||0)*.20,0,100),
+    quality:clamp((company.quality??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.55+(100-(company.simulationMetrics?.counters?.qualityMistakes||0)*2)*.20+(company.culture?.qualityDiscipline??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.15+(100-(company.manufacturing?.supplyRisk??OFFICE_AQUARIUM_CONSTANTS.defaults.unknownSupplyRisk))*.10,0,100),
+    customer:clamp((company.customerSentiment??customerSentiment??company.trust??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.50+(company.trust??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.25+(company.market?.hardwareDemand??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.12+(company.market?.aiDemand??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.13,0,100),
+    people:clamp(morale*.35+cohesion*.25+(100-avgStress())*.25+(company.culture?.workLife??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.15,0,100),
     finance:financeHealth,
-    trust:clamp((company.trust||50)*.65+(company.board||50)*.20+(company.leadership?.transparency||55)*.15,0,100),
-    innovation:clamp((company.culture?.innovation||50)*.55+(company.market?.aiDemand||50)*.18+(company.market?.hardwareDemand||50)*.12+(company.leadership?.longTermThinking||55)*.15,0,100)
+    trust:clamp((company.trust??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.65+(company.board??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.20+(company.leadership?.transparency??OFFICE_AQUARIUM_CONSTANTS.defaults.healthyScore)*.15,0,100),
+    innovation:clamp((company.culture?.innovation??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.55+(company.market?.aiDemand??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.18+(company.market?.hardwareDemand??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore)*.12+(company.leadership?.longTermThinking??OFFICE_AQUARIUM_CONSTANTS.defaults.healthyScore)*.15,0,100)
   };
   const entries=Object.entries(p).filter(([,w])=>Number(w)>0),total=entries.reduce((s,[,w])=>s+w,0)||1;
   const score=entries.reduce((s,[k,w])=>s+(signals[k]??50)*w,0)/total;
@@ -150,17 +150,17 @@ function derivedCohesion(){
   const active=employees.filter(e=>e.active),relationships=active.length?active.reduce((s,e)=>s+averageRelationship(e),0)/active.length:0;
   const relScore=clamp(50+relationships,0,100),collab=clamp((company.simulationMetrics?.counters?.collaborations||0)/Math.max(1,company.day+1)*12+45,0,100);
   const layoffPenalty=(company.layoffHistory||[]).filter(x=>company.day-(x.day||0)<45).length*8,resignPenalty=(company.history||[]).filter(h=>/resigned|retired|terminated|layoff/i.test(h.text||"")&&company.day-(h.day||0)<45).length*3;
-  return Math.round(clamp(relScore*.25+collab*.20+company.trust*.15+averageTeamCohesion()*.15+(company.culture?.communication||50)*.10+(100-avgStress())*.15-layoffPenalty-resignPenalty,0,100));
+  return Math.round(clamp(relScore*.25+collab*.20+company.trust*.15+averageTeamCohesion()*.15+(company.culture?.communication??50)*.10+(100-avgStress())*.15-layoffPenalty-resignPenalty,0,100));
 }
 function derivedTrust(){
   const active=employees.filter(e=>e.active),ceo=active.reduce((s,e)=>s+(e.opinionOfCEO?.trust??company.trust),0)/Math.max(1,active.length),fair=active.reduce((s,e)=>s+(e.opinionOfCEO?.fairness??55),0)/Math.max(1,active.length);
-  return Math.round(clamp(ceo*.55+(company.leadership?.transparency||55)*.15+fair*.15+(company.leadership?.accountability||55)*.15,0,100));
+  return Math.round(clamp(ceo*.55+(company.leadership?.transparency??55)*.15+fair*.15+(company.leadership?.accountability??55)*.15,0,100));
 }
 function derivedCustomerSentiment(){
   ensureCustomerMarketSystems?.();
   if((company.customers||0)>0&&company.customerSegments)return Math.round(company.customerSentiment??50);
   if((company.customers||0)<=0&&company.phase!=="pilot"&&company.phase!=="customer trial")return null;
-  const support=clamp(100-avgStress()*.35+(company.culture?.communication||50)*.35,0,100),delivery=clamp((company.manufacturing?.readiness||0)*.45+(company.manufacturing?.yield||50)*.35+(100-(company.manufacturing?.supplyRisk||0))*.20,0,100),feature=clamp((company.market?.aiDemand||50)*.45+(company.integration||0)*.35+(company.software||0)*.20,0,100),reputation=clamp((company.trust||0)*.55+(company.board||0)*.25+(company.quality||0)*.20,0,100),marketFit=clamp((company.market?.hardwareDemand||50)*.45+(company.market?.aiDemand||50)*.45-(company.market?.competitorHeat||50)*.15,0,100);
+  const support=clamp(100-avgStress()*.35+(company.culture?.communication??50)*.35,0,100),delivery=clamp((company.manufacturing?.readiness||0)*.45+(company.manufacturing?.yield??50)*.35+(100-(company.manufacturing?.supplyRisk||0))*.20,0,100),feature=clamp((company.market?.aiDemand??50)*.45+(company.integration||0)*.35+(company.software||0)*.20,0,100),reputation=clamp((company.trust||0)*.55+(company.board||0)*.25+(company.quality||0)*.20,0,100),marketFit=clamp((company.market?.hardwareDemand??50)*.45+(company.market?.aiDemand??50)*.45-(company.market?.competitorHeat??50)*.15,0,100);
   const complaintPenalty=Math.max(0,60-company.quality)*.35+Math.max(0,(company.manufacturing?.supplyRisk||0)-65)*.25;
   return Math.round(clamp(company.quality*.25+support*.20+delivery*.15+company.trust*.10+feature*.10+reputation*.10+marketFit*.10-complaintPenalty,0,100));
 }
@@ -169,7 +169,7 @@ function derivedManufacturingHealth(){
   const mfgProjects=relevantProjects("manufacturing",{includePaused:true}),weightedHealth=weightedProjectMetric(mfgProjects,projectVisibleHealth);
   if(!post){
     if(!mfgProjects.length&&company.phase==="prototype"&&(company.manufacturing?.readiness||0)<5)return null;
-    return Math.round(clamp((100-(company.manufacturing?.supplyRisk||35))*.20+(company.manufacturing?.readiness||0)*.25+(weightedHealth??company.quality)*.25+company.quality*.15+company.integration*.15,0,100));
+    return Math.round(clamp((100-(company.manufacturing?.supplyRisk??35))*.20+(company.manufacturing?.readiness||0)*.25+(weightedHealth??company.quality)*.25+company.quality*.15+company.integration*.15,0,100));
   }
   const yieldScore=company.manufacturing?.yield??50,supplier=100-(company.manufacturing?.supplyRisk||0),fulfillment=clamp((company.manufacturing?.capacity||0)-(company.customers||0)*.08+70,0,100),defect=clamp(100-(company.simulationMetrics?.counters?.qualityMistakes||0)*2,0,100),capacity=clamp(company.manufacturing?.capacity||0,0,100),staffing=company.staffingModel?.quality?.skillCoverage??derivedStaffingCoverage({requiredHeadcount:{quality:1},assignedEmployees:[]});
   return Math.round(clamp(yieldScore*.25+supplier*.20+fulfillment*.20+defect*.15+capacity*.10+staffing*.10,0,100));
@@ -185,7 +185,7 @@ function derivedInvestorConfidence(portfolioHealth){
   const missedGuidancePenalty=clamp((company.portfolioHealth?.averageScheduleVariance||0)*.25+(company.portfolioHealth?.atRiskProjects||0)*2.5,0,18);
   const publicFailurePenalty=clamp((company.boardGovernance?.strikes||0)*4+(company.crisis?8:0)+(company.companyRiskComponents?.total>75?6:0),0,20);
   const customerLift=clamp((company.customers||0)*.08+(company.dailyRevenue||0)*24,0,10);
-  const score=(company.marketConfidence||50)*.30+trendScore*.20+(company.valuationQuality||50)*.15+(company.investorAppetite||50)*.15+(company.leadershipReputation||50)*.10+boardStability*.10+customerLift-volatility*.65-dilutionPenalty-missedGuidancePenalty-publicFailurePenalty;
+  const score=(company.marketConfidence??50)*.30+trendScore*.20+(company.valuationQuality??50)*.15+(company.investorAppetite??50)*.15+(company.leadershipReputation??50)*.10+boardStability*.10+customerLift-volatility*.65-dilutionPenalty-missedGuidancePenalty-publicFailurePenalty;
   return Math.round(clamp(score,0,100));
 }
 function boardConfidenceTarget(morale=null,stress=null){
@@ -195,14 +195,14 @@ function boardConfidenceTarget(morale=null,stress=null){
   const cashScore=clamp((company.cash||0)*5.2,0,92);
   const executionScore=clamp(72-(portfolio.atRiskProjects||0)*8-Math.max(0,portfolio.averageScheduleVariance||0)*.55-Math.max(0,portfolio.averageBudgetVariance||0)*.35+(portfolio.activeProjects?6:0),0,96);
   const peopleScore=clamp(avgMorale*.55+(100-avgStressValue)*.35+(employees.filter(e=>e.active).length>=6?8:0),0,96);
-  const marketScore=clamp((derivedInvestorConfidence?.()??50)*.45+(company.trust||50)*.25+(company.customerSentiment||50)*.20+(company.leadershipReputation||50)*.10,0,96);
+  const marketScore=clamp((derivedInvestorConfidence?.()??50)*.45+(company.trust??50)*.25+(company.customerSentiment??50)*.20+(company.leadershipReputation??50)*.10,0,96);
   const governancePenalty=(company.boardGovernance?.strikes||0)*13+(company.boardControlPressure||0)*.10+(company.crisis?8:0)+Math.max(0,(risk.total||0)-55)*.22;
-  const target=runwayScore*.22+cashScore*.12+executionScore*.22+peopleScore*.16+marketScore*.20+(company.leadership?.accountability||55)*.08-governancePenalty;
+  const target=runwayScore*.22+cashScore*.12+executionScore*.22+peopleScore*.16+marketScore*.20+(company.leadership?.accountability??55)*.08-governancePenalty;
   return clamp(target,5,98);
 }
 function updateBoardConfidenceDaily(morale,stress){
   const target=boardConfidenceTarget(morale,stress);
-  let next=(company.board||50)*.985+target*.015;
+  let next=(company.board??50)*.985+target*.015;
   if((company.board||0)>92&&target<(company.board||0))next-=.12+((company.board||0)-92)*.03;
   if(next>98&&target<97)next=98;
   company.board=clamp(next,0,100);
@@ -214,14 +214,14 @@ function applyDailyOrganizationalPressure(morale,stress){
   const burnPressure=clamp(Math.abs(Math.min(0,net))/.18,0,1);
   const capacityPressure=clamp((company.projectCapacity?.totalOverload||0)/Math.max(1,company.projectCapacity?.totalCapacity||1),0,1);
   const projectPressure=clamp((portfolio.atRiskProjects||0)*.18+Math.max(0,portfolio.averageScheduleVariance||0)*.012+Math.max(0,portfolio.projectDrivenOpenRoles||0)*.08+capacityPressure*.32,0,1);
-  const boardPressure=clamp((100-(company.board||50))/100+(company.boardGovernance?.strikes||0)*.18+(company.boardControlPressure||0)*.004,0,1);
+  const boardPressure=clamp((100-(company.board??50))/100+(company.boardGovernance?.strikes||0)*.18+(company.boardControlPressure||0)*.004,0,1);
   const systemicPressure=clamp((risk.total||0)/100,0,1);
   const startupPressure=company.phase==="launched"?.04:.12;
   const pressure=clamp(startupPressure+runwayPressure*.28+burnPressure*.18+projectPressure*.24+boardPressure*.12+systemicPressure*.18,0,1);
   if(pressure<=.05)return;
   const active=employees.filter(e=>e.active);
   active.forEach(e=>{
-    const resilience=clamp((e.opinionOfCEO?.trust||55)*.004+(e.learning?.recovery||0)*.01+(e.learnedLessons?.planning||0)*.006,0,.45);
+    const resilience=clamp((e.opinionOfCEO?.trust??55)*.004+(e.learning?.recovery||0)*.01+(e.learnedLessons?.planning||0)*.006,0,.45);
     const personal=pressure*(1-resilience);
     e.stress=clamp(e.stress+personal*2.6,0,100);
     e.morale=clamp(e.morale-personal*2.2-(e.morale>88?Math.min(.45,(e.morale-88)*.035):0),0,100);
@@ -320,7 +320,7 @@ function compatibleProjectFor(project){
   return activeProjects().find(p=>p.id!==project.id&&(p.proposingDepartment===project.proposingDepartment||p.family===project.family||p.requiredDepartments.some(d=>(project.requiredDepartments||[]).includes(d))))||null;
 }
 function choicesForProjectControl(p,requested="review"){
-  const risk=p.performance?.riskTrend||p.visibleRisk||50,merge=compatibleProjectFor(p),cashRoom=company.cash>Math.max(3,p.estimatedCost*.15),canExpand=cashRoom&&(p.performance?.staffingCoverage||0)>55&&p.status!=="paused";
+  const risk=p.performance?.riskTrend??p.visibleRisk??50,merge=compatibleProjectFor(p),cashRoom=company.cash>Math.max(3,p.estimatedCost*.15),canExpand=cashRoom&&(p.performance?.staffingCoverage||0)>55&&p.status!=="paused";
   const pilotConfidence=clamp(64+projectLessonBias("pilotValue")*2+projectLessonBias("customerValidation"),35,88),cancelConfidence=clamp(45+projectLessonBias("cancellationTiming")*2+projectLessonBias("sunkCostDiscipline")*1.4,30,86),scopeConfidence=clamp(63+projectLessonBias("scopeControl")*1.8,35,88);
   const base={
     continue:{title:"Keep the current project plan",detail:"Continue the project without changing scope, staffing, or budget.",effect:{board:risk<70?1:-1},projectDecision:{id:p.id,action:"continue"},strategy:"balanced",benefits:["preserves momentum"],risks:["current risks remain"],uncertainty:"Material",estimatedConfidence:62},
@@ -340,7 +340,7 @@ function choicesForProjectControl(p,requested="review"){
   return picked.slice(0,3);
 }
 function makeProjectControlEvent(p,requested="review"){
-  const risk=p.performance?.riskTrend||p.visibleRisk||50;
+  const risk=p.performance?.riskTrend??p.visibleRisk??50;
   const timing=projectTimingForecast(p);
   return {id:`project-control-${requested}-${p.id}-${company.day}`,repeatable:false,category:"project",title:`Portfolio action: ${p.codename}`,copy:`CEO requested a ${requested} memo for ${p.title}. ${timing.summary}`,generatedCommunication:{type:"Portfolio Review",priority:requested==="cancel"||risk>75?"Urgent":"Decision Needed",sender:{name:"Portfolio Council",role:"Strategy"},subject:`Portfolio Action - ${p.title}`,message:`The Portfolio Council is asking for direction on ${p.title}. The project is currently ${projectStatusLabel(p)}, about ${Math.round(p.progress||0)}% complete, with ${risk>75?"high":risk>55?"visible":"contained"} execution risk, $${Number(p.budgetSpent||0).toFixed(2)}M spent, and ${Math.round(p.performance?.staffingCoverage||0)}% staffing coverage. ${timing.summary}`,recs:[["Portfolio",risk>75?`Reduce exposure or reset scope; current forecast is ${timing.status}`:`Keep decision tied to milestone evidence; current forecast is ${timing.short}`,74],["Finance",(p.performance?.budgetVariance||0)>25?"Control budget before expanding":"Budget can support a gated decision",68],["Product",(p.customerInterest||0)>60?"Preserve customer learning":"Validate demand before scaling",64]],impacts:[`Timing forecast: ${timing.summary}`,"Decision will route through the normal CEO archive","Project staffing demand and work items may change","Cancellation may create delayed morale, customer, and board effects"]},choices:choicesForProjectControl(p,requested)};
 }
@@ -430,12 +430,12 @@ function applyPortfolioAction(action){
     active.sort((a,b)=>(b.performance?.riskTrend||0)-(a.performance?.riskTrend||0)).slice(0,2).forEach(p=>{p.nextReviewDay=company.day;});
     recordHistory("Board portfolio triage accelerated reviews for the riskiest projects.","project",4);
   }else if(action==="protect-growth"){
-    active.forEach(p=>{p.priority=clamp((p.priority||50)+4,0,100);p.visibleRisk=clamp((p.visibleRisk||50)+2,0,100);});
-    company.culture.riskTolerance=clamp((company.culture.riskTolerance||50)+3,0,100);
+    active.forEach(p=>{p.priority=clamp((p.priority??50)+4,0,100);p.visibleRisk=clamp((p.visibleRisk??50)+2,0,100);});
+    company.culture.riskTolerance=clamp((company.culture.riskTolerance??50)+3,0,100);
     recordHistory("CEO protected growth projects despite board concern.","project",4);
   }else if(action==="cut-burn"){
     active.forEach(p=>{p.scope=clamp((p.scope||1)*.9,.35,4);p.budgetApproved=Number(((p.budgetApproved||p.estimatedCost)*.92).toFixed(2));});
-    company.culture.innovation=clamp((company.culture.innovation||55)-2,0,100);
+    company.culture.innovation=clamp((company.culture.innovation??55)-2,0,100);
     recordHistory("CEO reduced project burn across the portfolio.","project",4);
   }
 }
@@ -451,12 +451,12 @@ function applyProjectDecision(decision){
   }else if(decision.action==="delay"){p.status="delayed";p.nextReviewDay=company.day+45;p.visibleConfidence=clamp(p.visibleConfidence-4,0,100);recordHistory(`${p.title} was delayed for more evidence.`,"project",3);}
   else if(decision.action==="reject"){p.status="rejected";p.closedDay=company.day;archiveProjectOnce(p,"rejected");employees.filter(e=>e.active&&e.projectAffinity?.[p.id]).forEach(e=>{e.morale=clamp(e.morale-3,0,100);adjustCEOOpinion(e,{support:-2,trust:-1});});recordHistory(`${p.title} was rejected during portfolio review.`,"project",4);}
   else if(decision.action==="continue"){p.nextReviewDay=company.day+30;p.status=p.status==="at risk"?"execution":p.status;recordHistory(`${p.title} continued after portfolio review.`,"project",3);}
-  else if(decision.action==="resume"){p.status=(p.progress||0)<18?"planning":(p.progress||0)<45?"prototype":"execution";p.nextReviewDay=company.day+21;p.pausedUntil=null;p.visibleRisk=clamp((p.visibleRisk||50)+3,0,100);p.performance={...(p.performance||{}),riskTrend:clamp((p.performance?.riskTrend||p.visibleRisk||50)+3,0,100)};recordHistory(`${p.title} was resumed after a portfolio restart review.`,"project",4);recordWeeklyEvent(`${p.title} resumed after being paused.`,"project",4);}
+  else if(decision.action==="resume"){p.status=(p.progress||0)<18?"planning":(p.progress||0)<45?"prototype":"execution";p.nextReviewDay=company.day+21;p.pausedUntil=null;p.visibleRisk=clamp((p.visibleRisk??50)+3,0,100);p.performance={...(p.performance||{}),riskTrend:clamp((p.performance?.riskTrend??p.visibleRisk??50)+3,0,100)};recordHistory(`${p.title} was resumed after a portfolio restart review.`,"project",4);recordWeeklyEvent(`${p.title} resumed after being paused.`,"project",4);}
   else if(decision.action==="pause"){p.status="paused";p.nextReviewDay=company.day+30;p.budgetApproved=Number((p.budgetApproved*.92).toFixed(2));recordHistory(`${p.title} was paused to protect capacity.`,"project",4);}
   else if(decision.action==="reduce"){p.scope=clamp((p.scope||1)*.72,.35,3);p.budgetApproved=Number(Math.max(p.budgetSpent||0,(p.budgetApproved||p.estimatedCost)*.82).toFixed(2));p.visibleRisk=clamp(p.visibleRisk-8,0,100);p.nextReviewDay=company.day+25;reinforceProjectLesson("scopeControl",.85,p.title,7,"positive");reinforceProjectLesson("sunkCostDiscipline",.35,p.title,4,"positive");recordHistory(`${p.title} scope was reduced with milestone gates.`,"project",4);createOrReinforceLesson({key:"project-scope-control",title:"Scope control can preserve project value while reducing execution risk.",department:p.proposingDepartment,vector:{planning:.7,documentation:.45,scopeControl:.8,sunkCostDiscipline:.35},outcome:"positive",confidence:66,evidence:p.title,importance:4});}
   else if(decision.action==="expand"){p.scope=clamp((p.scope||1)*1.28,.5,4);p.marketVisibility=p.marketVisibility==="private"?"rumored":p.marketVisibility;p.budgetApproved=Number(((p.budgetApproved||p.estimatedCost)+Math.min(2.5,p.estimatedCost*.28)).toFixed(2));p.visibleRisk=clamp(p.visibleRisk+7,0,100);p.priority=clamp((p.priority||55)+8,0,100);p.nextReviewDay=company.day+25;reinforceProjectLesson("projectSize",(p.performance?.riskTrend||0)>70?-.35:.35,p.title,5,(p.performance?.riskTrend||0)>70?"contradiction":"positive");recordHistory(`${p.title} received expanded budget and scope.`,"project",4);}
   else if(decision.action==="split"){p.scope=clamp((p.scope||1)*.62,.35,2);p.status="prototype";p.budgetApproved=Number(Math.max(p.budgetSpent||0,(p.budgetApproved||p.estimatedCost)*.72).toFixed(2));p.visibleConfidence=clamp(p.visibleConfidence+5,0,100);p.nextReviewDay=company.day+20;reinforceProjectLesson("pilotValue",.55,p.title,6,"positive");reinforceProjectLesson("estimateAccuracy",.5,p.title,6,"positive");reinforceProjectLesson("scopeControl",.45,p.title,5,"positive");recordHistory(`${p.title} was split into phased milestones.`,"project",4);createOrReinforceLesson({key:"phased-project-control",title:"Phased project gates improve estimate accuracy and cancellation timing.",department:p.proposingDepartment,vector:{planning:.8,documentation:.5,pilotValue:.55,estimateAccuracy:.5},outcome:"positive",confidence:68,evidence:p.title,importance:4});}
-  else if(decision.action==="validate"){p.status="pilot";p.customerInterest=clamp((p.customerInterest||45)+6,0,100);p.visibleConfidence=clamp((p.visibleConfidence||50)+7,0,100);p.nextReviewDay=company.day+18;reinforceProjectLesson("customerValidation",.75,p.title,7,"positive");reinforceProjectLesson("marketTiming",.45,p.title,5,"positive");recordHistory(`${p.title} shifted toward customer validation before scaling.`,"project",4);}
+  else if(decision.action==="validate"){p.status="pilot";p.customerInterest=clamp((p.customerInterest??45)+6,0,100);p.visibleConfidence=clamp((p.visibleConfidence??50)+7,0,100);p.nextReviewDay=company.day+18;reinforceProjectLesson("customerValidation",.75,p.title,7,"positive");reinforceProjectLesson("marketTiming",.45,p.title,5,"positive");recordHistory(`${p.title} shifted toward customer validation before scaling.`,"project",4);}
   else if(decision.action==="merge"){const other=company.projects.find(x=>x.id===decision.mergeWith);if(other){p.scope=clamp((p.scope||1)+(other.scope||1)*.55,.5,4);p.budgetApproved=Number(((p.budgetApproved||0)+(other.budgetApproved||0)*.65).toFixed(2));p.workItemIds=[...new Set([...(p.workItemIds||[]),...(other.workItemIds||[])])];(company.workItems||[]).filter(w=>w.projectId===other.id).forEach(w=>w.projectId=p.id);p.requiredDepartments=[...new Set([...(p.requiredDepartments||[]),...(other.requiredDepartments||[])])];p.visibleRisk=clamp((p.visibleRisk||50)+5,0,100);other.status="merged";other.closedDay=company.day;archiveProjectOnce(other,"merged");recordHistory(`${other.title} was merged into ${p.title}.`,"project",5);}}
   else if(decision.action==="cancel"){p.status="canceled";p.closedDay=company.day;archiveProjectOnce(p,"canceled");if(p.marketVisibility!=="private")addValuationShock(-1.2,`${p.title} cancellation changed outside expectations`,p.id,30);(company.workItems||[]).filter(w=>w.projectId===p.id).forEach(w=>{w.status="closed";w.closedDay=company.day;});employees.filter(e=>e.active&&e.projectAffinity?.[p.id]).forEach(e=>{e.morale=clamp(e.morale-5+(e.projectAffinity[p.id].fatigue||0)*.05,0,100);e.stress=clamp(e.stress-3,0,100);e.projectHistory.unshift({day:company.day,projectId:p.id,outcome:"canceled"});});company.delayedDecisionEffects.push({dueDay:company.day+10,type:"project-cancel",projectTitle:p.title,projectId:p.id,effect:{board:p.hiddenReality.trueStrategicValue>70?-3:1,trust:p.customerInterest>65?-2:0},people:{morale:p.hiddenReality.trueTalentRetentionValue>65?-3:0,stress:-1},message:`The organization absorbed the cancellation of ${p.title}.`});reinforceProjectLesson("cancellationTiming",p.hiddenReality.trueStrategicValue>70?-.5:.8,p.title,8,p.hiddenReality.trueStrategicValue>70?"contradiction":"positive");reinforceProjectLesson("sunkCostDiscipline",.75,p.title,7,"positive");createOrReinforceLesson({key:"project-cancellation-discipline",title:"Project cancellations must weigh sunk cost, hidden strategic value, market timing, and team identity.",department:p.proposingDepartment,vector:{planning:.65,documentation:.55,cancellationTiming:.8,sunkCostDiscipline:.75,marketTiming:.35},outcome:"mixed",confidence:68,evidence:p.title,importance:5});recordMajorHistory(`${p.title} was canceled and its work was closed or transferred.`,"project",6);}
   company.projectDecisionHistory.unshift({day:company.day,projectId:p.id,title:p.title,action:decision.action});
@@ -476,7 +476,7 @@ function maybeQueueProjectReview(){
   const p=activeProjects().find(x=>company.day>=(x.nextReviewDay||999)&&!openRequestExists("project-review",x.id));
   if(!p)return;
   p.nextReviewDay=company.day+30;
-  const risk=p.performance?.riskTrend||p.visibleRisk||50;
+  const risk=p.performance?.riskTrend??p.visibleRisk??50;
   queuePortfolioMemoOnce(makeProjectControlEvent(p,risk>75?"reduce":"review"));
 }
 function updateProjectPortfolioSystem(){
@@ -495,7 +495,7 @@ function assignWorkOwner(work){
   const current=employees.find(e=>e.active&&e.id===work.ownerId);
   if(current){if(!work.collaborators.includes(current.id))work.collaborators.push(current.id);return;}
   const candidates=employees.filter(e=>e.active&&employeeTeam(e)===work.assignedTeam);
-  const best=candidates.map(e=>({e,score:workSkillFit(e,work)*100+(e.focus||50)*.45+(e.morale||50)*.18-(e.stress||0)*.3})).sort((a,b)=>b.score-a.score)[0]?.e;
+  const best=candidates.map(e=>({e,score:workSkillFit(e,work)*100+(e.focus??50)*.45+(e.morale??50)*.18-(e.stress||0)*.3})).sort((a,b)=>b.score-a.score)[0]?.e;
   if(best){work.ownerId=best.id;if(!work.collaborators.includes(best.id))work.collaborators.push(best.id);}
 }
 function activeWorkForEmployee(e){
@@ -517,7 +517,7 @@ function activeWorkForEmployee(e){
 function workSkillFit(e,work){
   if(!work)return .5;
   const skill=e.skills||{},req=work.requiredSkills||{};
-  return Object.entries(req).reduce((s,[k,v])=>s+Math.min(1.25,(skill[k]||35)/Math.max(1,v)),0)/Math.max(1,Object.keys(req).length);
+  return Object.entries(req).reduce((s,[k,v])=>s+Math.min(1.25,(skill[k]??35)/Math.max(1,v)),0)/Math.max(1,Object.keys(req).length);
 }
 function workContext(e){
   const work=activeWorkForEmployee(e),team=employeeTeam(e),t=company.teams?.[team]||{},beliefs=e.beliefs||{},brief=e.dailyBriefing||{};
@@ -741,11 +741,11 @@ function applyCollaborationOutcome(e){
   if(!partner||!item)return;
   const fit=(workSkillFit(e,item)+workSkillFit(partner,item))/2;
   const social=clamp((socialScore(e,partner.id)+socialScore(partner,e.id))/200,0,1);
-  const gain=clamp(1.2+fit*2.8+social*1.3+(company.culture?.communication||50)/80,1,7);
+  const gain=clamp(1.2+fit*2.8+social*1.3+(company.culture?.communication??50)/80,1,7);
   const before=item.progress||0;
   item.progress=clamp((item.progress||0)+gain,0,100);
   if(item.projectId)recordProjectLedger(item.projectId,"collaboration","work-progress",item.progress-before,`${e.name} and ${partner.name} collaborated on ${item.title}`);
-  item.qualityRisk=clamp((item.qualityRisk||35)-gain*.45,0,100);
+  item.qualityRisk=clamp((item.qualityRisk??35)-gain*.45,0,100);
   e.taskProgress=(e.taskProgress||0)+gain*.012;
   partner.taskProgress=(partner.taskProgress||0)+gain*.008;
   company.integration=clamp(company.integration+gain*.035,0,100);
@@ -777,13 +777,13 @@ function applyMeetingOutcome(e){
   meeting.applied=true;
   const item=(company.workItems||[]).find(w=>w.id===meeting.workItemId&&w.status==="open");
   const team=employeeTeam(e),t=company.teams?.[team];
-  const skill=((e.skills?.communication||50)+(e.skills?.leadership||45))/2;
-  const clarity=clamp((skill-40)/60+(company.culture?.communication||50)/160,0,1.6);
-  if(t){t.cohesion=clamp((t.cohesion||55)+clarity*1.4,0,100);t.pressure=clamp((t.pressure||35)-clarity*.9,0,100);}
+  const skill=((e.skills?.communication??50)+(e.skills?.leadership??45))/2;
+  const clarity=clamp((skill-40)/60+(company.culture?.communication??50)/160,0,1.6);
+  if(t){t.cohesion=clamp((t.cohesion??55)+clarity*1.4,0,100);t.pressure=clamp((t.pressure??35)-clarity*.9,0,100);}
   company.integration=clamp(company.integration+clarity*.08,0,100);
   company.trust=clamp(company.trust+clarity*.025,0,100);
   if(item){
-    item.qualityRisk=clamp((item.qualityRisk||35)-clarity*1.2,0,100);
+    item.qualityRisk=clamp((item.qualityRisk??35)-clarity*1.2,0,100);
     if(meeting.purpose==="blocker review"&&item.blockedBy?.length&&simulationRandom()<clamp(.08+clarity*.16,0,.34)){
       const blocker=item.blockedBy.shift();
       addStoryBeat(item.storyId,`${e.name} clarified ${blocker} in a meeting.`,"unblocked");
@@ -870,7 +870,7 @@ function roleOutput(e,output){
   const onboard=onboardingProductivity(e);
   if(e.onboardingMentorUntil&&company.day<=e.onboardingMentorUntil)output*=.92;
   output*=onboard;
-  output=output*(.85+(team.cohesion||55)/360+skillBoost);
+  output=output*(.85+(team.cohesion??55)/360+skillBoost);
   e.performance.recentOutput=clamp(e.performance.recentOutput*.92+output*16,0,30);
   switch(canonicalRole(e.role)){
     case "Software QA Engineer":company.trust+=output*.025;break;
@@ -881,7 +881,7 @@ function roleOutput(e,output){
     case "Software Architect":company.quality=clamp(company.quality+output*.012,0,100);break;
     case "Electrical Engineer":company.chip=clamp(company.chip+output*.012,0,100);break;
     case "Manufacturing Engineer":company.manufacturing.readiness=clamp((company.manufacturing.readiness||0)+output*.02,0,100);break;
-    case "Product Manager":ensureCustomerMarketSystems?.();Object.values(company.customerSegments||{}).forEach(seg=>{seg.roadmapConfidence=clamp((seg.roadmapConfidence||50)+output*.035,0,100);seg.supportSatisfaction=clamp((seg.supportSatisfaction||50)+output*.015,0,100);});syncCustomerSummaryFromSegments?.();company.trust+=output*.05;break;
+    case "Product Manager":ensureCustomerMarketSystems?.();Object.values(company.customerSegments||{}).forEach(seg=>{seg.roadmapConfidence=clamp((seg.roadmapConfidence??50)+output*.035,0,100);seg.supportSatisfaction=clamp((seg.supportSatisfaction??50)+output*.015,0,100);});syncCustomerSummaryFromSegments?.();company.trust+=output*.05;break;
     case "Industrial Designer":company.trust+=output*.025;break;
     case "Finance Analyst":company.board=clamp(company.board+output*.004*(company.board<92?1:.25),0,100);applyInvestorEffect({confidence:output*.01});const efficiencyGain=output*.00012*Math.max(0.25,(company.costEfficiency-.78)/.30);company.costEfficiency=clamp(company.costEfficiency-efficiencyGain,.78,1.08);break;
     case "Manager":case "Director":case "Vice President":company.trust=clamp(company.trust+output*.012,0,100);break;
@@ -892,7 +892,7 @@ function simulateMinute(renderNow=true){
   try{return simulateMinuteCore(renderNow);}
   catch(error){recordSimulationError(error,"simulateMinute");if(renderNow&&!validationMode){renderDecisionEvent();render();}}
 }
-function simulateMinuteCore(renderNow=true){if(company.gameOver)return;company.minute+=5;if(company.minute>=1200){company.day++;company.minute=480;dailyClose();if(company.paused||company.gameOver)return;}employees.forEach(e=>{if(company.paused||company.gameOver)return;if(!e.active)return;tickCooldowns(e,5);if(e.sickDays>0){finishAction(e);e.offsite=true;e.action="out sick";e.thought="I need time to recover before returning.";return;}if(e.offsite&&company.minute<1020){finishAction(e);e.offsite=false;moveToZone(e,e.homeZone);e.actionMinutes=0;}e.actionMinutes-=5;if(e.actionMinutes<=0){finishAction(e);chooseAction(e);}const roomEffect=e.offsite?{productivity:1,stress:0,focus:0,congestion:0}:applyRoomTickEffects(e);const working=e.action==="working"||e.action==="testing hardware";if(working){e.energy-=.37;e.stress+=company.directive==="speed" ? .44 : .23;e.focus-=.09;const output=(e.focus/100)*(e.morale/100)*.075*(company.directive==="speed"?1.20:1)*(roomEffect.productivity||1);roleOutput(e,output);e.taskProgress+=output;const mistakeRisk=(company.directive==="speed"?.0032:.0011)+(e.focus<36?.004:0)+(e.stress>78?.003:0)+((100-(company.culture?.qualityDiscipline||50))*.00004)+(Math.max(0,(roomEffect.congestion||0)-1)*.0012);if(simulationRandom()<mistakeRisk)recordQualityMistake(e,e.action==="testing hardware"?"a failed verification pass":"rushed technical work",e.action==="testing hardware"?.45:.55);}else if(e.action.includes("break")){const recovery=roomEffect.room==="break-area"?clamp(1.05-Math.max(0,(roomEffect.congestion||0)-1)*.22,.65,1.12):.75;e.energy+=.45*recovery;e.stress-=.35*recovery;e.focus+=.18*recovery;}else if(e.action.includes("talking")){e.morale+=.06;e.stress-=.12;}else if(e.action.includes("collaborating")){e.morale+=.04;e.stress+=.04;applyCollaborationOutcome(e);}else if(e.action==="leading a meeting"){const penalty=Math.max(0,(roomEffect.congestion||0)-1);e.stress+=.025+penalty*.05;e.focus-=.035+penalty*.05;applyMeetingOutcome(e);}else if(e.action==="venting"){e.morale-=.08;e.stress-=.08;}if(company.directive==="people")e.morale+=.014;if(company.directive==="cuts"){e.stress+=.055;e.morale-=.035;}if(company.directive==="quality"){e.stress-=.012;company.quality+=.003;}e.energy=clamp(e.energy,0,100);e.stress=clamp(e.stress,0,100);e.morale=clamp(e.morale,0,100);e.focus=clamp(e.focus,0,100);});observeRoomFamiliarity?.(5);if(company.paused||company.gameOver)return;clampCompany();maybePhaseAdvance();if(company.eventCooldown>0)company.eventCooldown--;const periodic=company.minute%30===0;if(periodic)maybeCreateDecisionEvent();if(company.minute%60===0)maybeEmergentEvent();if(periodic||company.cash<=0||company.board<20)evaluateFailure();if(renderNow&&!validationMode){renderDecisionEvent();render();}}
+function simulateMinuteCore(renderNow=true){if(company.gameOver)return;company.minute+=5;if(company.minute>=OFFICE_AQUARIUM_CONSTANTS.time.workdayEndMinute){company.day++;company.minute=OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute;dailyClose();if(company.paused||company.gameOver)return;}employees.forEach(e=>{if(company.paused||company.gameOver)return;if(!e.active)return;tickCooldowns(e,5);if(e.sickDays>0){finishAction(e);e.offsite=true;e.action="out sick";e.thought="I need time to recover before returning.";return;}if(e.offsite&&company.minute<OFFICE_AQUARIUM_CONSTANTS.time.offsiteReturnCutoffMinute){finishAction(e);e.offsite=false;moveToZone(e,e.homeZone);e.actionMinutes=0;}e.actionMinutes-=5;if(e.actionMinutes<=0){finishAction(e);chooseAction(e);}const roomEffect=e.offsite?{productivity:1,stress:0,focus:0,congestion:0}:applyRoomTickEffects(e);const working=e.action==="working"||e.action==="testing hardware";if(working){e.energy-=.37;e.stress+=company.directive==="speed" ? .44 : .23;e.focus-=.09;const output=(e.focus/100)*(e.morale/100)*.075*(company.directive==="speed"?1.20:1)*(roomEffect.productivity||1);roleOutput(e,output);e.taskProgress+=output;const mistakeRisk=(company.directive==="speed"?.0032:.0011)+(e.focus<36?.004:0)+(e.stress>78?.003:0)+((100-(company.culture?.qualityDiscipline??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore))*.00004)+(Math.max(0,(roomEffect.congestion||0)-1)*.0012);if(simulationRandom()<mistakeRisk)recordQualityMistake(e,e.action==="testing hardware"?"a failed verification pass":"rushed technical work",e.action==="testing hardware"?.45:.55);}else if(e.action.includes("break")){const recovery=roomEffect.room==="break-area"?clamp(1.05-Math.max(0,(roomEffect.congestion||0)-1)*.22,.65,1.12):.75;e.energy+=.45*recovery;e.stress-=.35*recovery;e.focus+=.18*recovery;}else if(e.action.includes("talking")){e.morale+=.06;e.stress-=.12;}else if(e.action.includes("collaborating")){e.morale+=.04;e.stress+=.04;applyCollaborationOutcome(e);}else if(e.action==="leading a meeting"){const penalty=Math.max(0,(roomEffect.congestion||0)-1);e.stress+=.025+penalty*.05;e.focus-=.035+penalty*.05;applyMeetingOutcome(e);}else if(e.action==="venting"){e.morale-=.08;e.stress-=.08;}if(company.directive==="people")e.morale+=.014;if(company.directive==="cuts"){e.stress+=.055;e.morale-=.035;}if(company.directive==="quality"){e.stress-=.012;company.quality+=.003;}e.energy=clamp(e.energy,0,100);e.stress=clamp(e.stress,0,100);e.morale=clamp(e.morale,0,100);e.focus=clamp(e.focus,0,100);});observeRoomFamiliarity?.(5);if(company.paused||company.gameOver)return;clampCompany();maybePhaseAdvance();if(company.eventCooldown>0)company.eventCooldown--;const periodic=company.minute%30===0;if(periodic)maybeCreateDecisionEvent();if(company.minute%60===0)maybeEmergentEvent();if(periodic||company.cash<=0||company.board<20)evaluateFailure();if(renderNow&&!validationMode){renderDecisionEvent();render();}}
 function clampCompany(){["chip","software","quality","integration","board","trust"].forEach(k=>company[k]=clamp(company[k],0,100));company.customers=Math.max(0,company.customers);company.valuation=Math.max(0,company.valuation);}
 function maybePhaseAdvance(){let next=company.phase;if(company.phase==="prototype"&&company.chip>=45&&company.software>=45)next="integration";if(company.phase==="integration"&&company.integration>=48&&company.quality>=50)next="customer trial";if(next!==company.phase){company.phase=next;company.log.push(`Product phase advanced to ${next}.`);recordWeeklyEvent(`Product phase advanced to ${next}.`,"product",4);}}
 

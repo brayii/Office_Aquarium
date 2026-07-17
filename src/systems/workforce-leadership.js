@@ -880,7 +880,7 @@ function performanceManagementRisk(e){
 }
 function archiveWorkforceNotice(subject,message,recs=[],impacts=[]){
   const comm={type:"HR Notification",priority:"Information",from:"People Operations",role:"HR",date:`Day ${company.day+1}`,subject,message,recs:recs.length?recs:[["People","Handled operationally",74]],impacts:impacts.length?impacts:["No CEO approval was required"],signature:"Regards,\nPeople Operations\nHR"};
-  archiveCommunication({id:`hr-${company.day}-${company.terminationNotifications?.length||0}`},{title:"Information noted",detail:"Operational workforce action recorded.",strategy:"people",uncertainty:"Low",estimatedConfidence:72},comm);
+  queueInformationalCommunication(comm,{id:`hr-${company.day}-${company.terminationNotifications?.length||0}`,category:"people",title:subject,copy:message});
 }
 function operationalTerminate(e,reason="failed PIP"){
   if(!e.active)return;

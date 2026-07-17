@@ -57,6 +57,30 @@ function checkMissingHtmlScripts() {
   return scripts.length;
 }
 
+function checkSharedConstants() {
+  const html = read("Office_Aquarium.html");
+  const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
+  const constantsIndex = scripts.indexOf("src/core/constants.js");
+  const startupIndex = scripts.indexOf("src/core/state-startup.js");
+  if (constantsIndex < 0) throw new Error("Shared constants script is not loaded by Office_Aquarium.html");
+  if (startupIndex < 0) throw new Error("State startup script is not loaded by Office_Aquarium.html");
+  if (constantsIndex > startupIndex) throw new Error("Shared constants must load before state-startup.js");
+  const constants = read(path.join("src", "core", "constants.js"));
+  const required = [
+    [/Codex\/reviewer rule/, "reviewer instruction"],
+    [/saveVersion\s*:\s*38/, "save version constant"],
+    [/workdayStartMinute\s*:\s*480/, "workday start constant"],
+    [/workdayEndMinute\s*:\s*1200/, "workday end constant"],
+    [/neutralScore\s*:\s*50/, "neutral score constant"],
+    [/projectStatus\s*:/, "project status constants"],
+    [/messageStatus\s*:/, "message status constants"],
+    [/hiringStatus\s*:/, "hiring status constants"]
+  ];
+  const missing = required.filter(([pattern]) => !pattern.test(constants)).map(([, label]) => label);
+  if (missing.length) throw new Error(`Shared constants missing required item(s): ${missing.join(", ")}`);
+  return required.length;
+}
+
 function checkDuplicateTopLevelDeclarations(files) {
   const seen = new Map();
   const duplicates = [];
@@ -188,10 +212,11 @@ const jsFiles = collectJsFiles("src").concat(collectJsFiles("tests"));
 const syntaxFiles = checkJavaScriptSyntax(jsFiles);
 const functions = checkDuplicateFunctions();
 const htmlScripts = checkMissingHtmlScripts();
+const sharedConstants = checkSharedConstants();
 const topLevelDeclarations = checkDuplicateTopLevelDeclarations(collectJsFiles("src"));
 const forbiddenChecks = checkForbiddenPatterns(collectJsFiles("src"));
 const randomAndTimers = checkRandomAndTimers(collectJsFiles("src"));
 const causalLearningGuards = checkCausalLearningIntegrity();
 const validationIsolationGuards = checkValidationIsolationGuards(collectJsFiles("src"));
 const publicReleaseUiGuards = checkPublicReleaseUi();
-console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards, validationIsolationGuards, publicReleaseUiGuards }, null, 2));
+console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, sharedConstants, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards, validationIsolationGuards, publicReleaseUiGuards }, null, 2));

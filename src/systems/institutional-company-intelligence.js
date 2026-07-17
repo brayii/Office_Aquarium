@@ -1163,11 +1163,11 @@ function updateInformationalSenderCredibility(msg,comm){
 function archiveInformationalEscalation(msg){
   const comm=communicationForEscalatedMessage(msg,"executive-info");
   reviewSuppressionAccountability(msg);
-  archiveCommunication({id:`info-${msg.id}`},{title:"Information reviewed",detail:"No CEO decision was required."},comm);
-  msg.status="executive-info";
+  queueInformationalCommunication(comm,{id:`info-${msg.id}`,category:"internal",sourceMessageId:msg.id,storyId:msg.storyId,title:msg.subject,copy:comm.message});
+  msg.status="queued-executive-info";
   updateInformationalSenderCredibility(msg,comm);
   updateCommunicationLearning(employees.find(e=>e.id===msg.fromId),"report","executive-info",msg);
-  recordHistory(`Executive memo noted: ${msg.subject}.`,"communication",2);
+  recordHistory(`Executive information queued: ${msg.subject}.`,"communication",2);
 }
 function repairQueuedEscalationState(){
   const queued=new Set((company.escalationQueue||[]).map(ev=>ev.sourceMessageId).filter(Boolean));
