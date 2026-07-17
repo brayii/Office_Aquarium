@@ -1087,15 +1087,15 @@ function communicationForEscalatedMessage(msg,route){
   const sender={name:manager.name,role:manager.role};
   const issue=messageIssue(msg),work=messageWorkItem(msg),evidence=[...(msg.evidence||[])];
   if(issue?.evidence)evidence.push(...issue.evidence);
-  if(work)evidence.push(`${work.title}: ${workStatusLabel(work)}, risk ${Math.round(work.qualityRisk||0)}`);
+  if(work)evidence.push(`${work.title}: ${workStatusLabel(work)} with ${qualitativeBand(work.qualityRisk||0,{low:35,high:70,lowText:"contained",midText:"visible",highText:"high"})} quality risk`);
   const chain=(company.storyChains||[]).find(c=>c.id===msg.storyId);
   if(chain?.beats?.length)evidence.push(`Story so far: ${chain.beats.slice(-3).map(b=>b.text).join(" -> ")}`);
   const score=Math.round(escalationScoreForMessage(msg));
   const review=msg.managerReview||{};
-  const routeText=route==="ceo-decision"?"The issue now needs CEO judgment.":"The issue has been logged for executive awareness.";
+  const routeText=route==="ceo-decision"?"The remaining options affect policy, budget, staffing, or company commitments, so the issue now needs CEO judgment.":"No CEO action is required right now; the issue has been logged for executive awareness.";
   const reviewText=review.action?`Manager review noted ${review.reason}. `:"";
   const message=`${directException?origin.name+" used a protected direct channel.":origin.name+" first raised this with "+sender.name+" before executive routing."} ${reviewText}${msg.managerInterpretation?`${msg.managerInterpretation} `:""}${routeText}`;
-  return {type:route==="ceo-decision"?"Escalated Decision Memo":"Executive Information Memo",priority:route==="ceo-decision"?"Decision Needed":"FYI",sender,subject:msg.subject,message,originEmployeeIds:[origin.id].filter(x=>x!==undefined),chainOfCommand:[`${origin.name} created the original ${String(msg.type||"report").replace(/-/g," ")}.`,directException?"Protected channel allowed direct CEO visibility.":`${sender.name}, ${sender.role}, reviewed and reframed the concern.`,route==="ceo-decision"?"The issue crossed the CEO decision threshold.":"The issue was archived as executive information."],recs:departmentRecommendationSet(msg),impacts:evidence.slice(0,5),signature:`Regards,
+  return {type:route==="ceo-decision"?"Escalated Decision Memo":"Executive Information Memo",priority:route==="ceo-decision"?"Decision Needed":"FYI",sender,subject:msg.subject,message,originEmployeeIds:[origin.id].filter(x=>x!==undefined),chainOfCommand:[`${origin.name} created the original ${String(msg.type||"report").replace(/-/g," ")}.`,directException?"Protected channel allowed direct CEO visibility.":`${sender.name}, ${sender.role}, reviewed and reframed the concern.`,route==="ceo-decision"?"The remaining options require CEO authority.":"The issue was archived as executive information."],recs:departmentRecommendationSet(msg),impacts:evidence.slice(0,5),signature:`Regards,
 ${sender.name}
 ${sender.role}`};
 }

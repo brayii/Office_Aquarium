@@ -94,6 +94,69 @@ async function main() {
     });
     assert(!/day\(s\)/i.test(timing.summary), "Project timing should use natural day wording");
 
+    company.finance.runwayDays = 52;
+    company.recruitingPipeline = [{
+      id: "clarity-freeze-role",
+      role: "Firmware Engineer",
+      department: "software",
+      status: "searching",
+      stage: "searching",
+      day: company.day - 12,
+      searchStartedDay: company.day - 12,
+      dueDay: company.day + 4,
+      attempts: 2,
+      market: "tight",
+      expectedFillDays: 28
+    }];
+    const policyEvent = makeHiringPolicyReviewEvent("release clarity test");
+    const policyComm = eventCommunication(policyEvent);
+    const policyText = `${policyComm.message} ${(policyEvent.choices || []).map(c => renderDecisionChoiceHtml(c, policyEvent).replace(/<[^>]+>/g, " ")).join(" ")}`;
+    assert(/set the hiring rule/i.test(policyText), "Hiring policy memo should explain it is setting policy");
+    assert(/not approve a specific candidate/i.test(policyText), "Hiring policy memo should not sound like candidate approval");
+    assert(/Freeze new headcount/i.test(policyText), "Hiring policy choices should use headcount wording");
+    assert(!/Approve the .* hire/i.test(policyText), `Hiring policy memo should not use role approval wording: ${policyText}`);
+
+    const freezeItem = company.recruitingPipeline[0];
+    queueHiringExceptionEvent(freezeItem, "freeze", null);
+    const freezeEvent = company.escalationQueue.find(ev => ev.id && String(ev.id).includes("hiring-exception-clarity-freeze-role"));
+    const freezeComm = eventCommunication(freezeEvent);
+    const freezeText = `${freezeComm.message} ${(freezeEvent.choices || []).map(c => renderDecisionChoiceHtml(c, freezeEvent).replace(/<[^>]+>/g, " ")).join(" ")}`;
+    assert(/not a candidate approval/i.test(freezeText), "Hiring freeze exception should say it is not candidate approval");
+    assert(/Continue the Firmware Engineer search/i.test(freezeText), "Freeze exception should offer a role-specific continue-search choice");
+    assert(/Use temporary contractor coverage/i.test(freezeText), "Freeze exception should offer contractor coverage");
+    assert(/Close the Firmware Engineer search/i.test(freezeText), "Freeze exception should offer closing the role");
+    assert(!/Increase salary band/i.test(freezeText), `Freeze exception should not show failed-search salary wording: ${freezeText}`);
+
+    const staleExecutivePhrases = /Requested action:|Executive attention:|decision threshold|Order portfolio triage|Protect growth bets|Cut project burn|Hold roadmap line|Approve recommended layoffs|Reject layoffs for now|Continue unchanged|Pause and reduce risk/i;
+
+    const proposal = makeProject({ family: "firmware", originType: "department", status: "proposal", scope: 1 });
+    const proposalEvent = makeProjectProposalEvent(proposal);
+    const proposalText = `${proposalEvent.generatedCommunication.message} ${(proposalEvent.choices || []).map(c => c.title).join(" ")}`;
+    assert(/asking whether .* should enter the active portfolio/i.test(proposalText), `Project proposal should explain the decision naturally: ${proposalText}`);
+    assert(!staleExecutivePhrases.test(proposalText), `Project proposal should avoid stale strategy-engine wording: ${proposalText}`);
+
+    const projectControlEvent = makeProjectControlEvent({
+      ...proposal,
+      status: "active",
+      progress: 48,
+      budgetSpent: 0.42,
+      budgetApproved: 1.4,
+      performance: { staffingCoverage: 62, riskTrend: 78, budgetVariance: 12 }
+    }, "review");
+    const projectControlText = `${projectControlEvent.generatedCommunication.message} ${(projectControlEvent.choices || []).map(c => c.title).join(" ")}`;
+    assert(/asking for direction/i.test(projectControlText), `Project control memo should explain the executive request: ${projectControlText}`);
+    assert(!staleExecutivePhrases.test(projectControlText), `Project control memo should avoid stale strategy-engine wording: ${projectControlText}`);
+
+    const customerEvent = makeCustomerStrategicMemo();
+    const customerText = `${customerEvent.generatedCommunication.message} ${(customerEvent.choices || []).map(c => c.title).join(" ")}`;
+    assert(/asking for direction/i.test(customerText), `Customer memo should explain why CEO direction is needed: ${customerText}`);
+    assert(!/Hold roadmap line|sentiment \d+,\s*churn risk \d+/i.test(customerText), `Customer memo should avoid terse score wording: ${customerText}`);
+
+    const backgroundEvent = makeBackgroundExecutiveEvent({ id: "clarity-background", department: "operations", title: "Supplier quote changed", description: "A supplier changed pricing assumptions on a useful component.", severity: 83, recoveryPaths: ["Negotiate a smaller order", "Accept a short delay"] });
+    const backgroundText = `${backgroundEvent.title} ${backgroundEvent.generatedCommunication.message}`;
+    assert(/needs executive direction/i.test(backgroundText), `Background memo should use a clear subject: ${backgroundText}`);
+    assert(!staleExecutivePhrases.test(backgroundText), `Background memo should avoid engine wording: ${backgroundText}`);
+
     validationMode = false;
     return { ok: failures.length === 0, failures, bannerText, internalReportText, timing: timing.summary };
   });

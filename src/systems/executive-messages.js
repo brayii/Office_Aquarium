@@ -476,22 +476,25 @@ function displayChoiceTitle(choice,ev={}){
   const lower=raw.toLowerCase();
   const p=decisionProjectSubject(ev,choice);
   const project=shortProjectName(p);
-  if(choice.hireRole)return `Approve a ${choice.hireRole}`;
+  if(choice.hireRole)return `Approve a ${choice.hireRole} position`;
   if(choice.hire||choice.hiringException){
-    const role=choice.role||ev.hiringRequest?.role||ev.hiringException?.role||"new role";
-    return `Approve the ${role} hire`;
+    const role=choice.role||ev.hiringRequest?.role||ev.hiringException?.role||hiringExceptionRole(choice)||"new role";
+    if(choice.hiringException?.action==="continue-search")return `Continue the ${role} search`;
+    if(choice.hiringException?.action==="contractor")return `Use temporary contractor coverage`;
+    if(choice.hiringException?.action==="cancel-role")return `Close the ${role} search`;
+    return `Approve the ${role} exception`;
   }
   if(choice.deferHiring){
     const role=choice.deferHiring.role||ev.hiringRequest?.role||"role";
-    return `Delay the ${role} hire`;
+    return `Delay the ${role} position`;
   }
   if(choice.rejectHiring){
     const role=choice.rejectHiring.role||ev.hiringRequest?.role||"role";
     return `Decline the ${role} request`;
   }
-  if(choice.hiringPolicy?.mode==="frozen")return "Freeze new hiring";
-  if(choice.hiringPolicy?.mode==="critical-only")return "Limit hiring to critical roles";
-  if(choice.hiringPolicy?.mode==="normal")return "Continue approved hiring";
+  if(choice.hiringPolicy?.mode==="frozen")return "Freeze new headcount";
+  if(choice.hiringPolicy?.mode==="critical-only")return "Allow only critical roles";
+  if(choice.hiringPolicy?.mode==="normal")return "Keep normal hiring review";
   if(choice.projectDecision){
     const action=choice.projectDecision.action;
     if(action==="continue")return `Stay on the ${project} plan`;
@@ -579,20 +582,26 @@ function institutionalLearningLine(model){
 function allPortfolioSubjects(){
   return [...(company.projects||[]),...(company.projectProposals||[]),...(company.projectArchive||[])];
 }
+function hiringExceptionRole(choice={}){
+  const id=choice.hiringException?.id||choice.id;
+  if(!id)return null;
+  return (company.recruitingPipeline||[]).find(r=>r.id===id)?.role||null;
+}
 function projectFromWorkSubject(work){
   if(!work?.projectId)return null;
   return allPortfolioSubjects().find(p=>p.id===work.projectId)||null;
 }
 function hiringDecisionRole(ev,choice={}){
-  return choice.hire?.role||choice.hireRole||choice.hiringException?.role||choice.deferHiring?.role||choice.rejectHiring?.role||ev.hiringRequest?.role||ev.hireRole||ev.deferHiring?.role||ev.rejectHiring?.role||null;
+  return choice.hire?.role||choice.hireRole||choice.hiringException?.role||hiringExceptionRole(choice)||choice.deferHiring?.role||choice.rejectHiring?.role||ev.hiringRequest?.role||ev.hireRole||ev.deferHiring?.role||ev.rejectHiring?.role||null;
 }
 function decisionContextSubject(ev,choice={}){
   const work=decisionWorkSubject(ev);
   const project=decisionProjectSubject(ev,choice)||projectFromWorkSubject(work);
   if(project)return {kind:"project",label:"Project",name:project.title||project.codename||project.id,id:project.id,detail:work?.title?`Related work: ${work.title}`:project.status?`Status: ${project.status}`:""};
   if(work)return {kind:"work",label:"Work item",name:work.title||work.id,id:work.id,detail:work.assignedTeam?`Team: ${teamDisplayName(work.assignedTeam)}`:""};
+  if(ev.hiringPolicyReview||choice.hiringPolicy)return {kind:"hiring-policy",label:"Hiring policy",name:hiringPolicyLabel?.()||"Current policy",id:ev.id||null,detail:"Company-wide hiring rule"};
   const role=hiringDecisionRole(ev,choice);
-  if(role)return {kind:"hiring",label:"Hiring request",name:role,id:ev.hiringRequest?.id||null,detail:ev.hiringRequest?.team?`Team: ${teamDisplayName(ev.hiringRequest.team)}`:""};
+  if(role)return {kind:"hiring",label:"Hiring request",name:role,id:ev.hiringRequest?.id||null,detail:ev.hiringRequest?.department?`Team: ${teamDisplayName(ev.hiringRequest.department)}`:ev.hiringRequest?.team?`Team: ${teamDisplayName(ev.hiringRequest.team)}`:""};
   if(ev.customerSegmentId)return {kind:"customer",label:"Customer segment",name:CUSTOMER_SEGMENT_DEFS[ev.customerSegmentId]?.label||ev.customerSegmentId,id:ev.customerSegmentId,detail:"Customer-facing decision"};
   const department=ev.memoIntelligence?.department||eventCategory(ev);
   if(department)return {kind:"department",label:"Department",name:teamDisplayName(department),id:department,detail:"Company-level operating decision"};
@@ -642,7 +651,13 @@ function formatMemoTime(minute){
   return `${display}:${mm} ${period}`;
 }
 function optionReasonText(choice,ev){
-  if(choice.hire||choice.hiringException)return "Approve the role if the capacity problem is more expensive than the added payroll.";
+  if(choice.hiringPolicy?.mode==="frozen")return "Use this when cash discipline matters more than adding ordinary capacity. Critical exceptions can still come back to the CEO.";
+  if(choice.hiringPolicy?.mode==="critical-only")return "Use this when the company still needs essential hires, but optional growth roles should wait.";
+  if(choice.hiringPolicy?.mode==="normal")return "Use this when staffing pressure is real enough that departments should keep bringing evidence-based headcount requests.";
+  if(choice.hiringException?.action==="continue-search")return "Use this when the specific role is important enough to keep recruiting despite the current cash warning.";
+  if(choice.hiringException?.action==="contractor")return "Use this when the team needs relief now but the permanent role should remain an HR search.";
+  if(choice.hiringException?.action==="cancel-role")return "Use this when protecting runway is more important than filling this open role right now.";
+  if(choice.hire||choice.hiringException)return "Approve the position or exception if the capacity problem is more expensive than the added payroll.";
   if(choice.deferHiring)return "Wait if the department can manage the pressure through prioritization, temporary coverage, or reduced scope.";
   if(choice.rejectHiring)return "Decline the request if the company needs the department to shrink the work rather than expand the team.";
   if(choice.hiringPolicy)return "Use this when staffing decisions need a company-wide rule instead of case-by-case exceptions.";
@@ -659,22 +674,29 @@ function optionReasonText(choice,ev){
 }
 function expectedEffectsHtml(choice,ev){
   const p=decisionProjectSubject(ev,choice),project=p?.title||p?.codename||"the affected project";
-  const role=ev.hiringRequest?.role||choice.hireRole||choice.deferHiring?.role||choice.rejectHiring?.role||"the affected role";
+  const role=ev.hiringRequest?.role||choice.hireRole||choice.hiringException?.role||hiringExceptionRole(choice)||choice.deferHiring?.role||choice.rejectHiring?.role||"the affected role";
   const seg=ev.customerSegmentId?CUSTOMER_SEGMENT_DEFS[ev.customerSegmentId]?.label||"the affected customer segment":"the affected customers";
   let immediate=`The responsible team begins the approved action and reports progress through the normal chain of command.`;
   let next=`The decision changes workload, cost, or risk in the area named in this memo.`;
   let long=`Follow-up reviews will compare the actual result against the evidence available today.`;
-  if(choice.hire||choice.hiringException){immediate="HR opens or adjusts the recruiting path.";next="Recruiting, interviews, and onboarding change capacity slowly.";long="Payroll, retention, and project delivery reveal whether the hire was worth it.";}
+  if(choice.hiringPolicy){immediate="People and Finance update the company-wide hiring rule.";next="New requests are either allowed, restricted, or suppressed according to the policy.";long="Retention, board confidence, runway, and project delivery show whether the policy was sustainable.";}
+  else if(choice.hire){immediate="HR opens the approved position.";next="Recruiting, interviews, and onboarding change capacity slowly.";long="Payroll, retention, and project delivery reveal whether the hire was worth it.";}
+  else if(choice.hiringException){immediate="HR updates this open role according to your decision.";next="The affected team either keeps waiting for a hire, gets temporary coverage, or reprioritizes without the role.";long="Payroll, workload, and delivery show whether the exception was handled well.";}
   else if(choice.deferHiring||choice.rejectHiring){immediate=`People and Finance record your decision on ${role}.`;next=`The department continues with its current capacity while backlog and stress reveal the cost of waiting.`;long=`Future reviews will show whether avoiding payroll was worth the execution pressure.`;}
   else if(choice.projectDecision){immediate=`Portfolio Council updates ${project}'s direction.`;next=`Staffing, blockers, quality, and schedule begin moving around the new ${project} plan.`;long=`${project}'s health and commercial value reveal whether the decision fit the opportunity.`;}
   else if(choice.customerStrategy){immediate=`Customer Success and Product act on the ${seg} plan.`;next=`Support load, renewals, sentiment, and revenue begin responding in ${seg}.`;long=`${seg} either becomes more durable or exposes the cost of the decision.`;}
   else if(choice.commercializeProject){immediate=`Product and Customer Success set the commercial path for ${project}.`;next=`Customers, support load, and revenue begin responding to the chosen exposure level.`;long=`The market will show whether ${project} was launched, piloted, or held at the right time.`;}
-  else if(choice.hiringPolicy){immediate="Hiring rules change across the company.";next="Suppressed or approved needs change workload and recruiting.";long="Retention, board confidence, and execution show whether the policy was sustainable.";}
   else if(choice.fundraising){immediate="Investor relations and cash planning change.";next="Runway improves or ownership and expectations become more demanding.";long="Valuation quality and board confidence test the capital decision.";}
   return `<small><b>Expected effects:</b><br>Immediate: ${immediate}<br>Next few weeks: ${next}<br>Long term: ${long}</small>`;
 }
 function optionBenefitSentence(choice,ev){
   const p=decisionProjectSubject(ev,choice),text=String(`${choice.title} ${choice.detail} ${(choice.benefits||[]).join(" ")}`).toLowerCase();
+  if(choice.hiringPolicy?.mode==="frozen")return `The company slows payroll growth while still preserving a path for critical exceptions.`;
+  if(choice.hiringPolicy?.mode==="critical-only")return `The company protects essential capacity without approving every growth request.`;
+  if(choice.hiringPolicy?.mode==="normal")return `Departments can keep escalating real staffing needs while HR handles candidates without CEO micromanagement.`;
+  if(choice.hiringException?.action==="continue-search")return `The affected team keeps a path to permanent capacity without asking the CEO to review candidates.`;
+  if(choice.hiringException?.action==="contractor")return `The team gets temporary relief while HR keeps the permanent search alive.`;
+  if(choice.hiringException?.action==="cancel-role")return `The company avoids a new payroll commitment and forces the department to narrow work around current capacity.`;
   if(choice.hire||choice.hiringException)return `The company can add capacity without turning the CEO into the hiring manager.`;
   if(choice.deferHiring)return `The company preserves runway and gives managers time to prove whether the need can be handled through prioritization or internal coverage.`;
   if(choice.rejectHiring)return `The company avoids adding payroll and forces the department to narrow its commitments around the capacity it already has.`;
@@ -689,6 +711,12 @@ function optionBenefitSentence(choice,ev){
 }
 function optionRiskSentence(choice,ev){
   const text=String(`${choice.title} ${choice.detail} ${(choice.risks||[]).join(" ")}`).toLowerCase();
+  if(choice.hiringPolicy?.mode==="frozen")return `The staffing need does not disappear; it may return as project delay, burnout, or quality risk.`;
+  if(choice.hiringPolicy?.mode==="critical-only")return `Managers may disagree about what is truly critical, and some useful growth work may slow down.`;
+  if(choice.hiringPolicy?.mode==="normal")return `Payroll can grow faster than runway if too many approved roles fill before revenue catches up.`;
+  if(choice.hiringException?.action==="continue-search")return `If HR fills the role, payroll rises while runway is already under pressure.`;
+  if(choice.hiringException?.action==="contractor")return `Contractors cost cash quickly and may not solve the long-term capability gap.`;
+  if(choice.hiringException?.action==="cancel-role")return `The workload remains inside the department and may show up later as missed milestones or resignations.`;
   if(choice.hire||choice.hiringException)return `The cost becomes permanent only after HR fills the role, and a weak hire could add payroll without solving the capacity problem.`;
   if(choice.deferHiring)return `If the department is already stretched, waiting may turn today's backlog into missed milestones or retention pressure.`;
   if(choice.rejectHiring)return `The work does not disappear. It is likely to show up later as project delay, lower quality, or frustration inside the affected department.`;
@@ -1700,7 +1728,7 @@ function processDecisionThreads(){
       thread.audit.operational=true;thread.phase=2;thread.state="In Progress";
       const effect=thread.projectId?"the related project is being watched":thread.workItemId?"the related work item is being tracked":"department behavior began shifting";
       if(thread.strategy==="people")employees.filter(e=>e.active&&employeeTeam(e)===thread.department).forEach(e=>e.stress=clamp(e.stress-1,0,100));
-      recordThreadFollowUp(thread,"operational",`Operational follow-through on "${thread.decision}" is underway; ${effect}.`);
+      recordThreadFollowUp(thread,"operational",`The team has started carrying out "${thread.decision}"; ${effect}.`);
     }
     if(!thread.audit.major&&company.day>=thread.phaseDueDays.major){
       thread.audit.major=true;thread.phase=3;thread.state=thread.expectedTone==="negative"?"Unexpected Development":"Resolved";
