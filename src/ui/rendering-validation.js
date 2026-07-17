@@ -286,9 +286,11 @@ function developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo){
   const capabilityDebug=`Company Capability Needs<br>${capabilityRows||"No capability model available."}<br><br>Missing Capabilities ${(company.capabilityGaps||[]).map(g=>`${g.label} ${g.gap}`).join(", ")||"none"}<br>Consequences Active ${Object.keys(company.capabilityConsequences||{}).join(", ")||"none"}<br>Promotion Candidates ${(company.capabilityPromotionCandidates||[]).map(c=>`${c.name} -> ${c.targetRole} (${Math.round(c.readiness)})`).join(", ")||"none"}<br>Project Requirement Re-Audit Result ${company.lastProjectRequirementAuditDay??"not run"}<br>Kept/Removed/Revised Reason ${JSON.stringify(company.capabilityAudit||{}).slice(0,700)}`;
   const roleDef=roleDefinition(e.role),roomEffect=e.roomEffect||roomEffectFor(e,e.lastAction||"work",e.currentRoom||rolePrimaryRoom(e.role)),caps=roleProjectCapabilities(e.role);
   const roleRoomDebug=`Role Definition ${canonicalRole(e.role)}<br>Department ${roleDepartment(e.role)}<br>Primary Room ${rolePrimaryRoom(e.role)}<br>Secondary Rooms ${roleSecondaryRooms(e.role).join(", ")||"none"}<br>Current Room ${e.currentRoom||roomForZone(e.zone)||"offsite"}<br>Room Selection Reason ${e.roomSelectionReason||"No room decision yet"}<br>Current Activity ${e.lastAction||e.action||"none"}<br>Room Capacity ${roomEffect?.capacity??"n/a"}; occupancy ${roomEffect?.occupancy??"n/a"}; congestion ${Number(roomEffect?.congestion||0).toFixed(2)}<br>Room Effect productivity ${Number(roomEffect?.productivity||1).toFixed(2)}, focus cost ${Number(roomEffect?.focus||0).toFixed(2)}, stress ${Number(roomEffect?.stress||0).toFixed(2)}<br>Project Capability ${Object.entries(caps).map(([k,v])=>`${k} ${Math.round(v*100)}%`).join(", ")||"none"}<br>Hiring Need Source ${company.hiringNeedHistory?.[roleDepartment(e.role)]?.factors?.[0]?.label||"none"}<br>Institutional Lesson Used ${Object.entries(e.learnedLessons||{}).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))[0]?.[0]||"none"}<br>Allowed Activities ${(roleDef?.allowedActivities||[]).join(", ")}`;
+  const personalityDebug=employeePersonalityDebugHtml(e);
   return `<div class="debug-panel"><h3>AI Debug</h3>
     <details class="debug-section"><summary>Employee AI</summary><div class="debug-section-content"><strong>Utility Scores</strong><br><code>${scoreLines||"No scores yet"}</code><br><br><strong>Cooldowns</strong><br>${cooldowns}<br><br><strong>Memory Bias</strong><br>${strongestMemory?`${strongestMemory.type}: ${Math.round(strongestMemory.strength)}`:"None"}<br><br><strong>Collaborator Candidate</strong><br>${availableCollaborator(e)?.name||"None"}<br><br><strong>Repetition</strong><br>${e.lastAction||"None"} x ${e.repeatCount||0}<br><br><strong>Duration</strong><br>${Math.round(e.actionMinutes||0)} minutes<br><br><strong>CEO Opinion</strong><br>Trust ${Math.round(ceo.trust||0)}, Fairness ${Math.round(ceo.fairness||0)}, Competence ${Math.round(ceo.competence||0)}, Support ${Math.round(ceo.support||0)}, Fear ${Math.round(ceo.fear||0)}</div></details>
     <details class="debug-section"><summary>Roles and Rooms</summary><div class="debug-section-content">${roleRoomDebug}</div></details>
+    <details class="debug-section"><summary>Personality and Emotional Reactions</summary><div class="debug-section-content">${personalityDebug}</div></details>
     <details class="debug-section"><summary>Policy Transition</summary><div class="debug-section-content">${policyDebug}</div></details>
     <details class="debug-section"><summary>Company Capabilities</summary><div class="debug-section-content">${capabilityDebug}</div></details>
     <details class="debug-section"><summary>Institutional Learning</summary><div class="debug-section-content">${learning}</div></details>
@@ -303,11 +305,21 @@ function developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo){
     <details class="debug-section"><summary>Executive Intelligence Snapshot</summary><div class="debug-section-content">Risks ${(snapshot.topRisks||[]).length}; opportunities ${(snapshot.topOpportunities||[]).length}; department beliefs ${(snapshot.departmentBeliefs||[]).length}; strategic signals ${(snapshot.strategicSignals||[]).length}.</div></details>
   </div>`;
 }
+function employeePersonalityDebugHtml(e){
+  ensureEmployeePersonality?.(e);
+  const dimensions=Object.entries(e.personality||{}).map(([k,v])=>`${k}: ${Number(v).toFixed(3)}`).join("<br>");
+  const drivers=Object.entries(e.emotionalState||{}).map(([k,v])=>`${k}: ${Math.round(Number(v)||0)}`).join("<br>");
+  const cooldowns=Object.entries(e.emotionalCooldowns||{}).map(([k,v])=>`${k}: ${v}`).join("<br>")||"None";
+  const totals=e.emotionalDailyTotals||{},limits=e.emotionalLimits||{},last=e.lastEmotionalReaction||{};
+  const events=(e.recentEmotionalEvents||[]).slice(0,6).map(ev=>`Day ${ev.day}: ${ev.reasonCode} morale ${Number(ev.moraleDelta||0).toFixed(2)}, stress ${Number(ev.stressDelta||0).toFixed(2)}`).join("<br>")||"No emotional events yet";
+  return `Personality Seed ${e.personalitySeed}<br>Archetypes ${(e.personalityArchetypes||[]).join(", ")||"none"}<br><br><strong>Personality Dimensions</strong><br>${dimensions}<br><br><strong>Emotional Drivers</strong><br>${drivers}<br><br><strong>Last Reaction</strong><br>Morale Delta ${Number(last.moraleDelta||0).toFixed(2)}; Stress Delta ${Number(last.stressDelta||0).toFixed(2)}; Reason Code ${last.reasonCode||"none"}<br><br><strong>Daily Caps</strong><br>Morale +${Number(totals.moraleGain||0).toFixed(2)}/${limits.maxDailyMoraleGain}, Morale -${Number(totals.moraleLoss||0).toFixed(2)}/${limits.maxDailyMoraleLoss}<br>Stress +${Number(totals.stressGain||0).toFixed(2)}/${limits.maxDailyStressGain}, Stress -${Number(totals.stressLoss||0).toFixed(2)}/${limits.maxDailyStressLoss}<br><br><strong>Cooldowns</strong><br>${cooldowns}<br><br><strong>Recent Emotional Events</strong><br>${events}`;
+}
 function showEmployee(id){
   const e=employees.find(x=>x.id===id);
+  ensureEmployeePersonality?.(e);
   document.getElementById("aiDebugToggle")?.classList.toggle("active",debugMode);
   document.getElementById("detailName").textContent=e.name;
-  document.getElementById("detailRole").textContent=`${e.role} - ${e.traits.join(" - ")}`;
+  document.getElementById("detailRole").textContent=`${e.role} - ${(e.personalityArchetypes||[]).slice(0,2).join(" - ")||e.traits.join(" - ")}`;
   const best=employees.filter(x=>x.id!==e.id).sort((a,b)=>socialScore(e,b.id)-socialScore(e,a.id))[0];
   const topGoals=Object.entries(e.goals||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k}: ${Math.round(v*100)}`).join("<br>");
   const scoreLines=Object.entries(e.decisionTrace?.scores||{}).slice(0,5).map(([k,v])=>`${k}: ${Math.round(v)}`).join("<br>");
@@ -321,6 +333,7 @@ function showEmployee(id){
       <div><strong>Focus</strong><br>${Math.round(e.focus)}</div>
       <div><strong>Morale</strong><br>${Math.round(e.morale)}</div>
       <div><strong>Stress</strong><br>${Math.round(e.stress)}</div>
+      <div><strong>Personality</strong><br>${personalityDescription?.(e)||"Balanced worker"}<br><small>${(e.personalityArchetypes||[]).slice(0,3).join(" - ")}</small></div>
       <div><strong>Top goals</strong><br>${topGoals}</div>
       <div><strong>Closest coworker</strong><br>${best?.name||"None"}${social?`<br>Trust ${Math.round(social.trust)}, Respect ${Math.round(social.respect)}, Friendship ${Math.round(social.friendship)}`:""}</div>
       <div><strong>Why this action?</strong><br>${e.thought||`Currently ${e.action}.`}</div>

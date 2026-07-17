@@ -20,6 +20,140 @@ const simulationTimer=new SimulationTimer();
 const validationSession=new ValidationSession(saveRepository,simulationTimer);
 const musicAudio=soundController.music,messageAudio=soundController.alert;
 function createSafeAudio(src,options={}){return soundController.create(src,options);}
+const PERSONALITY_KEYS=["workPace","sociability","collaboration","riskTolerance","adaptability","initiative","resilience","detailOrientation","empathy","structureNeed"];
+function hashText32(text){
+  let h=2166136261>>>0;
+  for(const ch of String(text)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}
+  return h>>>0;
+}
+function personalityRandom(seed){
+  let s=seed>>>0;
+  return ()=>{s=(Math.imul(1664525,s)+1013904223)>>>0;return s/4294967296;};
+}
+function personalitySeedForEmployee(eOrId,role="",salt=""){
+  const id=typeof eOrId==="object"?eOrId.id:eOrId;
+  const name=typeof eOrId==="object"?eOrId.name:"";
+  return hashText32(`${SAVE_VERSION}|${company?.randomState??2463534242}|${id}|${name}|${role}|${salt}`);
+}
+function generateEmployeePersonality(seed,role=""){
+  const rand=personalityRandom(seed),roleHint=roleDepartment(role);
+  const profile={};
+  PERSONALITY_KEYS.forEach(k=>profile[k]=Number((rand()*2-1).toFixed(3)));
+  if(roleHint==="quality")profile.detailOrientation=clamp(profile.detailOrientation+.14,-1,1);
+  if(roleHint==="product")profile.empathy=clamp(profile.empathy+.10,-1,1);
+  if(roleHint==="finance")profile.structureNeed=clamp(profile.structureNeed+.10,-1,1);
+  if(roleHint==="software")profile.adaptability=clamp(profile.adaptability+.08,-1,1);
+  if(roleHint==="hardware")profile.detailOrientation=clamp(profile.detailOrientation+.08,-1,1);
+  return profile;
+}
+function derivePersonalityArchetypes(profile={}){
+  const scored=[
+    ["Fast Builder",(profile.workPace||0)+(profile.initiative||0)*.7],
+    ["Perfectionist",(profile.detailOrientation||0)+(profile.structureNeed||0)*.6],
+    ["Mentor",(profile.empathy||0)+(profile.collaboration||0)*.7],
+    ["Lone Wolf",-(profile.sociability||0)+(profile.structureNeed||0)*.25],
+    ["Visionary",(profile.riskTolerance||0)+(profile.initiative||0)*.7+(profile.adaptability||0)*.4],
+    ["Diplomat",(profile.empathy||0)+(profile.sociability||0)*.5],
+    ["Organizer",(profile.structureNeed||0)+(profile.detailOrientation||0)*.45],
+    ["Curious",(profile.adaptability||0)+(profile.initiative||0)*.35],
+    ["Steady Worker",(profile.resilience||0)+(profile.structureNeed||0)*.35],
+    ["Social Connector",(profile.sociability||0)+(profile.collaboration||0)*.7]
+  ].sort((a,b)=>b[1]-a[1]);
+  const labels=scored.filter(([,v])=>v>.25).slice(0,3).map(([name])=>name);
+  scored.forEach(([name])=>{if(labels.length<2&&!labels.includes(name))labels.push(name);});
+  return labels.filter((v,i,a)=>a.indexOf(v)===i).slice(0,4);
+}
+function defaultEmotionalState(profile={}){
+  return {
+    socialBattery:Math.round(clamp(55+(profile.sociability||0)*18-(profile.structureNeed||0)*8,15,95)),
+    frustration:20,
+    belonging:Math.round(clamp(55+(profile.empathy||0)*10+(profile.collaboration||0)*8,20,95)),
+    recognitionSatisfaction:55,
+    psychologicalSafety:60,
+    recoveryDebt:0,
+    conflictFatigue:0,
+    needForQuietFocus:Math.round(clamp(48+(profile.structureNeed||0)*18-(profile.sociability||0)*12,10,95)),
+    needForSocialInteraction:Math.round(clamp(48+(profile.sociability||0)*20+(profile.collaboration||0)*8,10,95))
+  };
+}
+function ensureEmployeePersonality(e,{force=false,salt=""}={}){
+  if(!e)return e;
+  if(force||!Number.isFinite(e.personalitySeed))e.personalitySeed=personalitySeedForEmployee(e,e.role,salt);
+  if(force||!e.personality||typeof e.personality!=="object")e.personality=generateEmployeePersonality(e.personalitySeed,e.role);
+  PERSONALITY_KEYS.forEach(k=>{if(!Number.isFinite(e.personality[k]))e.personality[k]=0;});
+  e.personalityArchetypes=Array.isArray(e.personalityArchetypes)&&e.personalityArchetypes.length&&!force?e.personalityArchetypes:derivePersonalityArchetypes(e.personality);
+  e.emotionalState={...defaultEmotionalState(e.personality),...(e.emotionalState||{})};
+  e.emotionalCooldowns=e.emotionalCooldowns&&typeof e.emotionalCooldowns==="object"?e.emotionalCooldowns:{};
+  e.emotionalDailyTotals={day:company?.day??0,moraleGain:0,moraleLoss:0,stressGain:0,stressLoss:0,...(e.emotionalDailyTotals||{})};
+  e.emotionalLimits={maxDailyMoraleGain:8,maxDailyMoraleLoss:8,maxDailyStressGain:10,maxDailyStressLoss:10,...(e.emotionalLimits||{})};
+  e.recentEmotionalEvents=Array.isArray(e.recentEmotionalEvents)?e.recentEmotionalEvents.slice(0,12):[];
+  e.personalityDescription=personalityDescription(e);
+  return e;
+}
+function resetEmployeeEmotionalDay(e){
+  ensureEmployeePersonality(e);
+  if(e.emotionalDailyTotals?.day!==company.day){
+    e.emotionalDailyTotals={day:company.day,moraleGain:0,moraleLoss:0,stressGain:0,stressLoss:0};
+    Object.keys(e.emotionalCooldowns||{}).forEach(k=>{e.emotionalCooldowns[k]=Math.max(0,(e.emotionalCooldowns[k]||0)-1);if(e.emotionalCooldowns[k]<=0)delete e.emotionalCooldowns[k];});
+  }
+}
+function emotionalCapDelta(e,kind,delta){
+  const totals=e.emotionalDailyTotals,limits=e.emotionalLimits;
+  if(delta>0){
+    const key=kind==="morale"?"moraleGain":"stressGain",limit=kind==="morale"?limits.maxDailyMoraleGain:limits.maxDailyStressGain;
+    const allowed=Math.max(0,limit-(totals[key]||0)),applied=Math.min(delta,allowed);totals[key]=(totals[key]||0)+applied;return applied;
+  }
+  if(delta<0){
+    const key=kind==="morale"?"moraleLoss":"stressLoss",limit=kind==="morale"?limits.maxDailyMoraleLoss:limits.maxDailyStressLoss;
+    const allowed=Math.max(0,limit-(totals[key]||0)),applied=-Math.min(Math.abs(delta),allowed);totals[key]=(totals[key]||0)+Math.abs(applied);return applied;
+  }
+  return 0;
+}
+function evaluateEmployeeEmotionalReaction({employee,event={},relationshipContext={},workloadContext={},roomContext={}}={}){
+  const e=employee;if(!e)return {moraleDelta:0,stressDelta:0,reasonCode:"missing-employee",sourceEventId:event?.id||null,relatedEmployeeIds:[]};
+  ensureEmployeePersonality(e);
+  const p=e.personality,rel=Number(relationshipContext.relationshipScore??averageRelationship?.(e)??0),workload=Number(workloadContext.pressure??e.stress??50),roomStress=Number(roomContext.stress??0),congestion=Number(roomContext.congestion??0);
+  let moraleDelta=0,stressDelta=0,reasonCode=event.type||"daily";
+  if(event.type==="social"){moraleDelta+=.7+(p.sociability||0)*1.1+(rel>20?.5:rel<0?-.5:0);stressDelta+=-(.25+(p.sociability||0)*.35)+(p.structureNeed||0)*.25;}
+  else if(event.type==="focus"){moraleDelta+=.35+(p.structureNeed||0)*.55+(p.detailOrientation||0)*.35;stressDelta+=-(.15+(p.resilience||0)*.25)+(congestion>.8?.5:0);}
+  else if(event.type==="workload"){stressDelta+=.45+Math.max(0,workload-60)*.035-(p.resilience||0)*.55-(p.adaptability||0)*.2;moraleDelta+=workload>72?-(.35+(p.structureNeed||0)*.18):.12+(p.initiative||0)*.18;}
+  else if(event.type==="recovery"){stressDelta-=.8+(p.resilience||0)*.35+(p.structureNeed||0)*.12;moraleDelta+=.2+(p.resilience||0)*.18;}
+  else {stressDelta+=roomStress*.35-(p.resilience||0)*.18;moraleDelta+=(rel>20?.12:0)-(rel<-20?.25:0);}
+  return {moraleDelta:Number(clamp(moraleDelta,-3,3).toFixed(3)),stressDelta:Number(clamp(stressDelta,-3,3).toFixed(3)),reasonCode,sourceEventId:event.id||null,relatedEmployeeIds:relationshipContext.relatedEmployeeIds||[]};
+}
+function applyEmployeeEmotionalReaction(args){
+  const e=args?.employee;if(!e)return null;
+  ensureEmployeePersonality(e);resetEmployeeEmotionalDay(e);
+  const reaction=evaluateEmployeeEmotionalReaction(args),code=`${reaction.reasonCode}:${reaction.sourceEventId||"local"}`;
+  if(e.emotionalCooldowns[code]>0)return {...reaction,moraleDelta:0,stressDelta:0,capped:true};
+  const moraleDelta=emotionalCapDelta(e,"morale",reaction.moraleDelta),stressDelta=emotionalCapDelta(e,"stress",reaction.stressDelta);
+  e.morale=clamp((e.morale||0)+moraleDelta,0,100);e.stress=clamp((e.stress||0)+stressDelta,0,100);
+  e.emotionalCooldowns[code]=1;
+  e.lastEmotionalReaction={...reaction,moraleDelta,stressDelta};
+  e.recentEmotionalEvents=[{day:company.day,minute:company.minute,reasonCode:reaction.reasonCode,moraleDelta,stressDelta,sourceEventId:reaction.sourceEventId},...(e.recentEmotionalEvents||[])].slice(0,12);
+  const state=e.emotionalState||{};
+  state.frustration=clamp((state.frustration||20)+Math.max(0,stressDelta)*2-Math.max(0,-stressDelta),0,100);
+  state.belonging=clamp((state.belonging||55)+Math.max(0,moraleDelta)*.8-Math.max(0,-moraleDelta)*.9,0,100);
+  state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressDelta)*.8-Math.max(0,-stressDelta)*1.2,0,100);
+  return e.lastEmotionalReaction;
+}
+function applyDailyPersonalityEmotion(e){
+  if(!e?.active)return null;
+  const team=employeeTeam?.(e)||roleDepartment(e.role),teamState=company.teams?.[team]||{},room=e.currentRoom||roomForZone?.(e.zone)||rolePrimaryRoom(e.role);
+  const rel=typeof averageRelationship==="function"?averageRelationship(e):0,pressure=Math.max(Number(teamState.pressure||0),Number(e.stress||0));
+  const type=e.action?.includes("talking")||e.action?.includes("collaborating")?"social":e.action?.includes("break")?"recovery":pressure>65?"workload":"focus";
+  return applyEmployeeEmotionalReaction({employee:e,event:{type,id:`daily-${company.day}`},relationshipContext:{relationshipScore:rel},workloadContext:{pressure},roomContext:{room,congestion:roomCongestion?.(room)||0,stress:e.roomEffect?.stress||0}});
+}
+function personalityDescription(e){
+  const p=e?.personality||{},parts=[];
+  parts.push((p.detailOrientation||0)>.35?"Careful":(p.workPace||0)>.35?"Fast-moving":(p.resilience||0)>.35?"Steady":"Balanced");
+  parts.push((p.sociability||0)>.35?"social":(p.sociability||0)<-.35?"independent":"adaptable");
+  if((p.structureNeed||0)>.35)parts.push("prefers clear structure");
+  else if((p.adaptability||0)>.35)parts.push("handles change well");
+  else if((p.empathy||0)>.35)parts.push("notices team mood");
+  else if((p.resilience||0)<-.35)parts.push("needs recovery time");
+  return parts.join(" and ");
+}
 const eventLibrary=[
 {id:"burnout",repeatable:true,title:"Engineering workload warning",copy:"Several employees are showing sustained stress. The CTO asks how leadership should respond.",trigger:()=>avgStress()>67,choices:[{title:"Delay the launch",detail:"Protect quality and reduce stress.",effect:{cash:-.5,board:-6,trust:5},directive:"quality",days:10,people:{stress:-18,morale:8}},{title:"Hire contractors",detail:"Relieve pressure at a cash cost.",effect:{cash:-2.2,board:1,trust:2},directive:"people",days:12,people:{stress:-12,morale:5}},{title:"Keep pushing",detail:"Preserve schedule and increase risk.",effect:{board:5,trust:-4},directive:"speed",days:8,people:{stress:10,morale:-8}}]},
 {id:"milestone",title:"Prototype breakthrough",copy:"The hardware team reached a major milestone. Product leadership needs direction.",trigger:()=>company.chip>48,choices:[{title:"Begin customer testing",detail:"Reveal defects early and build trust.",effect:{cash:-1,board:2,trust:8,quality:5},directive:"quality",days:12,people:{stress:3,morale:4}},{title:"Accelerate toward launch",detail:"Move faster with more execution risk.",effect:{cash:-.8,board:6,trust:-2,integration:8},directive:"speed",days:10,people:{stress:8,morale:-2}},{title:"Return to research",detail:"Improve long-term quality.",effect:{cash:-1.4,board:-4,trust:4,quality:9},directive:"quality",days:14,people:{stress:-4,morale:6}}]},
@@ -43,7 +177,7 @@ function makeEmployee(i){
     {mastery:.62,promotion:.64,friendship:.32,stability:.82,recognition:.58}
   ];
   const role=roles[i]||"Product Manager",traitSet=traits[i%traits.length]||traits[0],goalProfile=goalProfiles[i%goalProfiles.length]||goalProfiles[0],base=zoneForRoom(rolePrimaryRoom(role));
-  return normalizeEmployeeRoleProfile({
+  const employee=normalizeEmployeeRoleProfile({
     id:i,name:names[i]||`Employee ${i+1}`,role,traits:[...traitSet],zone:base,homeZone:base,x:50,y:50,
     energy:72+simulationRandom()*18,stress:18+simulationRandom()*22,morale:65+simulationRandom()*20,
     focus:55+simulationRandom()*30,relationship:{},social:{},goals:{...goalProfile},
@@ -52,6 +186,7 @@ function makeEmployee(i){
     lastAction:null,repeatCount:0,cooldowns:{break:0,meeting:0,socialize:0,collaborate:0,complain:0},
     decisionTrace:{chosen:"arriving",scores:{},reasons:[]},opinionOfCEO:{trust:62,fairness:58,competence:64,support:56,fear:12},careerLevel:1,careerHistory:["Founding team"],beliefs:{},dailyBriefing:null,currentIntention:null,skills:baseSkillsForRole(role),performance:{recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999},learning:{caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}},communication:{reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:-999,lastHelpRequestDay:-999,rumorsShared:0},knownMessages:[],actionOutcomeContext:null,activeCollaboration:null,activeMeeting:null,learnedLessons:{testing:0,collaboration:0,documentation:0,escalation:0,innovation:0,riskTaking:0,planning:0,mentoring:0,recovery:0},lessonAcceptance:null,joinedDay:company?.day||0,age:28+i*4+Math.floor(simulationRandom()*4),stayScore:72,retentionRisk:28,jobSearchDays:0,retirementReadiness:0,quarterlyReview:null,promotionExpectation:45,salarySatisfaction:65,recognitionSatisfaction:60
   });
+  return ensureEmployeePersonality(employee,{salt:`founding-${i}`});
 }
 function resetCommunicationUi(){
   lastInboxSoundCount=null;
@@ -77,8 +212,17 @@ function loadGame(){try{const data=saveRepository.read();if(!data)return false;c
       decisionTrace:saved.decisionTrace||fresh.decisionTrace,opinionOfCEO:{...fresh.opinionOfCEO,...(saved.opinionOfCEO||{})},careerLevel:Number(saved.careerLevel)||fresh.careerLevel,careerHistory:Array.isArray(saved.careerHistory)?saved.careerHistory:fresh.careerHistory,beliefs:{...fresh.beliefs,...(saved.beliefs||{})},dailyBriefing:saved.dailyBriefing||fresh.dailyBriefing,currentIntention:saved.currentIntention||fresh.currentIntention,skills:{...fresh.skills,...(saved.skills||{})},performance:{...fresh.performance,...(saved.performance||{})},learning:{...fresh.learning,...(saved.learning||{}),contextualPreferences:{...(fresh.learning?.contextualPreferences||{}),...(saved.learning?.contextualPreferences||{})}},communication:{...fresh.communication,...(saved.communication||{})},knownMessages:Array.isArray(saved.knownMessages)?saved.knownMessages:[],actionOutcomeContext:saved.actionOutcomeContext||null,activeCollaboration:saved.activeCollaboration||null,activeMeeting:saved.activeMeeting||null,
       learnedLessons:{...fresh.learnedLessons,...(saved.learnedLessons||{})},
       lessonAcceptance:saved.lessonAcceptance??fresh.lessonAcceptance,
+      personalitySeed:Number.isFinite(saved.personalitySeed)?saved.personalitySeed:fresh.personalitySeed,
+      personality:saved.personality&&typeof saved.personality==="object"?saved.personality:fresh.personality,
+      personalityArchetypes:Array.isArray(saved.personalityArchetypes)?saved.personalityArchetypes:fresh.personalityArchetypes,
+      emotionalState:saved.emotionalState&&typeof saved.emotionalState==="object"?saved.emotionalState:fresh.emotionalState,
+      emotionalCooldowns:saved.emotionalCooldowns&&typeof saved.emotionalCooldowns==="object"?saved.emotionalCooldowns:fresh.emotionalCooldowns,
+      emotionalDailyTotals:saved.emotionalDailyTotals&&typeof saved.emotionalDailyTotals==="object"?saved.emotionalDailyTotals:fresh.emotionalDailyTotals,
+      emotionalLimits:saved.emotionalLimits&&typeof saved.emotionalLimits==="object"?saved.emotionalLimits:fresh.emotionalLimits,
+      recentEmotionalEvents:Array.isArray(saved.recentEmotionalEvents)?saved.recentEmotionalEvents:fresh.recentEmotionalEvents,
+      lastEmotionalReaction:saved.lastEmotionalReaction||fresh.lastEmotionalReaction||null,
       joinedDay:Number.isFinite(saved.joinedDay)?saved.joinedDay:(fresh.joinedDay||0),age:Number.isFinite(saved.age)?saved.age:fresh.age,stayScore:Number.isFinite(saved.stayScore)?saved.stayScore:72,retentionRisk:Number.isFinite(saved.retentionRisk)?saved.retentionRisk:28,jobSearchDays:Number(saved.jobSearchDays)||0,retirementReadiness:Number(saved.retirementReadiness)||0,quarterlyReview:saved.quarterlyReview||null,promotionExpectation:Number.isFinite(saved.promotionExpectation)?saved.promotionExpectation:45,salarySatisfaction:Number.isFinite(saved.salarySatisfaction)?saved.salarySatisfaction:65,recognitionSatisfaction:Number.isFinite(saved.recognitionSatisfaction)?saved.recognitionSatisfaction:60
-    };});company.randomState=loadedRandomState;employees.forEach(e=>normalizeEmployeeRoleProfile(e));employees.forEach(a=>employees.forEach(b=>{if(a!==b&&typeof a.relationship[b.id]!=="number")a.relationship[b.id]=0;}));company.completedEvents=Array.isArray(company.completedEvents)?company.completedEvents:[];company.costEfficiency=clamp(Number(company.costEfficiency)||1,.72,1.08);company.pilotDays=Number(company.pilotDays)||0;
+    };});company.randomState=loadedRandomState;employees.forEach(e=>{normalizeEmployeeRoleProfile(e);ensureEmployeePersonality(e);});employees.forEach(a=>employees.forEach(b=>{if(a!==b&&typeof a.relationship[b.id]!=="number")a.relationship[b.id]=0;}));company.completedEvents=Array.isArray(company.completedEvents)?company.completedEvents:[];company.costEfficiency=clamp(Number(company.costEfficiency)||1,.72,1.08);company.pilotDays=Number(company.pilotDays)||0;
 company.openRoles=Array.isArray(company.openRoles)?company.openRoles:[];
 company.newspapers=Array.isArray(company.newspapers)?company.newspapers:[];
 company.weeklyEvents=Array.isArray(company.weeklyEvents)?company.weeklyEvents:[];
