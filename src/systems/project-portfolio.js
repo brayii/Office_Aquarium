@@ -142,7 +142,59 @@ function makeProject({family,originType="department",originatorId=null,status="p
   const estimatedDuration=Math.round((45+reality.trueTechnicalDifficulty*1.4+rnd()*45)*(1-estimateBias*.008)*durationMultiplier);
   const visibility=status==="proposal"?"private":(originType==="legacy"?"announced":(rnd()>.72?"announced":rnd()>.42?"rumored":"private"));
   const p={id,family:chosen,codename:code,title:`Project ${code}: ${chosen.replace(/\b\w/g,c=>c.toUpperCase())}`,originType,originatorId,proposingDepartment:primary,createdDay:company.day,status,priority:Math.round(50+rnd()*45),scope,budgetApproved:status==="proposal"?0:estimatedCost*.45,budgetSpent:0,estimatedDuration,estimatedCost,estimatedBenefit:Math.round(reality.trueStrategicValue*(1-estimateNoise*.25)+rnd()*10+knowledgeBias*1.5),visibleRisk:Math.round(clamp(reality.trueTechnicalDifficulty*(.75+rnd()*estimateNoise)-confidence*.12-projectLessonBias("scopeControl")*.8,15,95)),visibleConfidence:Math.round(confidence),marketVisibility:visibility,requiredDepartments:projectRequiredDepartments(chosen,primary),requiredSkills:requiredSkillsForWork(primary,workItemTypeForTeam(primary)),requiredHeadcount:{[primary]:scope>1?2:1,quality:["hardware","software"].includes(primary)?1:0},assignedEmployees:[],workItemIds:[],milestones:[],deadlineDay:company.day+Math.round((45+reality.trueTechnicalDifficulty*1.8)*durationMultiplier),progress:0,quality:55,integration:35,customerInterest:Math.round(reality.trueCustomerExcitement*(.75+rnd()*.35)+validationBias),teamMoraleImpact:0,strategicNarrative:`${teamDisplayName(primary)} believes ${chosen} could strengthen the company portfolio.`,reviewHistory:[],hiddenReality:reality,seed:s,performance:{progress:0,scheduleVariance:0,budgetVariance:0,quality:55,integration:35,teamHealth:70,staffingCoverage:60,blockerCount:0,customerInterest:Math.round(reality.trueCustomerExcitement),strategicConfidence:Math.round(confidence),riskTrend:0,benefitRealization:0,forecastAtCompletion:Math.round(50+rnd()*35)},nextReviewDay:company.day+30};
+  reauditProjectRequirements(p);
   return p;
+}
+function projectCapabilityProfile(project){
+  const text=String(`${project.family||""} ${project.title||""} ${project.proposingDepartment||""}`).toLowerCase();
+  if(/university|research|training|knowledge/.test(text))return {required:["crossProjectCoordination"],preferred:["mentoringCapacity","executiveCommunication"],optional:["portfolioGovernance"]};
+  if(/manufacturing|yield|capacity|supplier/.test(text))return {required:["manufacturingReadiness"],preferred:["financialPlanning","technicalLeadership"],optional:["portfolioGovernance"]};
+  if(/customer|market|support|commercial|launch/.test(text))return {required:["customerSupportCapacity"],preferred:["financialPlanning","crossProjectCoordination"],optional:["executiveCommunication"]};
+  if(/firmware|integration|software|cloud|sdk|security|platform/.test(text))return {required:["technicalLeadership"],preferred:["crossProjectCoordination","mentoringCapacity"],optional:["portfolioGovernance"]};
+  if(/hardware|chip|accelerator|processor|memory|architecture/.test(text)||project.proposingDepartment==="hardware")return {required:["technicalLeadership"],preferred:["manufacturingReadiness","crossProjectCoordination"],optional:["financialPlanning"]};
+  return {required:["crossProjectCoordination"],preferred:["financialPlanning","managementCapacity"],optional:["portfolioGovernance"]};
+}
+function rolesForProjectCapabilities(capabilities,strict=false){
+  const roles=[...new Set((capabilities||[]).flatMap(cap=>COMPANY_CAPABILITY_TO_ROLES[cap]||[]))];
+  return strict?roles.filter(role=>!["Manager","Director","Vice President"].includes(role)):roles;
+}
+function reauditProjectRequirements(project){
+  if(!project)return project;
+  const profile=projectCapabilityProfile(project);
+  const primary=project.proposingDepartment||projectDepartmentForFamily(project.family||"");
+  project.successRequirements=Array.isArray(project.successRequirements)&&project.successRequirements.length?project.successRequirements:[
+    "complete required work items",
+    "maintain adequate quality",
+    "clear blockers before closeout",
+    "keep budget and schedule variance explainable"
+  ];
+  project.requiredCapabilities=Array.isArray(project.requiredCapabilities)?project.requiredCapabilities:profile.required;
+  project.preferredCapabilities=Array.isArray(project.preferredCapabilities)?project.preferredCapabilities:profile.preferred;
+  project.optionalCapabilities=Array.isArray(project.optionalCapabilities)?project.optionalCapabilities:profile.optional;
+  project.requiredRoles=Array.isArray(project.requiredRoles)?project.requiredRoles:rolesForProjectCapabilities(project.requiredCapabilities,true);
+  project.preferredRoles=Array.isArray(project.preferredRoles)?project.preferredRoles:rolesForProjectCapabilities(project.preferredCapabilities,false);
+  project.optionalRoles=Array.isArray(project.optionalRoles)?project.optionalRoles:rolesForProjectCapabilities(project.optionalCapabilities,false);
+  project.mechanicsAvailable=Array.isArray(project.mechanicsAvailable)&&project.mechanicsAvailable.length?project.mechanicsAvailable:["work items","staff allocation","blockers","portfolio review","commercial review"];
+  project.staffingPaths=Array.isArray(project.staffingPaths)&&project.staffingPaths.length?project.staffingPaths:["existing staff allocation","internal reassignment","approved hiring","acting support","scope reduction"];
+  project.learningDomains=Array.isArray(project.learningDomains)&&project.learningDomains.length?project.learningDomains:["estimateAccuracy","scopeControl","crossDepartmentCoordination","staffingTiming"];
+  project.requiredDepartments=Array.isArray(project.requiredDepartments)&&project.requiredDepartments.length?project.requiredDepartments:projectRequiredDepartments(project.family||"",primary);
+  project.requiredHeadcount=project.requiredHeadcount&&typeof project.requiredHeadcount==="object"?project.requiredHeadcount:{[primary]:1,quality:["hardware","software"].includes(primary)?1:0};
+  if(project.originType==="legacy"||/Legacy Flagship/i.test(project.title||"")){
+    const total=Object.values(project.requiredHeadcount).reduce((s,v)=>s+(Number(v)||0),0);
+    if(total>8){
+      const scale=8/total;
+      Object.keys(project.requiredHeadcount).forEach(k=>project.requiredHeadcount[k]=Math.max(0,Number((project.requiredHeadcount[k]*scale).toFixed(1))));
+    }
+    project.requiredRoles=(project.requiredRoles||[]).filter(role=>!["Manager","Director","Vice President","Manufacturing Engineer"].includes(role));
+    project.preferredRoles=[...new Set([...(project.preferredRoles||[]),"Finance Analyst","Product Manager"])];
+  }
+  project.requirementAudit={day:company.day,kept:["direct project work remains in requiredDepartments and requiredHeadcount"],removed:["company-wide management and executive capability is not counted as project-required staffing"],revised:[`required capabilities: ${project.requiredCapabilities.join(", ")||"none"}`,`preferred capabilities: ${project.preferredCapabilities.join(", ")||"none"}`],reason:"project requirements re-audited to separate project staffing from company capability gaps"};
+  return project;
+}
+function reauditProjectPortfolioRequirements(){
+  ensureProjectPortfolio();
+  [...(company.projects||[]),...(company.projectProposals||[]),...(company.projectArchive||[])].forEach(reauditProjectRequirements);
+  company.lastProjectRequirementAuditDay=company.day;
 }
 function changedConditionsForDormantProject(project){
   const reasons=[];
@@ -206,6 +258,7 @@ function ensureProjectPortfolio(){
     recordHistory?.("Legacy flagship project created from existing company progress.","project",4);
   }
   [...company.projects,...company.projectProposals,...company.projectArchive].forEach(p=>{
+    reauditProjectRequirements(p);
     p.assignedEmployees=Array.isArray(p.assignedEmployees)?p.assignedEmployees:[];
     p.staffAllocations=p.staffAllocations&&typeof p.staffAllocations==="object"?p.staffAllocations:{};
     p.causalLedger=Array.isArray(p.causalLedger)?p.causalLedger:[];

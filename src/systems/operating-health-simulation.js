@@ -481,6 +481,7 @@ function maybeQueueProjectReview(){
 }
 function updateProjectPortfolioSystem(){
   ensureProjectPortfolio();
+  if(typeof reauditProjectPortfolioRequirements==="function")reauditProjectPortfolioRequirements();
   generateProjectProposal();
   projectPerformanceUpdate();
   updatePortfolioHealth();

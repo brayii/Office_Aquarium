@@ -66,6 +66,66 @@ const ROLE_DEFINITIONS={
   }
 };
 const FOUNDING_ROLES=["Software Engineer","Firmware Engineer","Hardware Engineer","Chip Architect","Software QA Engineer","Industrial Designer","Product Manager","Finance Analyst"];
+const DEFAULT_COMPANY_CAPABILITY_NEEDS={
+  managementCapacity:0,
+  portfolioGovernance:0,
+  financialPlanning:0,
+  manufacturingReadiness:0,
+  customerSupportCapacity:0,
+  technicalLeadership:0,
+  mentoringCapacity:0,
+  successionCoverage:0,
+  crossProjectCoordination:0,
+  executiveCommunication:0
+};
+const COMPANY_CAPABILITY_TO_ROLES={
+  managementCapacity:["Manager","Director"],
+  portfolioGovernance:["Director","Vice President"],
+  financialPlanning:["Finance Analyst"],
+  manufacturingReadiness:["Manufacturing Engineer"],
+  customerSupportCapacity:["Product Manager","Manager"],
+  technicalLeadership:["Technical Lead","Software Architect","Chip Architect"],
+  mentoringCapacity:["Technical Lead","Manager","Director"],
+  successionCoverage:["Manager","Director","Vice President"],
+  crossProjectCoordination:["Product Manager","Manager","Director"],
+  executiveCommunication:["Vice President","Director","Finance Analyst"]
+};
+const COMPANY_CAPABILITY_LABELS={
+  managementCapacity:"Management capacity",
+  portfolioGovernance:"Portfolio governance",
+  financialPlanning:"Financial planning",
+  manufacturingReadiness:"Manufacturing readiness",
+  customerSupportCapacity:"Customer support capacity",
+  technicalLeadership:"Technical leadership",
+  mentoringCapacity:"Mentoring capacity",
+  successionCoverage:"Succession coverage",
+  crossProjectCoordination:"Cross-project coordination",
+  executiveCommunication:"Executive communication"
+};
+const COMPANY_CAPABILITY_DEPARTMENT={
+  managementCapacity:"people",
+  portfolioGovernance:"people",
+  financialPlanning:"finance",
+  manufacturingReadiness:"hardware",
+  customerSupportCapacity:"product",
+  technicalLeadership:"software",
+  mentoringCapacity:"people",
+  successionCoverage:"people",
+  crossProjectCoordination:"product",
+  executiveCommunication:"people"
+};
+const COMPANY_CAPABILITY_SUPPORT_WORK={
+  managementCapacity:{department:"people",type:"coordination",title:"Balance workloads and resolve people issues"},
+  portfolioGovernance:{department:"people",type:"portfolio",title:"Coordinate portfolio priorities and staffing"},
+  financialPlanning:{department:"finance",type:"forecasting",title:"Improve runway forecast and hiring affordability"},
+  manufacturingReadiness:{department:"hardware",type:"manufacturing",title:"Prepare suppliers and production readiness"},
+  customerSupportCapacity:{department:"product",type:"customer",title:"Prepare customer support and launch handoff"},
+  technicalLeadership:{department:"software",type:"architecture",title:"Review architecture and integration risk"},
+  mentoringCapacity:{department:"people",type:"mentoring",title:"Mentor onboarding and reduce knowledge gaps"},
+  successionCoverage:{department:"people",type:"succession",title:"Develop succession and acting-role coverage"},
+  crossProjectCoordination:{department:"product",type:"coordination",title:"Resolve cross-project dependency conflicts"},
+  executiveCommunication:{department:"people",type:"executive",title:"Prepare executive communication and board context"}
+};
 function canonicalRole(role){return ROLE_DEFINITIONS[role]?role:(ROLE_ALIASES[role]||role);}
 function roleDefinition(role){const canonical=canonicalRole(role);return ROLE_DEFINITIONS[canonical]||null;}
 function allRecruitableRoles(){return Object.keys(ROLE_DEFINITIONS);}
@@ -114,6 +174,53 @@ function roleForDepartmentHire(dept){
     people:["Manager","Director"]
   }[dept]||rolesForDepartment(dept);
   return preferred.slice().sort((a,b)=>(employees||[]).filter(e=>e.active&&canonicalRole(e.role)===a).length-(employees||[]).filter(e=>e.active&&canonicalRole(e.role)===b).length)[0];
+}
+function roleForCompanyCapability(capability){
+  const roles=COMPANY_CAPABILITY_TO_ROLES[capability]||[];
+  if(!roles.length)return roleForDepartmentHire(COMPANY_CAPABILITY_DEPARTMENT[capability]||"people");
+  return roles.slice().sort((a,b)=>(employees||[]).filter(e=>e.active&&canonicalRole(e.role)===a).length-(employees||[]).filter(e=>e.active&&canonicalRole(e.role)===b).length)[0];
+}
+function roleCapabilityContribution(role,capability,employee=null){
+  role=canonicalRole(role);
+  const mapped=COMPANY_CAPABILITY_TO_ROLES[capability]||[];
+  const def=roleDefinition(role)||{};
+  const skills=employee?.skills||def.skills||{};
+  const leadership=Number(skills.leadership)||Number(def.leadershipLevel||0)*20||35;
+  const communication=Number(skills.communication)||45;
+  const finance=Number(skills.finance)||25;
+  const architecture=Number(skills.architecture)||35;
+  const verification=Number(skills.verification)||35;
+  const product=Number(skills.product)||30;
+  const hardware=Number(skills.hardware)||35;
+  const software=Number(skills.software)||35;
+  const direct=mapped.includes(role)?50:0;
+  const leadershipLevel=roleLeadershipLevel(role)*7;
+  const skillScore={
+    managementCapacity:leadership*.50+communication*.35+product*.15,
+    portfolioGovernance:leadership*.45+communication*.25+finance*.18+product*.12,
+    financialPlanning:finance*.72+communication*.16+leadership*.12,
+    manufacturingReadiness:hardware*.42+verification*.30+communication*.14+leadership*.14,
+    customerSupportCapacity:product*.55+communication*.28+leadership*.17,
+    technicalLeadership:architecture*.38+software*.24+hardware*.18+verification*.10+leadership*.10,
+    mentoringCapacity:leadership*.45+communication*.35+Math.max(software,hardware,verification,architecture)*.20,
+    successionCoverage:leadership*.52+communication*.24+Math.max(product,finance,software,hardware)*.24,
+    crossProjectCoordination:communication*.36+leadership*.34+product*.20+finance*.10,
+    executiveCommunication:communication*.42+leadership*.32+finance*.16+product*.10
+  }[capability]||0;
+  const onboarding=employee&&typeof onboardingProductivity==="function"?onboardingProductivity(employee):1;
+  const stressPenalty=employee?Math.max(0,(employee.stress||0)-70)*.25:0;
+  return Math.round(clamp((direct+leadershipLevel+skillScore*.42-stressPenalty)*onboarding,0,100));
+}
+function capabilityFulfillmentOptions(capability){
+  const roles=COMPANY_CAPABILITY_TO_ROLES[capability]||[];
+  return [
+    `external hiring: ${roles.join(" or ")||roleForCompanyCapability(capability)}`,
+    "internal promotion recommendation",
+    "temporary acting role",
+    "contractor or advisor coverage",
+    "reassignment or mentoring plan",
+    "scope reduction or project reprioritization"
+  ];
 }
 function normalizeEmployeeRoleProfile(e){
   const role=canonicalRole(e.role);

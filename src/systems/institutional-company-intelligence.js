@@ -301,12 +301,13 @@ function evaluateCommunicationOutcomeRecords(){
     }
   });
 }
-const NON_AUTHORITATIVE_PATHS=new Set(["company.runtime","company.uiCache","company.companyRiskComponents","company.riskPillars","company.staffingModel","company.workforceAllocationSnapshot","company.executiveBriefing","company.executiveIntelligenceSnapshot","company.executiveObservations","company.debugState","company.dailyStageStatus","company.pendingCommunication.bodyPreview","company.crisis.currentProgressDetail"]);
+const NON_AUTHORITATIVE_PATHS=new Set(["company.runtime","company.uiCache","company.companyRiskComponents","company.riskPillars","company.staffingModel","company.workforceAllocationSnapshot","company.capabilityNeeds","company.capabilityCoverage","company.capabilityGaps","company.capabilityConsequences","company.capabilityContributors","company.capabilityPromotionCandidates","company.capabilityFulfillmentOptions","company.capabilityAudit","company.capabilityLearningSignals","company.capabilitySystemUpdatedDay","company.lastProjectRequirementAuditDay","company.executiveBriefing","company.executiveIntelligenceSnapshot","company.executiveObservations","company.debugState","company.dailyStageStatus","company.pendingCommunication.bodyPreview","company.crisis.currentProgressDetail"]);
 function isNonAuthoritativePath(path){
   if(NON_AUTHORITATIVE_PATHS.has(path))return true;
   if(/^company\.(dailyStageStatus\.\d+|lastDailyCloseStatus)\.(startedAt|completedAt|hashBefore|hashAfter)$/.test(path))return true;
   if(/^company\.learningEpisodes\.\d+\.observations$/.test(path))return true;
   if(/^employees\.\d+\.(currentRoom|roomSelectionReason|roomEffect)$/.test(path))return true;
+  if(/^company\.(projects|projectArchive|projectProposals)\.\d+\.requirementAudit$/.test(path))return true;
   return /^company\.(projects|projectArchive|projectProposals)\.\d+\.(commercialReadiness|commercialPotential|projectedDailyRevenue)$/.test(path);
 }
 function canonicalAuthoritativeState(value,path=""){

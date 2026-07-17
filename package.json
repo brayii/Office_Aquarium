@@ -11,6 +11,7 @@
     "test:regression": "node tests/simulation-regression-test.js",
     "test:workforce": "node tests/workforce-regression-test.js",
     "test:rooms-roles": "node tests/rooms-roles-hiring-regression-test.js",
+    "test:capabilities": "node tests/company-capability-portfolio-reaudit-test.js",
     "test:staffing-crisis": "node tests/staffing-crisis-blocker-reconciliation-test.js",
     "test:project": "node tests/project-health-regression-test.js",
     "test:friction": "node tests/organizational-friction-risk-test.js",
@@ -27,7 +28,7 @@
     "test:memo": "node tests/memo-context-test.js",
     "test:newspaper": "node tests/newspaper-clarity-test.js",
     "test:release-messages": "node tests/release-message-clarity-test.js",
-    "test": "npm run test:static && npm run test:smoke && npm run test:regression && npm run test:workforce && npm run test:rooms-roles && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:loss-paths && npm run test:customer && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:newspaper && npm run test:release-messages",
+    "test": "npm run test:static && npm run test:smoke && npm run test:regression && npm run test:workforce && npm run test:rooms-roles && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:loss-paths && npm run test:customer && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:newspaper && npm run test:release-messages",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },
