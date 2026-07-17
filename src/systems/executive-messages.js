@@ -1474,7 +1474,7 @@ function hiddenProjectFitScore(project,choice,ev){
     score-=Math.max(0,market-70)*.18+Math.max(0,25-timeLeft)*.25;
   }else if(strategy==="speed"||strategy==="revenue"||/launch|accelerate|market window|commit/.test(String(choice.title||"").toLowerCase())){
     score+=Math.max(0,market-50)*.42+Math.max(0,customer-55)*.28+Math.max(0,70-difficulty)*.18+Math.max(0,40-timeLeft)*.2;
-    score-=Math.max(0,visibleRisk-60)*.42+Math.max(0,60-quality)*.38+Math.max(0,70-company.manufacturing?.supplyRisk)*.03+Math.max(0,schedule)*.18;
+    score-=Math.max(0,visibleRisk-60)*.42+Math.max(0,60-quality)*.38+Math.max(0,(company.manufacturing?.supplyRisk||0)-55)*.18+Math.max(0,schedule)*.18;
   }else if(strategy==="people"||/support|hire|contractor|ownership/.test(String(choice.title||"").toLowerCase())){
     score+=Math.max(0,70-staffing)*.55+blockers*7+Math.max(0,avgStress()-60)*.25+Math.max(0,retention-55)*.18;
     score-=Math.max(0,4-company.cash)*3;
@@ -1750,10 +1750,19 @@ function evaluateStrategicOutcome(ev,choice){
   const expected=decisionOptionScore(choice,ctx);
   const fit=decisionFitScore(ev,choice,ctx);
   const uncertainty=choice.uncertainty==="High"?28:choice.uncertainty==="Material"?20:14;
-  const realized=fit*.68+expected*.32+rand(-uncertainty*.55,uncertainty*.55);
   const strategy=choice.strategy||inferDecisionStrategy(choice);
   const project=decisionProjectSubject(ev,choice);
   const work=decisionWorkSubject(ev);
+  const projectRisk=project?Number(project.performance?.riskTrend??project.visibleRisk??50):50;
+  const blockerPressure=project?Number(project.performance?.blockerCount??0)*5:work?.blockedBy?.length?10:0;
+  const supplyPressure=Math.max(0,(company.manufacturing?.supplyRisk||0)-62)*.16;
+  const peoplePressure=Math.max(0,avgStress()-68)*.16;
+  const lowQualityPressure=Math.max(0,58-(project?.performance?.quality??project?.quality??company.quality??58))*.14;
+  const downsideChance=clamp((uncertainty*.003)+Math.max(0,projectRisk-70)*.002+blockerPressure*.003+supplyPressure*.01+peoplePressure*.01+lowQualityPressure*.01,.04,.24);
+  const upsideChance=clamp((uncertainty*.0018)+Math.max(0,(project?.performance?.customerInterest??project?.customerInterest??company.customerSentiment??50)-68)*.002+Math.max(0,(company.culture?.innovation||50)-65)*.0015,.025,.15);
+  const surpriseRoll=simulationRandom();
+  const outcomeSurprise=surpriseRoll<downsideChance?-rand(5,18):surpriseRoll>1-upsideChance?rand(4,14):0;
+  const realized=fit*.68+expected*.32+rand(-uncertainty*.55,uncertainty*.55)+outcomeSurprise;
   let tone="mixed",effect={},people={},message="",projectImpact=null,workImpact=null;
   if(realized>=64){
     tone="positive";
@@ -1811,6 +1820,7 @@ function evaluateStrategicOutcome(ev,choice){
     expectedScore:Math.round(expected),
     realizedScore:Math.round(realized),
     fitScore:Math.round(fit),
+    outcomeSurprise:Number(outcomeSurprise.toFixed(2)),
     projectImpact,
     workImpact
   };

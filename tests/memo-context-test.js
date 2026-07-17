@@ -96,8 +96,33 @@ async function main() {
     assert(eventCopy.includes("Project Phoenix Release Validation"), "Inbox summary should name the related project");
     assert(choiceText.includes("Applies to: Project: Project Phoenix Release Validation"), "Choice cards should say what project the option applies to");
     assert(!/project-phoenix-context\b/.test(memoText), "Normal memo should prefer the project name over the internal id");
+
+    company.manufacturing = { ...(company.manufacturing || {}), supplyRisk: 92, readiness: 38, yield: 44 };
+    const speedChoice = { title: "Commit to the market window", detail: "Move quickly while demand is visible.", strategy: "speed", projectDecision: { id: project.id, action: "continue" } };
+    const validationChoice = { title: "Approve a validation sprint", detail: "Reduce project and supply risk before committing.", strategy: "quality", projectDecision: { id: project.id, action: "validate" } };
+    const highSupplySpeed = hiddenProjectFitScore(project, speedChoice, company.pendingEvent);
+    const highSupplyValidation = hiddenProjectFitScore(project, validationChoice, company.pendingEvent);
+    company.manufacturing.supplyRisk = 20;
+    const lowSupplySpeed = hiddenProjectFitScore(project, speedChoice, company.pendingEvent);
+    assert(highSupplySpeed < lowSupplySpeed - 6, `High supply risk should make speed choices less suitable (${highSupplySpeed} vs ${lowSupplySpeed})`);
+    assert(highSupplyValidation > highSupplySpeed, `Under high supply risk, validation should fit better than speed (${highSupplyValidation} vs ${highSupplySpeed})`);
+    company.manufacturing.supplyRisk = 95;
+    project.performance.riskTrend = 88;
+    project.performance.blockerCount = 3;
+    speedChoice.uncertainty = "High";
+    const surpriseSamples = [];
+    for (let i = 0; i < 60; i++) {
+      const beforeDelayed = company.delayedDecisionEffects.length;
+      const beforeHistory = company.decisionHistory.length;
+      company.randomState = (123456 + i * 7919) >>> 0;
+      const outcome = evaluateStrategicOutcome(company.pendingEvent, speedChoice);
+      surpriseSamples.push(Number(outcome.outcomeSurprise) || 0);
+      company.delayedDecisionEffects.length = beforeDelayed;
+      company.decisionHistory.length = beforeHistory;
+    }
+    assert(surpriseSamples.some(v => v < 0), "Risky decisions should sometimes produce negative hidden execution surprises");
     validationMode = false;
-    return { ok: failures.length === 0, failures, memoPreview: memoText.slice(0, 700), choicePreview: choiceText.slice(0, 700), eventCopy };
+    return { ok: failures.length === 0, failures, memoPreview: memoText.slice(0, 700), choicePreview: choiceText.slice(0, 700), eventCopy, highSupplySpeed, highSupplyValidation, lowSupplySpeed, surpriseSamples: surpriseSamples.slice(0, 12) };
   });
 
   await browser.close();
