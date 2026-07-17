@@ -69,12 +69,14 @@ npm run test:regression
 npm run test:personality
 npm run test:social-ai
 npm run test:social-experiences
+npm run test:social-relationships
 ```
 
 The employee work AI and social/personality AI boundary is documented in `docs/architecture/employee_ai_boundaries.md`. Future changes that touch personality, relationships, morale, stress, or employee drama should preserve that boundary unless the design is explicitly revised.
 
 Stage 1 social familiarity behavior is documented in `docs/specs/social_ai_stage_1_familiarity.md`.
 Stage 2 shared-experience behavior is documented in `docs/specs/social_ai_stage_2_shared_experiences.md`.
+Stage 3 relationship-interpretation behavior is documented in `docs/specs/social_ai_stage_3_relationship_interpretation.md`.
 
 Balance projection tools are developer validation tools, not CEO gameplay controls. In normal play they are hidden. To expose the Developer Tools validation panel in a local browser session, open the game with `?dev=1` or set `officeAquariumDeveloperMode` to `true` in browser storage. These tools run isolated companies in memory and must not reset, save, or mutate the active company.
 
