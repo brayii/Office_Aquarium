@@ -34,7 +34,8 @@
     "test:social-relationships": "node tests/social-ai-relationship-interpretation-test.js",
     "test:social-preferences": "node tests/social-ai-social-preferences-test.js",
     "test:social-reputation": "node tests/social-ai-workplace-reputation-test.js",
-    "test": "npm run test:static && npm run test:smoke && npm run test:regression && npm run test:workforce && npm run test:rooms-roles && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:loss-paths && npm run test:customer && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:newspaper && npm run test:release-messages && npm run test:personality && npm run test:social-ai && npm run test:social-experiences && npm run test:social-relationships && npm run test:social-preferences && npm run test:social-reputation",
+    "test:social-emotion": "node tests/social-ai-emotional-integration-test.js",
+    "test": "npm run test:static && npm run test:smoke && npm run test:regression && npm run test:workforce && npm run test:rooms-roles && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:loss-paths && npm run test:customer && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:newspaper && npm run test:release-messages && npm run test:personality && npm run test:social-ai && npm run test:social-experiences && npm run test:social-relationships && npm run test:social-preferences && npm run test:social-reputation && npm run test:social-emotion",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

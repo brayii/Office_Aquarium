@@ -128,21 +128,59 @@ function evaluateEmployeeEmotionalReaction({employee,event={},relationshipContex
   else {stressDelta+=roomStress*.35-(p.resilience||0)*.18;moraleDelta+=(rel>20?.12:0)-(rel<-20?.25:0);}
   return {moraleDelta:Number(clamp(moraleDelta,-3,3).toFixed(3)),stressDelta:Number(clamp(stressDelta,-3,3).toFixed(3)),reasonCode,sourceEventId:event.id||null,relatedEmployeeIds:relationshipContext.relatedEmployeeIds||[]};
 }
+function logSocialEmotionalTrace(trace){
+  if(!company)return trace;
+  company.socialEmotionTraces=Array.isArray(company.socialEmotionTraces)?company.socialEmotionTraces:[];
+  company.socialEmotionTraces=[trace,...company.socialEmotionTraces].slice(0,80);
+  company.lastSocialEmotionalEffect=trace;
+  return trace;
+}
+function notifyEmployeeEmotionChanged(e,trace){
+  if(!e)return false;
+  if(!validationMode&&typeof document!=="undefined"){
+    document.dispatchEvent(new CustomEvent("employee-state-changed",{detail:{employeeId:e.id,trace}}));
+    const modal=document.getElementById("employeeModal");
+    if(selectedEmployeeId===e.id&&modal&&!modal.classList.contains("hidden")&&typeof showEmployee==="function")showEmployee(e.id);
+    const node=document.getElementById(`agent-${e.id}`);
+    if(node)node.dataset.emotionalStateChanged=`${trace?.timestamp?.absoluteMinute??company?.minute??0}`;
+    return true;
+  }
+  return false;
+}
+function applyEmotionalRecommendation({employeeId,stressDelta=0,moraleDelta=0,reasonCode="emotion",sourceEventId=null,relatedEmployeeIds=[],timestamp=null}={}){
+  const e=(employees||[]).find(x=>x.id===Number(employeeId)&&x.active);
+  const requestedStress=Number(stressDelta)||0,requestedMorale=Number(moraleDelta)||0,ts=timestamp||simulationTimestamp();
+  if(!e){
+    return logSocialEmotionalTrace({type:"social_emotion_applied",employeeId:Number(employeeId),oldStress:null,stressDeltaRequested:requestedStress,stressDeltaApplied:0,newStress:null,oldMorale:null,moraleDeltaRequested:requestedMorale,moraleDeltaApplied:0,newMorale:null,reasonCode,sourceEventId,relatedEmployeeIds,blockedByCooldown:false,blockedByCap:false,status:"employee_missing",timestamp:ts});
+  }
+  ensureEmployeePersonality(e);resetEmployeeEmotionalDay(e);
+  const oldStress=Number(e.stress)||0,oldMorale=Number(e.morale)||0,code=`${sourceEventId||"local"}:${e.id}:${reasonCode}`;
+  if(e.emotionalCooldowns[code]>0){
+    return logSocialEmotionalTrace({type:"social_emotion_applied",employeeId:e.id,oldStress,stressDeltaRequested:requestedStress,stressDeltaApplied:0,newStress:oldStress,oldMorale,moraleDeltaRequested:requestedMorale,moraleDeltaApplied:0,newMorale:oldMorale,reasonCode,sourceEventId,relatedEmployeeIds,blockedByCooldown:true,blockedByCap:false,status:"blocked_by_cooldown",timestamp:ts});
+  }
+  if(requestedStress===0&&requestedMorale===0){
+    return logSocialEmotionalTrace({type:"social_emotion_applied",employeeId:e.id,oldStress,stressDeltaRequested:0,stressDeltaApplied:0,newStress:oldStress,oldMorale,moraleDeltaRequested:0,moraleDeltaApplied:0,newMorale:oldMorale,reasonCode,sourceEventId,relatedEmployeeIds,blockedByCooldown:false,blockedByCap:false,status:"zero_reaction",timestamp:ts});
+  }
+  const moraleApplied=emotionalCapDelta(e,"morale",requestedMorale),stressApplied=emotionalCapDelta(e,"stress",requestedStress);
+  const blockedByCap=(requestedMorale!==moraleApplied)||(requestedStress!==stressApplied);
+  e.morale=clamp(oldMorale+moraleApplied,0,100);e.stress=clamp(oldStress+stressApplied,0,100);
+  e.emotionalCooldowns[code]=1;
+  e.lastEmotionalReaction={moraleDelta:moraleApplied,stressDelta:stressApplied,reasonCode,sourceEventId,relatedEmployeeIds};
+  e.recentEmotionalEvents=[{day:company.day,minute:company.minute,reasonCode,moraleDelta:moraleApplied,stressDelta:stressApplied,sourceEventId},...(e.recentEmotionalEvents||[])].slice(0,12);
+  const state=e.emotionalState||{};
+  state.frustration=clamp((state.frustration||20)+Math.max(0,stressApplied)*2-Math.max(0,-stressApplied),0,100);
+  state.belonging=clamp((state.belonging||55)+Math.max(0,moraleApplied)*.8-Math.max(0,-moraleApplied)*.9,0,100);
+  state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressApplied)*.8-Math.max(0,-stressApplied)*1.2,0,100);
+  const trace={type:"social_emotion_applied",employeeId:e.id,oldStress,stressDeltaRequested:requestedStress,stressDeltaApplied:stressApplied,newStress:e.stress,oldMorale,moraleDeltaRequested:requestedMorale,moraleDeltaApplied:moraleApplied,newMorale:e.morale,reasonCode,sourceEventId,relatedEmployeeIds,blockedByCooldown:false,blockedByCap,status:blockedByCap&&stressApplied===0&&moraleApplied===0?"blocked_by_daily_cap":blockedByCap?"applied_with_cap":"applied",timestamp:ts};
+  trace.uiNotified=notifyEmployeeEmotionChanged(e,trace);
+  return logSocialEmotionalTrace(trace);
+}
+const emotionalSystem={applyRecommendation:applyEmotionalRecommendation};
 function applyEmployeeEmotionalReaction(args){
   const e=args?.employee;if(!e)return null;
-  ensureEmployeePersonality(e);resetEmployeeEmotionalDay(e);
-  const reaction=evaluateEmployeeEmotionalReaction(args),code=`${reaction.reasonCode}:${reaction.sourceEventId||"local"}`;
-  if(e.emotionalCooldowns[code]>0)return {...reaction,moraleDelta:0,stressDelta:0,capped:true};
-  const moraleDelta=emotionalCapDelta(e,"morale",reaction.moraleDelta),stressDelta=emotionalCapDelta(e,"stress",reaction.stressDelta);
-  e.morale=clamp((e.morale||0)+moraleDelta,0,100);e.stress=clamp((e.stress||0)+stressDelta,0,100);
-  e.emotionalCooldowns[code]=1;
-  e.lastEmotionalReaction={...reaction,moraleDelta,stressDelta};
-  e.recentEmotionalEvents=[{day:company.day,minute:company.minute,reasonCode:reaction.reasonCode,moraleDelta,stressDelta,sourceEventId:reaction.sourceEventId},...(e.recentEmotionalEvents||[])].slice(0,12);
-  const state=e.emotionalState||{};
-  state.frustration=clamp((state.frustration||20)+Math.max(0,stressDelta)*2-Math.max(0,-stressDelta),0,100);
-  state.belonging=clamp((state.belonging||55)+Math.max(0,moraleDelta)*.8-Math.max(0,-moraleDelta)*.9,0,100);
-  state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressDelta)*.8-Math.max(0,-stressDelta)*1.2,0,100);
-  return e.lastEmotionalReaction;
+  const reaction=evaluateEmployeeEmotionalReaction(args);
+  const trace=emotionalSystem.applyRecommendation({employeeId:e.id,stressDelta:reaction.stressDelta,moraleDelta:reaction.moraleDelta,reasonCode:reaction.reasonCode,sourceEventId:reaction.sourceEventId,relatedEmployeeIds:reaction.relatedEmployeeIds,timestamp:simulationTimestamp()});
+  return {...reaction,moraleDelta:trace?.moraleDeltaApplied||0,stressDelta:trace?.stressDeltaApplied||0,capped:trace?.blockedByCap||false,blockedByCooldown:trace?.blockedByCooldown||false};
 }
 function makeRelationshipKey(employeeAId,employeeBId){
   return [Number(employeeAId),Number(employeeBId)].sort((a,b)=>a-b).join(":");
@@ -160,6 +198,8 @@ function ensureSocialAISystems(){
   company.roomPresenceCounters=company.roomPresenceCounters&&typeof company.roomPresenceCounters==="object"?company.roomPresenceCounters:{};
   company.socialPreferenceHistory=Array.isArray(company.socialPreferenceHistory)?company.socialPreferenceHistory.slice(0,80):[];
   company.socialPreferenceDebug=Array.isArray(company.socialPreferenceDebug)?company.socialPreferenceDebug.slice(0,24):[];
+  company.socialEmotionTraces=Array.isArray(company.socialEmotionTraces)?company.socialEmotionTraces.slice(0,80):[];
+  company.lastSocialEmotionalEffect=company.lastSocialEmotionalEffect||null;
   company.workplaceReputations=company.workplaceReputations&&typeof company.workplaceReputations==="object"?company.workplaceReputations:{};
   Object.entries(company.socialRelationships).forEach(([key,record])=>{
     const ids=key.split(":").map(Number);
@@ -356,45 +396,38 @@ function socialExperienceReaction(employee,coworker,type,intensity,tone){
   ensureEmployeePersonality(employee);
   const p=employee.personality||{};
   let moraleDelta=0,stressDelta=0,reasonCode=`experience_${type}`;
-  if(type==="shared_break"){moraleDelta=.18+(p.sociability||0)*.18;stressDelta=-(.08+(p.empathy||0)*.04);}
-  else if(type==="shared_meeting"){moraleDelta=(p.collaboration||0)*.14;stressDelta=(p.structureNeed||0)>.35?-.03:.08-(p.collaboration||0)*.06;}
-  else if(type==="direct_help"){moraleDelta=.28+(p.empathy||0)*.20+(p.collaboration||0)*.12;stressDelta=-(p.empathy||0)*.08+(p.sociability||0)<-.6?.10:0;}
-  else if(type==="blocker_resolved_together"){moraleDelta=.35+(p.collaboration||0)*.18;stressDelta=.05-(p.resilience||0)*.08;}
-  else if(type==="deadline_pressure_together"){moraleDelta=(p.resilience||0)*.12;stressDelta=.25-(p.resilience||0)*.12;}
-  else if(type==="milestone_success_together"||type==="recognition_shared"){moraleDelta=.38+(p.sociability||0)*.10;stressDelta=-.08;}
-  else if(type==="milestone_failure_together"){moraleDelta=-.18;stressDelta=.32-(p.resilience||0)*.10;}
-  else {moraleDelta=.08+(p.collaboration||0)*.08;stressDelta=(tone==="negative"?.18:0)-(tone==="positive"?.05:0);}
-  if(tone==="negative"){moraleDelta-=.12;stressDelta+=.18;}
-  if(tone==="positive"){moraleDelta+=.12;stressDelta-=.06;}
-  if(tone==="mixed"){moraleDelta+=.04;stressDelta+=.10;}
+  if(type==="shared_break"){moraleDelta=1.2+(p.sociability||0)*.7;stressDelta=-(.8+(p.empathy||0)*.25);}
+  else if(type==="shared_meeting"){moraleDelta=(p.collaboration||0)*.55;stressDelta=(p.structureNeed||0)>.35?-.4:.6-(p.collaboration||0)*.3;}
+  else if(type==="direct_help"){moraleDelta=2.1+(p.empathy||0)*.7+(p.collaboration||0)*.45;stressDelta=-(1+(p.empathy||0)*.35);}
+  else if(type==="blocker_resolved_together"){moraleDelta=2.6+(p.collaboration||0)*.55;stressDelta=-(.7+(p.resilience||0)*.35);}
+  else if(type==="deadline_pressure_together"){moraleDelta=(p.resilience||0)*.35-.8;stressDelta=2.1-(p.resilience||0)*.45;}
+  else if(type==="milestone_success_together"||type==="recognition_shared"){moraleDelta=2.2+(p.sociability||0)*.4;stressDelta=-.7;}
+  else if(type==="milestone_failure_together"){moraleDelta=-1.4;stressDelta=2.4-(p.resilience||0)*.45;}
+  else if(type==="interruption_shared"){moraleDelta=-.8;stressDelta=1.5;}
+  else if(type==="conflict_observed"){moraleDelta=-1.4;stressDelta=2.3;}
+  else {moraleDelta=.7+(p.collaboration||0)*.35;stressDelta=(tone==="negative"?1.2:0)-(tone==="positive"?.6:0);}
+  if(tone==="negative"){moraleDelta-=.8;stressDelta+=1.1;}
+  if(tone==="positive"){moraleDelta+=.7;stressDelta-=.5;}
+  if(tone==="mixed"){moraleDelta+=.2;stressDelta+=.7;}
   const relationshipReaction=relationshipEmotionalReaction(employee,coworker,type==="interruption_shared"?"interruption":type==="deadline_pressure_together"?"pressure":type==="direct_help"||type==="blocker_resolved_together"?"helpful_nearby":"social");
-  moraleDelta+=relationshipReaction.moraleDelta*.35;
-  stressDelta+=relationshipReaction.stressDelta*.35;
-  const scale=clamp((Number(intensity)||1)/3,.25,1.35);
-  return {moraleDelta:Number(clamp(moraleDelta*scale,-1.5,1.5).toFixed(3)),stressDelta:Number(clamp(stressDelta*scale,-1.5,1.5).toFixed(3)),reasonCode,sourceEventId:null,relatedEmployeeIds:[coworker.id]};
+  moraleDelta+=relationshipReaction.moraleDelta*.45;
+  stressDelta+=relationshipReaction.stressDelta*.45;
+  const scale=clamp((Number(intensity)||1)/3,.45,1.35);
+  return {moraleDelta:Math.round(clamp(moraleDelta*scale,-3,3)),stressDelta:Math.round(clamp(stressDelta*scale,-4,4)),reasonCode,sourceEventId:null,relatedEmployeeIds:[coworker.id]};
 }
 function applySocialReaction(employee,reaction){
-  resetEmployeeEmotionalDay(employee);
-  const code=`${reaction.reasonCode}:${reaction.sourceEventId||"local"}`;
-  if(employee.emotionalCooldowns[code]>0)return {...reaction,moraleDelta:0,stressDelta:0,capped:true};
-  const moraleDelta=emotionalCapDelta(employee,"morale",reaction.moraleDelta),stressDelta=emotionalCapDelta(employee,"stress",reaction.stressDelta);
-  employee.morale=clamp((employee.morale||0)+moraleDelta,0,100);
-  employee.stress=clamp((employee.stress||0)+stressDelta,0,100);
-  employee.emotionalCooldowns[code]=1;
-  employee.lastEmotionalReaction={...reaction,moraleDelta,stressDelta};
-  employee.recentEmotionalEvents=[{day:company.day,minute:company.minute,reasonCode:reaction.reasonCode,moraleDelta,stressDelta,sourceEventId:reaction.sourceEventId},...(employee.recentEmotionalEvents||[])].slice(0,12);
-  const state=employee.emotionalState||{};
-  state.frustration=clamp((state.frustration||20)+Math.max(0,stressDelta)*2-Math.max(0,-stressDelta),0,100);
-  state.belonging=clamp((state.belonging||55)+Math.max(0,moraleDelta)*.8-Math.max(0,-moraleDelta)*.9,0,100);
-  state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressDelta)*.8-Math.max(0,-stressDelta)*1.2,0,100);
-  return employee.lastEmotionalReaction;
+  const trace=emotionalSystem.applyRecommendation({employeeId:employee?.id,stressDelta:reaction?.stressDelta||0,moraleDelta:reaction?.moraleDelta||0,reasonCode:reaction?.reasonCode||"social_reaction",sourceEventId:reaction?.sourceEventId||null,relatedEmployeeIds:reaction?.relatedEmployeeIds||[],timestamp:simulationTimestamp()});
+  return {...reaction,moraleDelta:trace?.moraleDeltaApplied||0,stressDelta:trace?.stressDeltaApplied||0,capped:trace?.blockedByCap||false,blockedByCooldown:trace?.blockedByCooldown||false,status:trace?.status};
 }
 function recordSharedExperience(a,b,{type="shared_work_activity",sourceEventId=null,roomId=null,projectId=null,participants=null,tone=null,intensity=1,requireSource=false}={}){
   if(!a?.active||!b?.active||a.id===b.id)return null;
   const experienceType=normalizeSocialExperienceType(type);
   if((requireSource||experienceType==="direct_help"||experienceType==="blocker_resolved_together")&&!sourceEventId)return null;
   const record=socialRelationshipRecord(a.id,b.id,{create:true}),pairKey=makeRelationshipKey(a.id,b.id),id=`${sourceEventId||`local-${company.day}-${company.minute}`}:${experienceType}:${pairKey}`;
-  if((record.recentExperiences||[]).some(x=>x.id===id))return record;
+  if((record.recentExperiences||[]).some(x=>x.id===id)){
+    [a,b].forEach(employee=>logSocialEmotionalTrace({type:"social_emotion_applied",employeeId:employee.id,oldStress:employee.stress,stressDeltaRequested:0,stressDeltaApplied:0,newStress:employee.stress,oldMorale:employee.morale,moraleDeltaRequested:0,moraleDeltaApplied:0,newMorale:employee.morale,reasonCode:`experience_${experienceType}`,sourceEventId:id,relatedEmployeeIds:[a.id,b.id].filter(x=>x!==employee.id),blockedByCooldown:false,blockedByCap:false,status:"duplicate_event",timestamp:simulationTimestamp()}));
+    return record;
+  }
   const boundedIntensity=clamp(Math.round(Number(intensity)||1),1,5);
   const reactionA=socialExperienceReaction(a,b,experienceType,boundedIntensity,tone||"neutral");
   const reactionB=socialExperienceReaction(b,a,experienceType,boundedIntensity,tone||"neutral");
@@ -545,6 +578,14 @@ function workplaceReputationDebugHtml(e){
   const d=rep.dimensions||{},observations=(rep.observations||[]).slice(0,6).map(o=>`${o.type} ${o.tone} intensity ${o.intensity} source ${o.sourceId}`).join("<br>")||"none";
   const changes=(rep.recentChanges||[]).slice(0,5).map(c=>`Day ${c.day}: ${c.type} ${c.tone} - ${c.changes.map(x=>`${x.key} ${x.delta>0?"+":""}${x.delta}`).join(", ")}`).join("<br>")||"none";
   return `Confidence ${Math.round(rep.confidence||0)} - ${reputationLabelFor(rep)}<br>Technical ${Math.round(d.technical??50)}; Reliability ${Math.round(d.reliability??50)}; Approachability ${Math.round(d.approachability??50)}; Professionalism ${Math.round(d.professionalism??50)}<br><br><strong>Contributing Observations</strong><br>${observations}<br><br><strong>Recent Changes</strong><br>${changes}`;
+}
+function socialEmotionTraceDebugHtml(e){
+  const trace=(company.socialEmotionTraces||[]).find(t=>t.employeeId===e?.id)||company.lastSocialEmotionalEffect;
+  if(!trace)return "No social emotional effect recorded yet.";
+  const employee=(employees||[]).find(x=>x.id===trace.employeeId);
+  const stress=`${trace.oldStress??"n/a"} -> ${trace.newStress??"n/a"} (${trace.stressDeltaApplied>0?"+":""}${trace.stressDeltaApplied??0})`;
+  const morale=`${trace.oldMorale??"n/a"} -> ${trace.newMorale??"n/a"} (${trace.moraleDeltaApplied>0?"+":""}${trace.moraleDeltaApplied??0})`;
+  return `Employee: ${employee?.name||trace.employeeId}<br>Event: ${trace.sourceEventId||"local"}<br>Reason: ${trace.reasonCode}<br>Stress: ${stress}<br>Morale: ${morale}<br>Applied: ${trace.status==="applied"?"yes":trace.status}<br>Blocked by cooldown: ${trace.blockedByCooldown?"yes":"no"}; blocked by daily cap: ${trace.blockedByCap?"yes":"no"}<br>Related employees: ${(trace.relatedEmployeeIds||[]).join(", ")||"none"}<br>UI notified: ${trace.uiNotified?"yes":"no"}`;
 }
 function applySocialEncounterEmotion(employee,coworker,type,sourceEventId,gain){
   const reaction=socialEncounterEmotion(employee,coworker,type,gain);
