@@ -847,6 +847,14 @@ function queueInformationalCommunication(comm,sourceEvent={}){
   ensureBibleSystems?.();
   company.escalationQueue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];
   const sender=comm.sender||{name:comm.from||"Executive Office",role:comm.role||"Leadership Team"};
+  const noReplyText="No reply is needed. Open this update to read it, then file it when you are done.";
+  const message=String(comm.message||sourceEvent.copy||"An executive update is available for review.").trim();
+  const normalizedComm={
+    ...comm,
+    priority:comm.priority||"FYI",
+    message:/no reply is needed/i.test(message)?message:`${message}\n\n${noReplyText}`,
+    impacts:[...new Set([...(Array.isArray(comm.impacts)?comm.impacts:[]),"No CEO reply is required"])]
+  };
   const id=sourceEvent.id||nextSimulationId("info-message");
   const exists=(company.escalationQueue||[]).some(ev=>ev.id===id)||company.pendingEvent?.id===id||(company.communications||[]).some(m=>m.eventId===id);
   if(exists)return false;
@@ -857,15 +865,15 @@ function queueInformationalCommunication(comm,sourceEvent={}){
     category:sourceEvent.category||"information",
     sourceMessageId:sourceEvent.sourceMessageId||null,
     storyId:sourceEvent.storyId||null,
-    title:comm.subject||sourceEvent.title||"Executive update",
-    copy:comm.message||sourceEvent.copy||"An executive update is available for review.",
-    generatedCommunication:{...comm,sender},
+    title:normalizedComm.subject||sourceEvent.title||"Executive update",
+    copy:noReplyText,
+    generatedCommunication:{...normalizedComm,sender},
     choices:[{
       title:"File this update",
       detail:"Read the update and move it to Old Messages.",
       strategy:"information",
       uncertainty:"Observed",
-      estimatedConfidence:comm.estimatedConfidence||65,
+      estimatedConfidence:normalizedComm.estimatedConfidence||65,
       benefits:["keeps the CEO informed without creating a fake decision"],
       risks:["no direct CEO action is taken"]
     }]
@@ -901,6 +909,9 @@ function fileInformationalCommunication(){
   company.paused=false;
   if(!validationMode){updatePauseButton();saveGame();renderDecisionEvent();render();}
   return archivedMemo;
+}
+function informationalMemoNoticeHtml(){
+  return `<div class="memo-block informational-notice"><h4>No reply needed</h4><p>This is an informational follow-up. Read it for context, then file it when you are done.</p></div>`;
 }
 function teamDisplayName(team){return {hardware:"Hardware",software:"Software",quality:"Quality",product:"Product",finance:"Finance",people:"People","customer success":"Customer Success",board:"Board",company:"Company"}[String(team||"").toLowerCase()]||team;}
 function departmentBriefingHtml(){
@@ -1303,12 +1314,14 @@ function renderCommunicationInboxList(){
   if(company.pendingEvent){
     const ev=company.pendingEvent,comm=company.pendingCommunication||ev.generatedCommunication||{};
     ev.read=true;
-    rows.push(`<button type="button" class="ceo-mail-item active read"><strong>${htmlEscape(comm.subject||ev.title||"CEO decision needed")}</strong><small>${htmlEscape(comm.type||"Decision memo")} - ${htmlEscape(communicationListSender(ev))} - Active now</small><small>${htmlEscape(communicationListPreview(ev)||"Awaiting CEO decision.")}</small></button>`);
+    const info=isInformationalExecutiveEvent(ev);
+    rows.push(`<button type="button" class="ceo-mail-item active read"><strong>${htmlEscape(comm.subject||ev.title||"CEO decision needed")}</strong><small>${htmlEscape(comm.type||"Decision memo")} - ${htmlEscape(communicationListSender(ev))} - ${info?"No reply needed":"Active now"}</small><small>${htmlEscape(communicationListPreview(ev)||"Awaiting CEO decision.")}</small></button>`);
   }
   queued.forEach((ev,i)=>{
     const comm=ev.generatedCommunication||{};
     const canOpen=!company.pendingEvent;
-    rows.push(`<button type="button" class="ceo-mail-item waiting ${canOpen?"openable":""} ${ev.read?"read":"unread"}" ${canOpen?`onclick="openQueuedMemoAt(${i})"`:""}><strong>${htmlEscape(comm.subject||ev.title||"Queued memo")}</strong><small>${htmlEscape(comm.type||"Memo")} - ${htmlEscape(communicationListSender(ev))} - ${canOpen?"Ready to open":"Waiting behind active memo"}</small><small>${htmlEscape(communicationListPreview(ev)||"Queued for CEO review.")}</small></button>`);
+    const info=isInformationalExecutiveEvent(ev);
+    rows.push(`<button type="button" class="ceo-mail-item waiting ${canOpen?"openable":""} ${ev.read?"read":"unread"}" ${canOpen?`onclick="openQueuedMemoAt(${i})"`:""}><strong>${htmlEscape(comm.subject||ev.title||"Queued memo")}</strong><small>${htmlEscape(comm.type||"Memo")} - ${htmlEscape(communicationListSender(ev))} - ${info?"No reply needed":canOpen?"Ready to open":"Waiting behind active memo"}</small><small>${htmlEscape(communicationListPreview(ev)||"Queued for CEO review.")}</small></button>`);
   });
   list.innerHTML=rows.length?rows.join(""):`<div class="ceo-mail-empty"><strong>Inbox clear</strong><br>The company is operating on its own. A memo or email will appear when leadership is needed.</div>`;
 }
@@ -1991,11 +2004,11 @@ function renderDecisionEvent(){
   renderCommunicationInboxList();
   const contextText=decisionContextSummary(ev);
   const informational=isInformationalExecutiveEvent(ev);
-  document.getElementById("eventTitle").textContent=comm.subject;document.getElementById("eventCopy").textContent=informational?"Read this executive update, then file it when you are done.":contextText?`Decision context: ${contextText}. Review the communication and record a CEO decision.`:"Review the communication and record a CEO decision.";badge.textContent=informational?"Information":"Action needed";badge.className=informational?"inbox-badge quiet":"inbox-badge alert";grid.classList.toggle("hidden",informational);button.classList.remove("hidden");button.textContent=informational?"File Message":"Record CEO Decision";memo.classList.remove("hidden");
+  document.getElementById("eventTitle").textContent=comm.subject;document.getElementById("eventCopy").textContent=informational?"No reply is needed. Read this executive update, then file it when you are done.":contextText?`Decision context: ${contextText}. Review the communication and record a CEO decision.`:"Review the communication and record a CEO decision.";badge.textContent=informational?"No reply needed":"Action needed";badge.className=informational?"inbox-badge quiet":"inbox-badge alert";grid.classList.toggle("hidden",informational);button.classList.remove("hidden");button.textContent=informational?"File Message":"Record CEO Decision";memo.classList.remove("hidden");
   const priorityClass=comm.priority==="Urgent"?"urgent":comm.priority==="FYI"?"fyi":"";
   ev.memoIntelligence=ev.memoIntelligence||buildMemoIntelligence(ev,comm);
   ensureExecutiveMessageModel(ev,comm);
-  memo.innerHTML=`<article class="memo-card"><div class="memo-header"><div><div class="memo-type">${comm.type}</div><h3>${comm.subject}</h3></div><span class="memo-priority ${priorityClass}">${comm.priority}</span></div>${communicationHeaderHtml(comm,comm.structuredMessage)}<div class="memo-message">${comm.message}</div>${memoIntelligenceHtml(ev,comm)}<div class="memo-signature">${comm.signature.replace(/\n/g,"<br>")}</div></article>`;
+  memo.innerHTML=`<article class="memo-card"><div class="memo-header"><div><div class="memo-type">${comm.type}</div><h3>${comm.subject}</h3></div><span class="memo-priority ${priorityClass}">${informational?"No reply needed":comm.priority}</span></div>${communicationHeaderHtml(comm,comm.structuredMessage)}${informational?informationalMemoNoticeHtml():""}<div class="memo-message">${comm.message}</div>${memoIntelligenceHtml(ev,comm)}<div class="memo-signature">${comm.signature.replace(/\n/g,"<br>")}</div></article>`;
   alert.innerHTML=informational?`<strong>${comm.type}: ${comm.subject}</strong>${comm.from} sent an informational update.`:`<strong>${comm.type}: ${comm.subject}</strong>${comm.from} requests a CEO decision${contextText?` for ${contextText}`:""}.`;alert.classList.toggle("hidden",informational);grid.innerHTML="";if(!informational)(ev.choices||[]).slice(0,3).forEach((d,i)=>{const b=document.createElement("button");b.className="decision"+(i===company.selected?" selected":"");b.innerHTML=renderDecisionChoiceHtml(d,ev);b.onclick=()=>{company.selected=i;renderDecisionEvent()};grid.appendChild(b);});
 }
 function eventCategory(ev){return ev.category||({cash:"finance",performance:"people",hiring:"people",burnout:"people",culture:"culture",milestone:"product",launch:"product","pilot-review":"product","market-shift":"market","supply-chain":"operations","shareholder-letter":"board"}[ev.id]||"opportunity");}

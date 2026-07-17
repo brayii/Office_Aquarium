@@ -151,12 +151,15 @@ async function main() {
     assert(company.communications.length === 0, "Informational update should not become an old message before it is opened");
     assert(company.escalationQueue.length === 1, "Informational update should wait in the inbox queue");
     assert(document.getElementById("commInboxList").innerText.includes("Informational workforce update"), "Inbox should list informational update");
+    assert(/No reply needed/i.test(document.getElementById("commInboxList").innerText), "Inbox row should clearly mark informational updates as no-reply messages");
 
     const openedInfo = openQueuedMemoAt(0);
     assert(openedInfo, "Opening informational update should activate it");
     assert(company.pendingEvent?.informationalOnly === true, "Informational update should remain marked informational");
     assert(document.getElementById("decisionGrid").classList.contains("hidden"), "Informational update should not show strategic choice cards");
     assert(document.getElementById("applyDecision").innerText.includes("File Message"), "Informational update should use a file-message action");
+    assert(/No reply is needed|No reply needed/i.test(document.getElementById("eventCopy").innerText), "Opened informational update should tell the CEO no reply is needed");
+    assert(/No reply needed/i.test(document.getElementById("memoContainer").innerText), "Informational memo body should include a no-reply notice");
     applyDecision();
     assert(company.pendingEvent === null, "Filing informational update should clear pending event");
     assert(company.communications.length === 1, "Filing informational update should create one old message");
