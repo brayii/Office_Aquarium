@@ -289,12 +289,14 @@ function developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo){
   const personalityDebug=employeePersonalityDebugHtml(e);
   const familiarityDebug=socialFamiliarityDebugHtml?.(e)||"No social familiarity data.";
   const socialPreferenceDebug=socialPreferenceDebugHtml?.(e)||"No social preference data.";
+  const workplaceReputationDebug=workplaceReputationDebugHtml?.(e)||"No workplace reputation data.";
   return `<div class="debug-panel"><h3>AI Debug</h3>
     <details class="debug-section"><summary>Employee AI</summary><div class="debug-section-content"><strong>Utility Scores</strong><br><code>${scoreLines||"No scores yet"}</code><br><br><strong>Cooldowns</strong><br>${cooldowns}<br><br><strong>Memory Bias</strong><br>${strongestMemory?`${strongestMemory.type}: ${Math.round(strongestMemory.strength)}`:"None"}<br><br><strong>Collaborator Candidate</strong><br>${availableCollaborator(e)?.name||"None"}<br><br><strong>Repetition</strong><br>${e.lastAction||"None"} x ${e.repeatCount||0}<br><br><strong>Duration</strong><br>${Math.round(e.actionMinutes||0)} minutes<br><br><strong>CEO Opinion</strong><br>Trust ${Math.round(ceo.trust||0)}, Fairness ${Math.round(ceo.fairness||0)}, Competence ${Math.round(ceo.competence||0)}, Support ${Math.round(ceo.support||0)}, Fear ${Math.round(ceo.fear||0)}</div></details>
     <details class="debug-section"><summary>Roles and Rooms</summary><div class="debug-section-content">${roleRoomDebug}</div></details>
     <details class="debug-section"><summary>Personality and Emotional Reactions</summary><div class="debug-section-content">${personalityDebug}</div></details>
     <details class="debug-section"><summary>Social Familiarity</summary><div class="debug-section-content">${familiarityDebug}</div></details>
     <details class="debug-section"><summary>Social Preferences</summary><div class="debug-section-content">${socialPreferenceDebug}</div></details>
+    <details class="debug-section"><summary>Workplace Reputation</summary><div class="debug-section-content">${workplaceReputationDebug}</div></details>
     <details class="debug-section"><summary>Policy Transition</summary><div class="debug-section-content">${policyDebug}</div></details>
     <details class="debug-section"><summary>Company Capabilities</summary><div class="debug-section-content">${capabilityDebug}</div></details>
     <details class="debug-section"><summary>Institutional Learning</summary><div class="debug-section-content">${learning}</div></details>
