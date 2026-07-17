@@ -266,6 +266,6 @@ function applyRoomTickEffects(e){
   e.roomSelectionReason=`${e.role} ${effect.correct?"is using a relevant room":"is outside the ideal room"} for ${e.action}.`;
   e.roomEffect=effect;
   e.focus=clamp(e.focus-effect.focus,0,100);
-  e.stress=clamp(e.stress+effect.stress,0,100);
+  applyEmployeeEmotionDelta?.(e,{stressDelta:effect.stress,reasonCode:"room-effect",sourceEventId:`room-${company?.day||0}-${company?.minute||0}`,ignoreCooldown:true});
   return effect;
 }
