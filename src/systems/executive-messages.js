@@ -179,6 +179,140 @@ function filterEvidenceForDepartment(evidence,dept,choice=null){
     return ids.some(id=>allowed.includes(id)||choiceIds.includes(id));
   }).slice(0,3);
 }
+function recommendationScoreRules(){
+  return OFFICE_AQUARIUM_CONSTANTS?.recommendations||{minScore:5,maxScore:95,supportScore:66,opposeScore:42};
+}
+function clampRecommendationScore(score){
+  const rules=recommendationScoreRules();
+  return clamp(score,rules.minScore,rules.maxScore);
+}
+function recommendationPosition(score){
+  const rules=recommendationScoreRules();
+  return score>=rules.supportScore?"support":score<=rules.opposeScore?"oppose":"cautious";
+}
+function hiringRequestRecommendationAdjustment(choice,ev,department="company"){
+  const request=ev?.hiringRequest;
+  if(!request)return 0;
+  const text=[request.operationalImpact,request.financeAssessment,...(request.reasons||[]),ev.copy,ev.generatedCommunication?.message].join(" ").toLowerCase();
+  const confidence=Number(request.confidence)||55,runway=Number(company.finance?.runwayDays)||999,netFlow=Number(company.finance?.netCashFlowDaily)||0;
+  let need=0;
+  if(/critical|severe|uncovered|missing|no current|blocked|overload|succession|retention|burnout/.test(text))need+=18;
+  if(/material|project|backlog|stress|capacity|skill coverage|healthy staffing/.test(text))need+=10;
+  if(/manageable|preventive|monitoring/.test(text))need-=8;
+  need+=clamp((confidence-55)*.45,-10,16);
+  const cashPressure=(runway<60?22:runway<90?14:runway<120?7:0)+(netFlow<-.12?8:0);
+  const isApprove=!!(choice.hire||choice.hireRole),isDelay=!!choice.deferHiring,isReject=!!choice.rejectHiring;
+  let adjustment=0;
+  if(isApprove)adjustment+=need-cashPressure*.75;
+  if(isDelay)adjustment+=cashPressure*.55-need*.35+(confidence<50?8:0);
+  if(isReject)adjustment+=cashPressure*.35-need*.65+(confidence<45?10:0);
+  const dept=String(department||"").toLowerCase();
+  if(isApprove&&dept===request.department)adjustment+=6;
+  if(isApprove&&dept==="people")adjustment+=5;
+  if(isDelay&&dept==="finance")adjustment+=4;
+  if(isReject&&confidence>=62)adjustment-=8;
+  return clamp(adjustment,-24,28);
+}
+function customerStrategyRecommendationAdjustment(choice,ev,department="company"){
+  const strategy=choice?.customerStrategy;
+  if(!strategy)return 0;
+  const segmentId=strategy.segmentId||ev?.customerSegmentId||"enterprise";
+  const seg=company.customerSegments?.[segmentId];
+  if(!seg)return 0;
+  const churn=Number(seg.churnRisk)||0,sentiment=Number(seg.sentiment??company.customerSentiment??50),support=Number(seg.supportSatisfaction??50);
+  const issues=(seg.currentIssues||[]).filter(i=>!i.resolved).length,runway=Number(company.finance?.runwayDays)||999;
+  const pressure=Math.max(0,churn-45)*.35+Math.max(0,55-sentiment)*.3+Math.max(0,55-support)*.25+issues*4;
+  let adjustment=0;
+  if(strategy.mode==="recovery")adjustment+=pressure*.85+(churn>65?8:0)-Math.max(0,75-runway)*.08;
+  else if(strategy.mode==="support")adjustment+=pressure*.7+Math.max(0,55-support)*.25-Math.max(0,90-runway)*.1;
+  else if(strategy.mode==="hold")adjustment+=Math.max(0,runway<75?10:0)+Math.max(0,25-pressure)*.35-pressure*.55;
+  const dept=String(department||"").toLowerCase();
+  if((strategy.mode==="recovery"||strategy.mode==="support")&&(dept==="customer success"||dept==="product"))adjustment+=4;
+  if(strategy.mode==="hold"&&dept==="finance"&&runway<90)adjustment+=5;
+  return clamp(adjustment,-24,28);
+}
+function commercialProjectRecommendationAdjustment(choice,ev,department="company"){
+  const decision=choice?.commercializeProject;
+  if(!decision)return 0;
+  const project=decisionProjectSubject(ev,choice);
+  if(!project)return 0;
+  const readiness=Number(project.commercialReadiness)||0,potential=Number(project.commercialPotential)||0,revenue=Number(project.projectedDailyRevenue)||0;
+  const interest=Number(project.performance?.customerInterest??project.customerInterest??50),risk=Number(project.performance?.riskTrend??project.visibleRisk??50);
+  const supportPressure=Math.max(0,avgStress()-65),runway=Number(company.finance?.runwayDays)||999;
+  let adjustment=0;
+  if(decision.mode==="launch"){
+    adjustment+=Math.max(0,readiness-58)*.35+Math.max(0,potential-60)*.25+Math.max(0,interest-55)*.18+Math.min(16,revenue*120);
+    adjustment-=Math.max(0,risk-65)*.3+Math.max(0,60-readiness)*.45+supportPressure*.18;
+  }else if(decision.mode==="pilot"){
+    adjustment+=Math.max(0,potential-48)*.22+Math.max(0,interest-45)*.16+Math.max(0,risk-50)*.18+Math.max(0,72-readiness)*.12;
+    adjustment-=Math.max(0,readiness-85)*.12+Math.max(0,45-potential)*.18;
+  }else if(decision.mode==="shelve"){
+    adjustment+=Math.max(0,52-readiness)*.32+Math.max(0,45-potential)*.28+Math.max(0,risk-76)*.18+Math.max(0,55-runway)*.08;
+    adjustment-=Math.max(0,potential-70)*.32+Math.max(0,readiness-70)*.26+Math.min(14,revenue*100);
+  }
+  const dept=String(department||"").toLowerCase();
+  if(decision.mode==="launch"&&(dept==="product"||dept==="finance"))adjustment+=3;
+  if(decision.mode==="pilot"&&(dept==="quality"||dept==="engineering"||dept==="hardware"||dept==="software"))adjustment+=4;
+  if(decision.mode==="shelve"&&dept==="finance"&&runway<75)adjustment+=4;
+  return clamp(adjustment,-26,30);
+}
+function hiringPolicyRecommendationAdjustment(choice,ev,department="company"){
+  const policy=choice?.hiringPolicy;
+  if(!policy)return 0;
+  const runway=Number(company.finance?.runwayDays)||999,netFlow=Number(company.finance?.netCashFlowDaily)||0;
+  const needs=Object.values(company.hiringNeedHistory||{}).filter(h=>(h.lastScore||0)>=75).length;
+  const suppressed=(company.hiringRequestHistory||[]).filter(h=>h.status==="suppressed-policy"&&company.day-(h.day||0)<=30).length;
+  const missing=Number(company.portfolioHealth?.currentlyMissingStaff??company.projectCapacity?.missingAssignments??0)||0;
+  const staffingPressure=needs*6+suppressed*4+missing*8+Math.max(0,avgStress()-62)*.25;
+  const financePressure=(runway<60?22:runway<90?14:runway<120?7:0)+(netFlow<-.12?8:0);
+  let adjustment=0;
+  if(policy.mode==="frozen")adjustment+=financePressure-staffingPressure*.45;
+  else if(policy.mode==="critical-only")adjustment+=financePressure*.45+staffingPressure*.35+Math.max(0,needs-1)*2;
+  else if(policy.mode==="normal")adjustment+=staffingPressure*.55-financePressure*.55+(runway>120?6:0);
+  const dept=String(department||"").toLowerCase();
+  if(policy.mode==="frozen"&&dept==="finance")adjustment+=4;
+  if(policy.mode==="normal"&&(dept==="people"||dept==="product"))adjustment+=4;
+  if(policy.mode==="critical-only"&&dept==="board")adjustment+=3;
+  return clamp(adjustment,-24,28);
+}
+function workforceReductionRecommendationAdjustment(choice,ev,department="company"){
+  if(!choice?.layoff&&!choice?.rejectLayoff)return 0;
+  const active=employees.filter(e=>e.active);
+  const runway=Number(company.finance?.runwayDays)||999,netFlow=Number(company.finance?.netCashFlowDaily)||0;
+  const morale=active.reduce((s,e)=>s+(e.morale||50),0)/Math.max(1,active.length);
+  const financialPressure=(runway<45?24:runway<75?16:runway<110?8:0)+(netFlow<-.15?10:0);
+  const peopleFragility=Math.max(0,55-morale)*.28+Math.max(0,55-(company.trust||50))*.24+Math.max(0,avgStress()-68)*.25;
+  let adjustment=0;
+  if(choice.layoff?.voluntary)adjustment+=financialPressure*.65-peopleFragility*.35+4;
+  else if(choice.layoff)adjustment+=financialPressure-peopleFragility-8;
+  else if(choice.rejectLayoff)adjustment+=peopleFragility+Math.max(0,runway-90)*.08-financialPressure;
+  const dept=String(department||"").toLowerCase();
+  if(choice.layoff&&dept==="finance")adjustment+=5;
+  if(choice.rejectLayoff&&dept==="people")adjustment+=5;
+  if(choice.layoff?.voluntary&&dept==="people")adjustment+=4;
+  return clamp(adjustment,-26,28);
+}
+function fundraisingRecommendationAdjustment(choice,ev,department="company"){
+  if(!choice?.fundraising)return 0;
+  const offer=choice.fundraising,mode=String(offer.mode||choice.strategy||"").toLowerCase();
+  const runway=Number(company.finance?.runwayDays)||999,confidence=Number(company.marketConfidence??50),appetite=Number(company.investorAppetite??50),quality=Number(company.valuationQuality??50);
+  const dilution=Number(offer.dilutionPercent)||0,amount=Number(offer.amount)||0;
+  let adjustment=Math.max(0,120-runway)*.12+Math.max(0,appetite-52)*.2+Math.max(0,confidence-50)*.12+Math.max(0,quality-50)*.1;
+  adjustment-=Math.max(0,dilution-14)*.45;
+  if(mode==="aggressive")adjustment+=Math.max(0,90-runway)*.12+Math.max(0,appetite-65)*.24-Math.max(0,55-quality)*.2-Math.max(0,dilution-20)*.4;
+  if(mode==="bridge")adjustment+=Math.max(0,65-runway)*.2-Math.max(0,quality-55)*.12;
+  if(mode==="modest")adjustment+=Math.min(8,amount*.8)+Math.max(0,appetite-50)*.1;
+  const dept=String(department||"").toLowerCase();
+  if(dept==="finance"||dept==="board")adjustment+=4;
+  return clamp(adjustment,-20,26);
+}
+function eventSpecificRecommendationAdjustment(choice,ev,department="company"){
+  return customerStrategyRecommendationAdjustment(choice,ev,department)
+    +commercialProjectRecommendationAdjustment(choice,ev,department)
+    +hiringPolicyRecommendationAdjustment(choice,ev,department)
+    +workforceReductionRecommendationAdjustment(choice,ev,department)
+    +fundraisingRecommendationAdjustment(choice,ev,department);
+}
 function institutionalLessonsForChoice(choice,dept){
   const text=String(`${choice?.title||""} ${choice?.detail||""} ${choice?.strategy||""} ${choice?.directive||""}`).toLowerCase();
   const signals=[];
@@ -218,21 +352,23 @@ function evaluateChoiceForDepartment(choice,department,context={}){
   const evidence=Array.isArray(context.evidence)?context.evidence:[],ev=context.event||{},ctx=context.snapshot||decisionContextSnapshot();
   const dept=department||"company";
   const deptEvidence=filterEvidenceForDepartment(evidence,dept,choice);
-  const strategyScore=decisionOptionScore(choice,ctx,dept);
+  const strategyScore=decisionFitScore(ev,choice,ctx,dept)
+    +hiringRequestRecommendationAdjustment(choice,ev,dept)
+    +eventSpecificRecommendationAdjustment(choice,ev,dept);
   const lessonsUsed=institutionalLessonsForChoice(choice,dept);
   const lessonAdjustment=lessonsUsed.reduce((s,l)=>s+l.influence,0);
   const evidenceAdjustment=deptEvidence.reduce((s,line)=>{
     const ids=evidenceSignalIds(line),choiceIds=choiceEvidenceIds(choice);
     return s+(ids.some(id=>choiceIds.includes(id))?3:1);
   },0);
-  const score=clamp(strategyScore+lessonAdjustment+Math.min(8,evidenceAdjustment),0,100);
+  const score=clampRecommendationScore(strategyScore+lessonAdjustment+Math.min(8,evidenceAdjustment));
   const evidenceText=deptEvidence.join(" ");
   const selectedEvidence=deptEvidence.filter(line=>evidenceSignalIds(line).some(id=>choiceEvidenceIds(choice).includes(id))).slice(0,2);
   const reasons=[departmentViewpointReason(dept,ev,choice)];
   if(!selectedEvidence.length&&evidenceText)selectedEvidence.push(deptEvidence[0]);
   const confidence=clamp((Number(choice.estimatedConfidence)||55)*.45+score*.35+(selectedEvidence.length?12:0),20,95);
   const uncertainty=confidence>72?"Low":confidence>55?"Material":"High";
-  return {score,position:score>=66?"support":score<=42?"oppose":"cautious",reasons,selectedEvidence,lessonsUsed,confidence,uncertainty};
+  return {score,position:recommendationPosition(score),reasons,selectedEvidence,lessonsUsed,confidence,uncertainty};
 }
 function memoRecommendedChoice(ev,dept,evidence=[]){
   const choices=Array.isArray(ev.choices)?ev.choices:[];
@@ -1519,7 +1655,7 @@ function decisionOptionScore(choice,ctx,department="company"){
     people:{people:14,quality:4,"cost-control":-7,speed:-4}
   };
   score+=(objectives[deptKey]?.[strategy]||0);
-  return clamp(score,5,95);
+  return clampRecommendationScore(score);
 }
 function decisionProjectSubject(ev,choice={}){
   choice=choice||{};
@@ -1564,12 +1700,12 @@ function hiddenProjectFitScore(project,choice,ev){
   if(choice.projectDecision?.action==="cancel"&&visibleRisk>82&&value<62)score+=18;
   if(choice.projectDecision?.action==="expand"&&staffing<58)score-=16;
   if(choice.projectDecision?.action==="validate"&&market>62)score+=8;
-  return clamp(score,5,95);
+  return clampRecommendationScore(score);
 }
-function decisionFitScore(ev,choice,ctx){
+function decisionFitScore(ev,choice,ctx,department="company"){
   const project=decisionProjectSubject(ev,choice),hidden=hiddenProjectFitScore(project,choice,ev);
   if(hidden!==null)return hidden;
-  const work=decisionWorkSubject(ev),base=decisionOptionScore(choice,ctx);
+  const work=decisionWorkSubject(ev),base=decisionOptionScore(choice,ctx,department);
   if(!work)return base;
   const strategy=choice.strategy||inferDecisionStrategy(choice);
   let score=base;
@@ -1577,7 +1713,7 @@ function decisionFitScore(ev,choice,ctx){
   if(strategy==="speed"&&work.qualityRisk>68)score-=14;
   if(strategy==="people"&&work.blockedBy?.length)score+=10;
   if(strategy==="finance"&&work.priority>72)score-=6;
-  return clamp(score,5,95);
+  return clampRecommendationScore(score);
 }
 function decisionOutcomeLabel(choice,ev){
   const s=choice.strategy||inferDecisionStrategy(choice),project=decisionProjectSubject(ev,choice);
@@ -2225,7 +2361,7 @@ function resolveHiring(mode,roleOverride=null){
     replacement.morale=70+simulationRandom()*10;
     replacement.focus=68+simulationRandom()*12;
     replacement.stress=18+simulationRandom()*10;
-    replacement.relationship={};replacement.social={};replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`Hired as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.actionOutcomeContext=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:-999,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;normalizeEmployeeRoleProfile(replacement);ensureEmployeePersonality(replacement,{force:true,salt:`hire-${company.day}-${role}-${slot}`});inheritInstitutionalLearning(replacement);
+    replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`Hired as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.actionOutcomeContext=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:-999,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;normalizeEmployeeRoleProfile(replacement);ensureEmployeePersonality(replacement,{force:true,salt:`hire-${company.day}-${role}-${slot}`});inheritInstitutionalLearning(replacement);
     employees.forEach(other=>{
       if(other.id!==replacement.id){
         recordSocialEncounter(replacement,other,{type:"onboarding_introduction",gain:1.2,sourceEventId:`onboarding-intro-${replacement.id}-${other.id}-${company.day}`,cooldownMinutes:1440});

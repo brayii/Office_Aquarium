@@ -148,9 +148,10 @@ function derivedCompanyMorale(){
 }
 function derivedCohesion(){
   const active=employees.filter(e=>e.active),moraleScore=active.reduce((s,e)=>s+(e.morale||50),0)/Math.max(1,active.length),stressScore=100-avgStress();
-  const collab=clamp((company.simulationMetrics?.counters?.collaborations||0)/Math.max(1,company.day+1)*12+45,0,100);
-  const layoffPenalty=(company.layoffHistory||[]).filter(x=>company.day-(x.day||0)<45).length*8,resignPenalty=(company.history||[]).filter(h=>/resigned|retired|terminated|layoff/i.test(h.text||"")&&company.day-(h.day||0)<45).length*3;
-  return Math.round(clamp(moraleScore*.18+collab*.20+company.trust*.15+averageTeamCohesion()*.15+(company.culture?.communication??50)*.12+stressScore*.20-layoffPenalty-resignPenalty,0,100));
+  const cohesionRules=OFFICE_AQUARIUM_CONSTANTS.cohesion,defaults=OFFICE_AQUARIUM_CONSTANTS.defaults;
+  const collab=clamp((company.simulationMetrics?.counters?.collaborations||0)/Math.max(1,company.day+1)*cohesionRules.collaborationPerDayWeight+cohesionRules.collaborationBase,defaults.minScore,defaults.maxScore);
+  const layoffPenalty=(company.layoffHistory||[]).filter(x=>company.day-(x.day||0)<cohesionRules.recentDepartureWindowDays).length*cohesionRules.layoffPenalty,resignPenalty=(company.history||[]).filter(h=>/resigned|retired|terminated|layoff/i.test(h.text||"")&&company.day-(h.day||0)<cohesionRules.recentDepartureWindowDays).length*cohesionRules.departurePenalty;
+  return Math.round(clamp(moraleScore*.18+collab*.20+company.trust*.15+averageTeamCohesion()*.15+(company.culture?.communication??defaults.neutralScore)*.12+stressScore*.20-layoffPenalty-resignPenalty,defaults.minScore,defaults.maxScore));
 }
 function derivedTrust(){
   const active=employees.filter(e=>e.active),ceo=active.reduce((s,e)=>s+(e.opinionOfCEO?.trust??company.trust),0)/Math.max(1,active.length),fair=active.reduce((s,e)=>s+(e.opinionOfCEO?.fairness??55),0)/Math.max(1,active.length);
@@ -567,15 +568,16 @@ function labThought(e,ctx){
 }
 function utility(e){
   const hour=company.minute/60;
-  const g=e.goals||{mastery:.5,promotion:.5,friendship:.5,stability:.5,recognition:.5};
+  const g=normalizeEmployeeGoals?.(e.goals)||{mastery:.5,promotion:.5,socialConnection:.5,stability:.5,recognition:.5};
+  const socialDrive=Number.isFinite(Number(g.socialConnection))?Number(g.socialConnection):.5;
   const ctx=workContext(e),intent=intentionBias(e,ctx);
   const ceo={trust:62,fairness:58,competence:64,support:56,fear:12,...(e.opinionOfCEO||{})},culture={...initialCompany.culture,...(company.culture||{})};
   const scores={
     work:e.focus*.46+e.morale*.22-e.stress*.32+g.mastery*24+g.promotion*12+g.recognition*10+intent.work,
     lab:(rolePrimaryRoom(e.role)==="hardware-lab"||roleProjectCapabilities(e.role).quality>.6?42:12)+e.focus*.3+g.mastery*20+intent.lab,
     break:(100-e.energy)*.78+e.stress*.55+g.stability*18+memoryBias(e,"OVERTIME")*.5,
-    socialize:(e.traits.includes("social")?44:16)+g.friendship*32+(e.morale<45?10:0)+Math.max(0,(e.emotionalState?.needForSocialInteraction||0)-55)*.18,
-    collaborate:24+g.mastery*16+g.friendship*18+g.recognition*8+intent.collaborate,
+    socialize:(e.traits.includes("social")?44:16)+socialDrive*32+(e.morale<45?10:0)+Math.max(0,(e.emotionalState?.needForSocialInteraction||0)-OFFICE_AQUARIUM_CONSTANTS.social.socialNeedThreshold)*.18,
+    collaborate:24+g.mastery*16+socialDrive*18+g.recognition*8+intent.collaborate,
     meeting:(e.role==="Product Manager"?50:18)+intent.meeting,
     complain:e.stress*.66+(company.directive==="cuts"?20:0)+memoryBias(e,"CEO_CUTS")*.55,
     home:hour>=17?88+(hour-17)*24+g.stability*16:0

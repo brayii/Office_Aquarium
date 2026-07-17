@@ -46,6 +46,8 @@ async function main() {
     reset(true, false, 112233);
     ensureBibleSystems();
     updateCompanyInformationSystem();
+    assert(employees.every(e => !("social" in e) && !("relationship" in e)), "Employees should not keep legacy mutable social or relationship containers");
+    assert(employees.every(e => !("friendship" in (e.goals || {})) && Number.isFinite(Number(e.goals?.socialConnection))), "Employee social drive should use socialConnection, not legacy friendship");
     const [a, b, c] = employees.filter(e => e.active);
     a.currentRoom = "break-area";
     b.currentRoom = "break-area";

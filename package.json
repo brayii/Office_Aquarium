@@ -12,6 +12,8 @@
     "test:failure-page": "node tests/failure-test-page-test.js",
     "test:regression": "node tests/simulation-regression-test.js",
     "test:workforce": "node tests/workforce-regression-test.js",
+    "test:hiring-recommendations": "node tests/hiring-recommendation-test.js",
+    "test:message-recommendations": "node tests/message-recommendation-scoring-test.js",
     "test:rooms-roles": "node tests/rooms-roles-hiring-regression-test.js",
     "test:capabilities": "node tests/company-capability-portfolio-reaudit-test.js",
     "test:staffing-crisis": "node tests/staffing-crisis-blocker-reconciliation-test.js",
@@ -42,7 +44,7 @@
     "test:social-reputation": "node tests/social-ai-workplace-reputation-test.js",
     "test:social-emotion": "node tests/social-ai-emotional-integration-test.js",
     "test:emotional-homeostasis": "node tests/emotional-homeostasis-test.js",
-    "test": "npm run test:static && npm run test:smoke && npm run test:failure-page && npm run test:regression && npm run test:workforce && npm run test:rooms-roles && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:loss-paths && npm run test:customer && npm run test:operating-health && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:communication && npm run test:newspaper && npm run test:release-messages && npm run test:personality && npm run test:social-boundary && npm run test:social-ai && npm run test:social-experiences && npm run test:social-relationships && npm run test:social-preferences && npm run test:social-reputation && npm run test:social-emotion && npm run test:emotional-homeostasis && npm run test:social-emotional-long-run",
+    "test": "npm run test:static && npm run test:smoke && npm run test:failure-page && npm run test:regression && npm run test:workforce && npm run test:hiring-recommendations && npm run test:message-recommendations && npm run test:rooms-roles && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:loss-paths && npm run test:customer && npm run test:operating-health && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:communication && npm run test:newspaper && npm run test:release-messages && npm run test:personality && npm run test:social-boundary && npm run test:social-ai && npm run test:social-experiences && npm run test:social-relationships && npm run test:social-preferences && npm run test:social-reputation && npm run test:social-emotion && npm run test:emotional-homeostasis && npm run test:social-emotional-long-run",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

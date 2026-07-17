@@ -24,6 +24,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     firstRuntimeId:1
   },
   time:{
+    minutesPerDay:1440,
     workdayStartMinute:480,
     workdayEndMinute:1200,
     offsiteReturnCutoffMinute:1020,
@@ -41,6 +42,36 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     unknownTeamCohesion:55,
     maxScore:100,
     minScore:0
+  },
+  social:{
+    neutralRelationship:{
+      trust:50,
+      respect:50,
+      comfort:50,
+      professionalFriction:0
+    },
+    familiarityKnownThreshold:15,
+    passiveBreakThresholdMinutes:20,
+    passiveRoomThresholdMinutes:60,
+    socialNeedThreshold:55,
+    minFamiliarity:0,
+    maxFamiliarity:100
+  },
+  cohesion:{
+    collaborationBase:45,
+    collaborationPerDayWeight:12,
+    recentDepartureWindowDays:45,
+    layoffPenalty:8,
+    departurePenalty:3
+  },
+  retention:{
+    defaultBelonging:50
+  },
+  recommendations:{
+    minScore:5,
+    maxScore:95,
+    supportScore:66,
+    opposeScore:42
   },
   sound:{
     modes:{

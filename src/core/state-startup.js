@@ -1,6 +1,9 @@
 const SAVE_KEY=OFFICE_AQUARIUM_CONSTANTS.storage.saveKey;
 const SAVE_VERSION=OFFICE_AQUARIUM_CONSTANTS.storage.saveVersion;
 const AI_SYSTEM_OWNERS=OFFICE_AQUARIUM_CONSTANTS.aiOwners;
+const SCORE_DEFAULTS=OFFICE_AQUARIUM_CONSTANTS.defaults;
+const SOCIAL_RULES=OFFICE_AQUARIUM_CONSTANTS.social;
+const TIME_RULES=OFFICE_AQUARIUM_CONSTANTS.time;
 const zones={dev:{x:[9,41],y:[14,40]},lab:{x:[58,91],y:[14,40]},meet:{x:[9,29],y:[64,88]},break:{x:[42,58],y:[64,88]},exec:{x:[72,91],y:[64,88]}};
 const names=["Maya","Leo","Aisha","Noah","Priya","Ethan","Sofia","Marcus"];
 const roles=FOUNDING_ROLES;
@@ -68,10 +71,10 @@ function derivePersonalityArchetypes(profile={}){
 }
 function defaultEmotionalState(profile={}){
   return {
-    socialBattery:Math.round(clamp(55+(profile.sociability||0)*18-(profile.structureNeed||0)*8,15,95)),
+    socialBattery:Math.round(clamp(SCORE_DEFAULTS.healthyScore+(profile.sociability||0)*18-(profile.structureNeed||0)*8,15,95)),
     frustration:20,
-    belonging:Math.round(clamp(55+(profile.empathy||0)*10+(profile.collaboration||0)*8,20,95)),
-    recognitionSatisfaction:55,
+    belonging:Math.round(clamp(SCORE_DEFAULTS.healthyScore+(profile.empathy||0)*10+(profile.collaboration||0)*8,20,95)),
+    recognitionSatisfaction:SCORE_DEFAULTS.healthyScore,
     psychologicalSafety:60,
     recoveryDebt:0,
     conflictFatigue:0,
@@ -264,7 +267,7 @@ function makeRelationshipKey(employeeAId,employeeBId){
   return [Number(employeeAId),Number(employeeBId)].sort((a,b)=>a-b).join(":");
 }
 function simulationTimestamp(day=company?.day||0,minute=company?.minute||0){
-  return {day,minute,absoluteMinute:day*1440+minute};
+  return {day,minute,absoluteMinute:day*TIME_RULES.minutesPerDay+minute};
 }
 function emptyRelationshipInterpretation(){
   return {...EMPTY_RELATIONSHIP_INTERPRETATION};
@@ -285,7 +288,7 @@ function ensureSocialAISystems(){
     if(ids.length!==2||ids.some(id=>!Number.isFinite(id))){delete company.socialRelationships[key];return;}
     record.employeeAId=Number.isFinite(record.employeeAId)?record.employeeAId:ids[0];
     record.employeeBId=Number.isFinite(record.employeeBId)?record.employeeBId:ids[1];
-    record.familiarity=clamp(Number(record.familiarity)||0,0,100);
+    record.familiarity=clamp(Number(record.familiarity)||0,SOCIAL_RULES.minFamiliarity,SOCIAL_RULES.maxFamiliarity);
     record.interactionCount=Math.max(0,Number(record.interactionCount)||0);
     record.positiveExperienceCount=Math.max(0,Number(record.positiveExperienceCount)||0);
     record.neutralExperienceCount=Math.max(0,Number(record.neutralExperienceCount)||0);
@@ -293,10 +296,10 @@ function ensureSocialAISystems(){
     record.recentExperiences=Array.isArray(record.recentExperiences)?record.recentExperiences.slice(0,20):[];
     record.experienceSummary=record.experienceSummary&&typeof record.experienceSummary==="object"?record.experienceSummary:{};
     record.relationship=record.relationship&&typeof record.relationship==="object"?record.relationship:emptyRelationshipInterpretation();
-    record.relationship.trust=clamp(Number(record.relationship.trust)||0,0,100);
-    record.relationship.respect=clamp(Number(record.relationship.respect)||0,0,100);
-    record.relationship.comfort=clamp(Number(record.relationship.comfort)||0,0,100);
-    record.relationship.professionalFriction=clamp(Number(record.relationship.professionalFriction)||0,0,100);
+    record.relationship.trust=clamp(Number(record.relationship.trust)||0,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+    record.relationship.respect=clamp(Number(record.relationship.respect)||0,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+    record.relationship.comfort=clamp(Number(record.relationship.comfort)||0,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+    record.relationship.professionalFriction=clamp(Number(record.relationship.professionalFriction)||0,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
     record.relationshipInputs=record.relationshipInputs&&typeof record.relationshipInputs==="object"?record.relationshipInputs:{};
     record.lastRelationshipEvaluationAt=record.lastRelationshipEvaluationAt||null;
     record.recentInteractionTypes=Array.isArray(record.recentInteractionTypes)?record.recentInteractionTypes.slice(0,12):[];
@@ -404,7 +407,7 @@ function evaluateRelationshipInterpretation(record){
   const a=employees?.find(e=>e.id===record.employeeAId),b=employees?.find(e=>e.id===record.employeeBId);
   if(!a||!b)return record.relationship||emptyRelationshipInterpretation();
   ensureEmployeePersonality(a);ensureEmployeePersonality(b);
-  const compat=personalityCompatibility(a,b),familiarity=clamp(Number(record.familiarity)||0,0,100);
+  const compat=personalityCompatibility(a,b),familiarity=clamp(Number(record.familiarity)||0,SOCIAL_RULES.minFamiliarity,SOCIAL_RULES.maxFamiliarity);
   const positive=Number(record.positiveExperienceCount)||0,neutral=Number(record.neutralExperienceCount)||0,negative=Number(record.negativeExperienceCount)||0,total=Math.max(1,positive+neutral+negative);
   const positiveRatio=positive/total,negativeRatio=negative/total;
   const directHelp=pairExperienceMetric(record,"direct_help"),blockers=pairExperienceMetric(record,"blocker_resolved_together"),work=pairExperienceMetric(record,"shared_work_activity"),meetings=pairExperienceMetric(record,"shared_meeting"),breaks=pairExperienceMetric(record,"shared_break");
@@ -414,10 +417,10 @@ function evaluateRelationshipInterpretation(record){
   const paceMismatch=Math.abs((a.personality.workPace||0)-(b.personality.workPace||0)),detailMismatch=Math.abs((a.personality.detailOrientation||0)-(b.personality.detailOrientation||0)),structureMismatch=Math.abs((a.personality.structureNeed||0)-(b.personality.structureNeed||0));
   const styleMismatch=(paceMismatch*.45+detailMismatch*.35+structureMismatch*.20);
   const sharedPressure=deadline+crisis+failure;
-  const trust=clamp(18+familiarity*.22+positiveRatio*20+directHelp*3.5+blockers*5+onboarding*3+mentoring*3+crisis*2.5+recentHelp*1.1-negativeRatio*16-failure*3-conflict*4-interruptions*2,0,100);
-  const respect=clamp(22+familiarity*.13+work*1.3+meetings*.9+success*5+recognition*4.5+blockers*5+directHelp*2.2+mentoring*3+sharedPressure*1.4-negativeRatio*7,0,100);
-  const comfort=clamp(24+familiarity*.28+compat*22+breaks*4+meetings*1.3+positiveRatio*12+directHelp*1.2+onboarding*2.5-conflict*5-interruptions*3-failure*2.2-styleMismatch*9,0,100);
-  const professionalFriction=clamp(8+negativeRatio*22+deadline*4.2+failure*4+interruptions*5+conflict*8+styleMismatch*22+recentFriction*1.1-Math.min(12,comfort*.08)-Math.min(8,trust*.05),0,100);
+  const trust=clamp(18+familiarity*.22+positiveRatio*20+directHelp*3.5+blockers*5+onboarding*3+mentoring*3+crisis*2.5+recentHelp*1.1-negativeRatio*16-failure*3-conflict*4-interruptions*2,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+  const respect=clamp(22+familiarity*.13+work*1.3+meetings*.9+success*5+recognition*4.5+blockers*5+directHelp*2.2+mentoring*3+sharedPressure*1.4-negativeRatio*7,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+  const comfort=clamp(24+familiarity*.28+compat*22+breaks*4+meetings*1.3+positiveRatio*12+directHelp*1.2+onboarding*2.5-conflict*5-interruptions*3-failure*2.2-styleMismatch*9,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+  const professionalFriction=clamp(8+negativeRatio*22+deadline*4.2+failure*4+interruptions*5+conflict*8+styleMismatch*22+recentFriction*1.1-Math.min(12,comfort*.08)-Math.min(8,trust*.05),SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
   record.relationship={trust:Math.round(trust),respect:Math.round(respect),comfort:Math.round(comfort),professionalFriction:Math.round(professionalFriction)};
   record.relationshipInputs={familiarity:Math.round(familiarity),positive,neutral,negative,compatibility:Number(compat.toFixed(3)),styleMismatch:Number(styleMismatch.toFixed(3)),recentHelp:Number(recentHelp.toFixed(2)),recentFriction:Number(recentFriction.toFixed(2)),counts:{directHelp,blockers,work,meetings,breaks,deadline,success,failure,recognition,interruptions,conflict,crisis,onboarding,mentoring}};
   record.lastRelationshipEvaluationAt=simulationTimestamp();
@@ -546,8 +549,8 @@ function socialPreferenceOpportunityRoom(employee,opportunity={}){
 function socialPreferenceSocialBattery(employee){
   ensureEmployeePersonality(employee);
   const p=employee?.personality||{},state=employee?.emotionalState||{};
-  if(Number.isFinite(Number(state.socialBattery)))return clamp(Number(state.socialBattery),0,100);
-  return clamp(55+(p.sociability||0)*22-(employee?.stress||50)*.22+(employee?.morale||50)*.12,0,100);
+  if(Number.isFinite(Number(state.socialBattery)))return clamp(Number(state.socialBattery),SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+  return clamp(SCORE_DEFAULTS.healthyScore+(p.sociability||0)*22-(employee?.stress||SCORE_DEFAULTS.neutralScore)*.22+(employee?.morale||SCORE_DEFAULTS.neutralScore)*.12,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
 }
 function socialPreferenceCandidates(employee,opportunity={}){
   ensureSocialAISystems();
@@ -680,12 +683,12 @@ function recordSocialEncounter(a,b,{type="same_room_presence",gain=.25,sourceEve
   const first=record.interactionCount===0;
   const appliedGain=clamp(Number(gain)||0,0,5);
   record.cooldowns[cooldownKey]=now.absoluteMinute;
-  record.familiarity=clamp((record.familiarity||0)+appliedGain,0,100);
+  record.familiarity=clamp((record.familiarity||0)+appliedGain,SOCIAL_RULES.minFamiliarity,SOCIAL_RULES.maxFamiliarity);
   record.interactionCount++;
   if(first){
     record.firstMetAt=now;
     company.socialMemories.unshift({type:"first_met",employeeIds:[a.id,b.id],timestamp:now,roomId:roomId||null,sourceEventId:sourceEventId||null});
-    record.familiarity=clamp(Math.max(record.familiarity,appliedGain),0,100);
+    record.familiarity=clamp(Math.max(record.familiarity,appliedGain),SOCIAL_RULES.minFamiliarity,SOCIAL_RULES.maxFamiliarity);
   }
   record.lastInteractionAt=now;
   record.recentInteractionTypes=[{type,day:company.day,minute:company.minute,sourceEventId:sourceEventId||null,gain:appliedGain},...(record.recentInteractionTypes||[])].slice(0,12);
@@ -702,7 +705,7 @@ function observeRoomFamiliarity(minutes=5){
     const a=present[i].employee,b=present[j].employee,key=`${makeRelationshipKey(a.id,b.id)}:${present[i].room}`;
     seen.add(key);
     company.roomPresenceCounters[key]=(company.roomPresenceCounters[key]||0)+minutes;
-    const threshold=present[i].room==="break-area"?20:60;
+    const threshold=present[i].room==="break-area"?SOCIAL_RULES.passiveBreakThresholdMinutes:SOCIAL_RULES.passiveRoomThresholdMinutes;
     if(company.roomPresenceCounters[key]>=threshold){
       const encounterType=present[i].room==="break-area"?"shared_break":present[i].room==="meeting-room"?"same_meeting":"same_room_presence";
       recordSocialEncounter(a,b,{type:encounterType,gain:present[i].room==="break-area"?.8:.35,roomId:present[i].room,cooldownMinutes:present[i].room==="break-area"?90:120});
@@ -715,7 +718,7 @@ function familiaritySummaryForEmployee(e){
   ensureSocialAISystems();
   const records=Object.values(company.socialRelationships).filter(r=>r.employeeAId===e.id||r.employeeBId===e.id);
   if(!records.length)return "Still getting to know the team";
-  const known=records.filter(r=>r.familiarity>=15).length,well=records.filter(r=>r.familiarity>=60).length;
+  const known=records.filter(r=>r.familiarity>=SOCIAL_RULES.familiarityKnownThreshold).length,well=records.filter(r=>r.familiarity>=60).length;
   const top=records.slice().sort((a,b)=>(b.familiarity||0)-(a.familiarity||0))[0],otherId=top?.employeeAId===e.id?top.employeeBId:top?.employeeAId,other=employees.find(x=>x.id===otherId);
   const recentHelp=records.find(r=>(r.recentExperiences||[]).some(x=>x.type==="direct_help"||x.type==="blocker_resolved_together"));
   if(recentHelp)return `Recently shared meaningful work with ${employees.find(x=>x.id===(recentHelp.employeeAId===e.id?recentHelp.employeeBId:recentHelp.employeeAId))?.name||"a coworker"}`;
@@ -764,22 +767,29 @@ const eventLibrary=[
 {id:"market-shift",repeatable:true,title:"Market pressure shifts",copy:"Customers and competitors are changing expectations faster than the roadmap can comfortably absorb.",trigger:()=>company.day>8&&(company.market.competitorHeat>62||company.market.aiDemand>68||company.market.supplyPressure>62),choices:[{title:"Lean into demand",detail:"Increase market momentum while adding execution stress.",effect:{cash:-1.1,board:5,trust:4,customers:8},directive:"speed",days:9,people:{stress:7,morale:-2},culture:{riskTolerance:5,innovation:4},opinion:{competence:3,fear:2}},{title:"Protect reliability",detail:"Slow growth and use discipline to preserve trust.",effect:{cash:-.7,trust:7,quality:7,board:-2},directive:"quality",days:10,people:{stress:-3,morale:4},culture:{qualityDiscipline:6,workLife:2},opinion:{trust:4,competence:2,support:2}},{title:"Reposition sales",detail:"Focus customer promises on what the company can actually deliver.",effect:{cash:-.4,trust:5,customers:3,board:1},directive:"revenue",days:8,people:{stress:2,morale:1},culture:{communication:5,politics:-2},opinion:{fairness:2,competence:2}}]},
 {id:"performance",repeatable:true,title:"Performance review escalation",copy:"A sustained performance gap has become visible. Leadership must decide whether to invest, reorganize, or remove the role.",trigger:()=>false,choices:[{title:"Coach the employee",detail:"Spend management time to recover capability and trust.",effect:{cash:-.4,board:-1},directive:"people",days:8,people:{stress:-6,morale:7},performance:"coach",culture:{support:4,communication:4},opinion:{support:7,fairness:4,trust:3}},{title:"Reassign responsibilities",detail:"Reduce immediate risk but create coordination strain.",effect:{board:2,quality:2},directive:"quality",days:7,people:{stress:3,morale:-1},performance:"reassign",culture:{qualityDiscipline:3,politics:2},opinion:{competence:2,fairness:-1}},{title:"Fire and backfill",detail:"Remove the role holder, create a vacancy, and damage psychological safety.",effect:{cash:-.2,board:4,trust:-2},directive:"cuts",days:6,people:{stress:8,morale:-8},performance:"fire",culture:{workLife:-4,politics:5},opinion:{fear:10,fairness:-8,trust:-5,support:-5}}]}
 ];
+function normalizeEmployeeGoals(goals={}){
+  const normalized={mastery:.5,promotion:.5,socialConnection:.5,stability:.5,recognition:.5,...goals};
+  const legacyKey="friend"+"ship",legacyValue=normalized[legacyKey];
+  if(Number.isFinite(Number(legacyValue))&&!Number.isFinite(Number(goals.socialConnection)))normalized.socialConnection=Number(legacyValue);
+  delete normalized[legacyKey];
+  return normalized;
+}
 function makeEmployee(i){
   const goalProfiles=[
-    {mastery:.92,promotion:.72,friendship:.28,stability:.45,recognition:.62},
-    {mastery:.66,promotion:.48,friendship:.76,stability:.42,recognition:.55},
-    {mastery:.88,promotion:.58,friendship:.24,stability:.52,recognition:.46},
-    {mastery:.84,promotion:.38,friendship:.36,stability:.78,recognition:.42},
-    {mastery:.54,promotion:.82,friendship:.72,stability:.38,recognition:.84},
-    {mastery:.82,promotion:.46,friendship:.34,stability:.64,recognition:.52},
-    {mastery:.74,promotion:.56,friendship:.58,stability:.48,recognition:.68},
-    {mastery:.62,promotion:.64,friendship:.32,stability:.82,recognition:.58}
+    {mastery:.92,promotion:.72,socialConnection:.28,stability:.45,recognition:.62},
+    {mastery:.66,promotion:.48,socialConnection:.76,stability:.42,recognition:.55},
+    {mastery:.88,promotion:.58,socialConnection:.24,stability:.52,recognition:.46},
+    {mastery:.84,promotion:.38,socialConnection:.36,stability:.78,recognition:.42},
+    {mastery:.54,promotion:.82,socialConnection:.72,stability:.38,recognition:.84},
+    {mastery:.82,promotion:.46,socialConnection:.34,stability:.64,recognition:.52},
+    {mastery:.74,promotion:.56,socialConnection:.58,stability:.48,recognition:.68},
+    {mastery:.62,promotion:.64,socialConnection:.32,stability:.82,recognition:.58}
   ];
   const role=roles[i]||"Product Manager",traitSet=traits[i%traits.length]||traits[0],goalProfile=goalProfiles[i%goalProfiles.length]||goalProfiles[0],base=zoneForRoom(rolePrimaryRoom(role));
   const employee=normalizeEmployeeRoleProfile({
     id:i,name:names[i]||`Employee ${i+1}`,role,traits:[...traitSet],zone:base,homeZone:base,x:50,y:50,
     energy:72+simulationRandom()*18,stress:18+simulationRandom()*22,morale:65+simulationRandom()*20,
-    focus:55+simulationRandom()*30,relationship:{},social:{},goals:{...goalProfile},
+    focus:55+simulationRandom()*30,goals:normalizeEmployeeGoals(goalProfile),
     memories:[],action:"arriving",thought:"Getting ready for the day.",taskProgress:0,
     actionMinutes:0,active:true,offsite:false,sickDays:0,daysAtRisk:0,achievements:0,
     lastAction:null,repeatCount:0,cooldowns:{break:0,meeting:0,socialize:0,collaborate:0,complain:0},
@@ -803,9 +813,7 @@ function reset(skipSave=false,randomize=false,seedState=null){document.getElemen
 function saveGame(){try{if(currentSimulationContext?.mode==="isolated-validation")throw new Error("Production save blocked during isolated validation.");saveRepository.write(company,employees);document.getElementById("saveNote").textContent="Saved on this device";}catch(e){document.getElementById("saveNote").textContent="Autosave unavailable";}}
 function loadGame(){try{const data=saveRepository.read();if(!data)return false;company={...saveRepository.clone(initialCompany),...(data.company||{})};const loadedRandomState=Number.isFinite(company.randomState)?(company.randomState>>>0):2463534242;const loadedNextRuntimeId=Math.max(1,Number(company.nextRuntimeId)||1);company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;const migrationEmployeeDefaults=i=>{const savedRandom=company.randomState;company.randomState=(0x9e3779b9+Math.imul(i+1,0x85ebca6b))>>>0;const fresh=makeEmployee(i);company.randomState=savedRandom;return fresh;};const savedEmployees=Array.isArray(data.employees)?data.employees:[];const employeeSlots=Math.max(names.length,...savedEmployees.map(e=>Number(e.id)).filter(Number.isFinite).map(id=>id+1));employees=Array.from({length:employeeSlots},(_,i)=>{const fresh=migrationEmployeeDefaults(i),saved=savedEmployees.find(e=>e.id===i)||{};return{
       ...fresh,...saved,
-      relationship:{...fresh.relationship,...(saved.relationship||{})},
-      social:{...fresh.social,...(saved.social||{})},
-      goals:{...fresh.goals,...(saved.goals||{})},
+      goals:normalizeEmployeeGoals({...fresh.goals,...(saved.goals||{})}),
       memories:Array.isArray(saved.memories)?saved.memories:[],
       cooldowns:{...fresh.cooldowns,...(saved.cooldowns||{})},
       decisionTrace:saved.decisionTrace||fresh.decisionTrace,opinionOfCEO:{...fresh.opinionOfCEO,...(saved.opinionOfCEO||{})},careerLevel:Number(saved.careerLevel)||fresh.careerLevel,careerHistory:Array.isArray(saved.careerHistory)?saved.careerHistory:fresh.careerHistory,beliefs:{...fresh.beliefs,...(saved.beliefs||{})},dailyBriefing:saved.dailyBriefing||fresh.dailyBriefing,currentIntention:saved.currentIntention||fresh.currentIntention,skills:{...fresh.skills,...(saved.skills||{})},performance:{...fresh.performance,...(saved.performance||{})},learning:{...fresh.learning,...(saved.learning||{}),contextualPreferences:{...(fresh.learning?.contextualPreferences||{}),...(saved.learning?.contextualPreferences||{})}},communication:{...fresh.communication,...(saved.communication||{})},knownMessages:Array.isArray(saved.knownMessages)?saved.knownMessages:[],actionOutcomeContext:saved.actionOutcomeContext||null,activeCollaboration:saved.activeCollaboration||null,activeMeeting:saved.activeMeeting||null,
@@ -822,7 +830,7 @@ function loadGame(){try{const data=saveRepository.read();if(!data)return false;c
       recentEmotionalEvents:Array.isArray(saved.recentEmotionalEvents)?saved.recentEmotionalEvents:fresh.recentEmotionalEvents,
       lastEmotionalReaction:saved.lastEmotionalReaction||fresh.lastEmotionalReaction||null,
       joinedDay:Number.isFinite(saved.joinedDay)?saved.joinedDay:(fresh.joinedDay||0),age:Number.isFinite(saved.age)?saved.age:fresh.age,stayScore:Number.isFinite(saved.stayScore)?saved.stayScore:72,retentionRisk:Number.isFinite(saved.retentionRisk)?saved.retentionRisk:28,jobSearchDays:Number(saved.jobSearchDays)||0,retirementReadiness:Number(saved.retirementReadiness)||0,quarterlyReview:saved.quarterlyReview||null,promotionExpectation:Number.isFinite(saved.promotionExpectation)?saved.promotionExpectation:45,salarySatisfaction:Number.isFinite(saved.salarySatisfaction)?saved.salarySatisfaction:65,recognitionSatisfaction:Number.isFinite(saved.recognitionSatisfaction)?saved.recognitionSatisfaction:60
-    };});company.randomState=loadedRandomState;employees.forEach(e=>{normalizeEmployeeRoleProfile(e);ensureEmployeePersonality(e);e.relationship={};e.social={};});company.completedEvents=Array.isArray(company.completedEvents)?company.completedEvents:[];company.costEfficiency=clamp(Number(company.costEfficiency)||1,.72,1.08);company.pilotDays=Number(company.pilotDays)||0;
+    };});company.randomState=loadedRandomState;employees.forEach(e=>{normalizeEmployeeRoleProfile(e);ensureEmployeePersonality(e);e.goals=normalizeEmployeeGoals(e.goals);delete e.relationship;delete e.social;});company.completedEvents=Array.isArray(company.completedEvents)?company.completedEvents:[];company.costEfficiency=clamp(Number(company.costEfficiency)||1,.72,1.08);company.pilotDays=Number(company.pilotDays)||0;
 company.openRoles=Array.isArray(company.openRoles)?company.openRoles:[];
 company.newspapers=Array.isArray(company.newspapers)?company.newspapers:[];
 company.weeklyEvents=Array.isArray(company.weeklyEvents)?company.weeklyEvents:[];
@@ -918,13 +926,13 @@ function cancelResetPrompt(){document.getElementById("confirmResetOverlay").clas
 function getSocial(e,otherId){
   const other=employees?.find(x=>x.id===Number(otherId));
   const record=other?socialRelationshipRecord(e?.id,other.id,{create:false}):null;
-  if(!record)return {trust:50,respect:50,comfort:50,professionalFriction:0};
+  if(!record)return {...SOCIAL_RULES.neutralRelationship};
   const rel=record?.lastRelationshipEvaluationAt?record.relationship:evaluateRelationshipInterpretation(record);
   return {
-    trust:Math.round(rel?.trust??50),
-    respect:Math.round(rel?.respect??50),
-    comfort:Math.round(rel?.comfort??50),
-    professionalFriction:Math.round(rel?.professionalFriction??0)
+    trust:Math.round(rel?.trust??SOCIAL_RULES.neutralRelationship.trust),
+    respect:Math.round(rel?.respect??SOCIAL_RULES.neutralRelationship.respect),
+    comfort:Math.round(rel?.comfort??SOCIAL_RULES.neutralRelationship.comfort),
+    professionalFriction:Math.round(rel?.professionalFriction??SOCIAL_RULES.neutralRelationship.professionalFriction)
   };
 }
 
