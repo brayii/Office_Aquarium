@@ -747,26 +747,17 @@ Memories decay over time.
 
 ## 5.7 Social Relationships
 
-Current social state is split between legacy compatibility data and the newer staged Social Personality AI.
+Current social state is owned by the staged Social Personality AI. `company.socialAIModelVersion = 2` marks the consolidated boundary model.
 
-The legacy per-employee social record remains load-compatible and may contain:
-
-```js
-{
-  trust,
-  respect,
-  friendship,
-  rivalry
-}
-```
-
-These legacy fields are still used as a lightweight social compatibility score. They should not be confused with the newer Stage 3 professional relationship interpretation.
-
-The current pair-level Social Personality AI stores hidden professional relationship records in `company.socialRelationships[pairKey]`:
+The canonical pair-level Social Personality AI stores hidden professional relationship records in `company.socialRelationships[pairKey]`:
 
 - Stage 1: familiarity from real encounters
 - Stage 2: shared experience history with tone, intensity, dedupe keys, and source events
 - Stage 3: derived trust, respect, comfort, and professional friction
+
+Legacy employee-local fields such as `employee.relationship`, `employee.social`, `getSocial()`, `socialScore()`, and `adjustSocial()` are compatibility adapters only. New work, hiring, project, and collaboration logic must not write or score direct friendship, rivalry, trust, respect, comfort, or friction values on employee objects.
+
+Passive co-presence can increase familiarity, but it must not create shared-experience history or emotional effects unless a concrete source event exists.
 
 Relationship interpretation is derived from accumulated history, recency, and personality compatibility. It must not directly write work output, project progress, hiring, Institutional Learning, or task selection.
 
@@ -1712,12 +1703,13 @@ Test:
 
 Test:
 
-- social fields initialize
-- social score is stable
-- adjustSocial updates both employees
-- relationships stay in bounds
-- collaboration improves trust/respect
-- rivalry does not become negative
+- canonical social records initialize without fabricated relationships
+- social compatibility adapters are deterministic and do not consume RNG
+- passive co-presence increases familiarity only
+- concrete shared experiences can affect stress and morale through the emotional system
+- work AI does not receive direct social, friendship, rivalry, trust, respect, comfort, or friction bonuses
+- save/load preserves canonical social records
+- hidden social values do not leak into normal CEO UI
 
 ## 20.4 Company Systems
 

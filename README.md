@@ -36,10 +36,25 @@ Run the full local validation suite:
 npm test
 ```
 
+Run the same validation suite with a pass/fail-rate report:
+
+```powershell
+npm run test:report
+```
+
+The report runner executes each test group in order and prints:
+
+- total test groups
+- passed and failed groups
+- pass rate
+- runtime
+- failed group names and the tail of their output
+
 The suite checks:
 
 - duplicate HTML IDs and duplicate named JavaScript functions
 - browser launch/startup
+- the manual failure-test page and its generated save scenarios
 - day rollover through daily close
 - save/load continuation
 - deterministic replay from a saved day-50 state to day 100
@@ -64,6 +79,7 @@ Useful targeted checks:
 npm run test:staffing-crisis
 npm run test:project
 npm run test:workforce
+npm run test:failure-page
 npm run test:loss-paths
 npm run test:risk
 npm run test:crisis
@@ -73,8 +89,10 @@ npm run test:long-run
 npm run test:regression
 npm run test:personality
 npm run test:social-ai
+npm run test:social-boundary
 npm run test:social-experiences
 npm run test:social-relationships
+npm run test:social-emotional-long-run
 ```
 
 The employee work AI and social/personality AI boundary is documented in `docs/architecture/employee_ai_boundaries.md`. Future changes that touch personality, relationships, morale, stress, or employee drama should preserve that boundary unless the design is explicitly revised.
@@ -84,6 +102,35 @@ Stage 2 shared-experience behavior is documented in `docs/specs/social_ai_stage_
 Stage 3 relationship-interpretation behavior is documented in `docs/specs/social_ai_stage_3_relationship_interpretation.md`.
 
 Balance projection tools are developer validation tools, not CEO gameplay controls. In normal play they are hidden. To expose the Developer Tools validation panel in a local browser session, open the game with `?dev=1` or set `officeAquariumDeveloperMode` to `true` in browser storage. These tools run isolated companies in memory and must not reset, save, or mutate the active company.
+
+### Manual Failure Test Page
+
+The developer failure-test page is:
+
+```text
+tests\Office_Aquarium_Failure_Test.html
+```
+
+Open it in the same browser you use for the game when you want to create targeted test saves for:
+
+- CEO removal by the board
+- company failure
+- day rollover at 7:55 PM
+- project archive integrity
+- near-complete project closeout
+- hiring pipeline continuity
+- CEO Inbox three-choice routing
+- commercial revenue from completed projects
+
+Use `Back Up Current Save` before creating a test save. After creating a scenario, open `Office_Aquarium.html`, choose `Continue Company`, and let the simulation run. The page also has `Run Local Checks` for quick save-shape checks.
+
+Developers should also run the automated page check:
+
+```powershell
+npm run test:failure-page
+```
+
+That check confirms the failure-test page writes current-version saves and that every scenario button creates the expected save shape.
 
 ## Packaging
 

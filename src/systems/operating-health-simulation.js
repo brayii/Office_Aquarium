@@ -518,6 +518,16 @@ function workSkillFit(e,work){
   const skill=e.skills||{},req=work.requiredSkills||{};
   return Object.entries(req).reduce((s,[k,v])=>s+Math.min(1.25,(skill[k]??35)/Math.max(1,v)),0)/Math.max(1,Object.keys(req).length);
 }
+function assertNoSocialFieldsInWorkResolutionInputs(inputs={}){
+  const forbidden=/social|relationship|friendship|rivalry|trust|respect|comfort|friction/i;
+  const bad=Object.keys(inputs||{}).filter(key=>forbidden.test(key));
+  if(bad.length){
+    const error=new Error(`Work AI resolution received Social AI field(s): ${bad.join(", ")}`);
+    recordSimulationError?.(error,"work-ai-boundary");
+    if(validationMode)throw error;
+  }
+  return true;
+}
 function workContext(e){
   const work=activeWorkForEmployee(e),team=employeeTeam(e),t=company.teams?.[team]||{},beliefs=e.beliefs||{},brief=e.dailyBriefing||{};
   const deadlineRisk=work?clamp((7-(work.deadlineDay-company.day))*12+work.priority*.25,0,100):0;
@@ -626,7 +636,7 @@ function utility(e){
     `Top goal ${Object.entries(g).sort((a,b)=>b[1]-a[1])[0][0]}`,`CEO trust ${Math.round(ceo.trust)}`,`Culture communication ${Math.round(culture.communication)}`,
     `Institutional bias ${Object.entries(e.learnedLessons||{}).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))[0]?.[0]||"none"}`
   ];
-  e.decisionTrace={chosen,scores:Object.fromEntries(Object.entries(scores).sort((a,b)=>b[1]-a[1])),reasons};
+  e.decisionTrace={ownerSystem:AI_SYSTEM_OWNERS.work,chosen,scores:Object.fromEntries(Object.entries(scores).sort((a,b)=>b[1]-a[1])),reasons};
   return chosen;
 }
 function learningState(e){
@@ -685,7 +695,7 @@ function updateActionLearning(e,context){
   const harmful=mistakeDelta>0||stressDelta>8||(qualityGain<-.3&&ownedProgress)||(trustGain<-.3&&ownedProgress);
   ensureBibleSystems();
   company.actionOutcomes=Array.isArray(company.actionOutcomes)?company.actionOutcomes:[];
-  company.actionOutcomes.unshift({actionId:nextSimulationId("action-outcome"),day:company.day,employeeId:e.id,action,contextKey:ctxKey,outputProduced:Number(outputGain.toFixed(4)),workProgress:Number(workProgressGain.toFixed(3)),blockersResolved,defectsIntroduced:Math.max(0,Number(mistakeDelta.toFixed(2))),defectsPrevented:Math.max(0,Number((-mistakeDelta).toFixed(2))),stressChange:Number(stressDelta.toFixed(2)),coordinationChange:Number(integrationGain.toFixed(3)),trustChangeOwned:Number(trustGain.toFixed(3)),integrationGain:Number(integrationGain.toFixed(3)),qualityGain:Number(qualityGain.toFixed(3)),ownedProgress,productive,harmful,workItemId:context.workItemId||null,projectId:workItem?.projectId||null,partnerIds:e.activeCollaboration?[e.activeCollaboration.partnerId].filter(Number.isFinite):[],startedDay:context.startedDay,completedDay:company.day});
+  company.actionOutcomes.unshift({ownerSystem:AI_SYSTEM_OWNERS.work,actionId:nextSimulationId("action-outcome"),day:company.day,employeeId:e.id,action,contextKey:ctxKey,outputProduced:Number(outputGain.toFixed(4)),workProgress:Number(workProgressGain.toFixed(3)),blockersResolved,defectsIntroduced:Math.max(0,Number(mistakeDelta.toFixed(2))),defectsPrevented:Math.max(0,Number((-mistakeDelta).toFixed(2))),stressChange:Number(stressDelta.toFixed(2)),coordinationChange:Number(integrationGain.toFixed(3)),trustChangeOwned:Number(trustGain.toFixed(3)),integrationGain:Number(integrationGain.toFixed(3)),qualityGain:Number(qualityGain.toFixed(3)),ownedProgress,productive,harmful,workItemId:context.workItemId||null,projectId:workItem?.projectId||null,partnerIds:e.activeCollaboration?[e.activeCollaboration.partnerId].filter(Number.isFinite):[],startedDay:context.startedDay,completedDay:company.day});
   company.actionOutcomes=company.actionOutcomes.slice(0,260);
   if(action==="collaborate"){
     if(productive){adjustLearningTrait(e,"collaboration",.12,0,10);adjustLearningTrait(e,"mentor",.07,0,10);adjustLearningTrait(e,"helpSeeking",.06,-5,10);adjustContextualPreference(e,"collaborate",ctxKey,.09);recordLearningEvidence({domain:"workforce",eventType:"collaboration",action:"owned-collaboration",outcome:"positive",magnitude:1,confidence:62,department:employeeTeam(e),employeeIds:[e.id],projectId:workItem?.projectId||null,evidence:`${e.name} completed useful collaboration`,contributors:[{type:"employee",id:e.id,weight:.65},{type:"workItem",id:context.workItemId||null,weight:.25},{type:"global",id:"company",weight:.10}]});}
@@ -739,8 +749,10 @@ function applyCollaborationOutcome(e){
   const item=(company.workItems||[]).find(w=>w.id===session.workItemId&&w.status==="open");
   if(!partner||!item)return;
   const fit=(workSkillFit(e,item)+workSkillFit(partner,item))/2;
-  const social=clamp((socialScore(e,partner.id)+socialScore(partner,e.id))/200,0,1);
-  const gain=clamp(1.2+fit*2.8+social*1.3+(company.culture?.communication??50)/80,1,7);
+  const workInputs={skillFit:fit,employeeFocus:e.focus||50,partnerFocus:partner.focus||50,employeeMorale:e.morale||50,partnerMorale:partner.morale||50,employeeStress:e.stress||0,partnerStress:partner.stress||0,communicationCulture:company.culture?.communication??50};
+  assertNoSocialFieldsInWorkResolutionInputs(workInputs);
+  const stateModifier=((workInputs.employeeFocus+workInputs.partnerFocus)/200)*.65+((workInputs.employeeMorale+workInputs.partnerMorale)/200)*.25-Math.max(0,(workInputs.employeeStress+workInputs.partnerStress)/2-65)*.006;
+  const gain=clamp(1.2+fit*3.0+stateModifier+(company.culture?.communication??50)/90,1,7);
   const before=item.progress||0;
   item.progress=clamp((item.progress||0)+gain,0,100);
   if(item.projectId)recordProjectLedger(item.projectId,"collaboration","work-progress",item.progress-before,`${e.name} and ${partner.name} collaborated on ${item.title}`);
@@ -750,7 +762,7 @@ function applyCollaborationOutcome(e){
   company.integration=clamp(company.integration+gain*.035,0,100);
   company.quality=clamp(company.quality+gain*.018,0,100);
   if(item.blockedBy?.length){
-    const chance=clamp(.12+fit*.22+social*.08,0,.55);
+    const chance=clamp(.12+fit*.25+stateModifier*.08,0,.55);
     if(simulationRandom()<chance){
       const blocker=item.blockedBy.shift();
       addStoryBeat(item.storyId,`${e.name} and ${partner.name} resolved ${blocker} through collaboration.`,"unblocked");
@@ -760,7 +772,6 @@ function applyCollaborationOutcome(e){
       recordLearningEvidence({domain:"workforce",eventType:"collaboration",action:"resolve-blocker",outcome:"positive",magnitude:gain,confidence:76,department:item.assignedTeam,employeeIds:[e.id,partner.id],evidence:`Collaboration resolved ${blocker}`,contributors:[{type:"employee",id:e.id,weight:.45},{type:"employee",id:partner.id,weight:.45},{type:"workItem",id:item.id,weight:.1}]});
     }
   }
-  adjustSocial(e,partner,{respect:2,trust:1});
   addMemory(partner,"COLLABORATION",`${e.name} collaborated on ${item.title}.`,"positive",6,e.name);
 }
 function meetingPurposeFor(e,ctx){
@@ -818,7 +829,7 @@ function chooseAction(e){
     const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="talking with coworkers";e.thought=thoughtFor("socialize",e,ctx);e.actionMinutes=rand(25,50);e.cooldowns.socialize=70;
   }else if(a==="collaborate"){
     target=availableCollaborator(e);const room=roomForAction(e,a,{...ctx,collaborator:target});moveToZone(e,zoneForRoom(room));e.action=`collaborating with ${target?.name||"a teammate"}`;e.thought=thoughtFor("collaborate",e,ctx);e.actionMinutes=rand(35,70);e.cooldowns.collaborate=90;
-    if(target){startCollaborationSession(e,target,ctx);adjustSocial(e,target,{respect:3,trust:2});addMemory(e,"COLLABORATION",`${target.name} helped move the work forward.`,"positive",8,target.name);}
+    if(target){startCollaborationSession(e,target,ctx);addMemory(e,"COLLABORATION",`${target.name} helped move the work forward.`,"positive",8,target.name);}
   }else if(a==="meeting"){
     const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="leading a meeting";e.thought=thoughtFor("meeting",e,ctx);e.actionMinutes=rand(35,65);e.cooldowns.meeting=110;e.activeMeeting={workItemId:ctx.work?.id||null,purpose:meetingPurposeFor(e,ctx),startedDay:company.day,startedMinute:company.minute};
   }else if(a==="complain"){
@@ -835,7 +846,15 @@ function chooseAction(e){
       target=employees.find(x=>x.id===preference.selectedEmployeeId)||null;
       if(target){
         e.action=`talking with ${target.name}`;
-        adjustSocial(e,target,{friendship:2,trust:1});
+        recordSharedExperience(e,target,{
+          type:"conversation",
+          roomId:chosenRoom,
+          sourceEventId:`social-conversation-${e.id}-${target.id}-${company.day}-${Math.floor(company.minute/30)}`,
+          emotionalWeight:.7,
+          outcome:"neutral",
+          importance:2,
+          evidence:"A voluntary conversation created social familiarity without changing work execution."
+        });
         addMemory(e,"SOCIAL_HELP",`I had a good conversation with ${target.name}.`,"positive",5,target.name);
       }
     }else if(a==="socialize"&&preference?.selectedType==="alone"){

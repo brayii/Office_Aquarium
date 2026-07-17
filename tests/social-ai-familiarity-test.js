@@ -108,6 +108,7 @@ async function main() {
     ensureSocialAISystems();
     assert(company.socialRelationships[keyAB].familiarity === 100, "Familiarity should be bounded at 100");
 
+    Object.values(company.socialRelationships || {}).forEach(record => evaluateRelationshipInterpretation(record));
     const savedRelationships = JSON.stringify(company.socialRelationships);
     saveGame();
     const loaded = loadGame();

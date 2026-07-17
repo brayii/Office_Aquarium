@@ -87,7 +87,6 @@ function initializeIsolatedEmployees(){
   employees=names.map((_,i)=>makeEmployee(i));
   const shuffled=traits.map(x=>[...x]).sort(()=>simulationRandom()-.5);
   employees.forEach((e,i)=>{e.traits=shuffled[i];e.energy=clamp(e.energy+rand(-8,8),55,95);e.morale=clamp(e.morale+rand(-8,8),52,90);e.focus=clamp(e.focus+rand(-8,8),45,92);});
-  employees.forEach(a=>employees.forEach(b=>{if(a!==b)a.relationship[b.id]=Math.round(simulationRandom()*55-18)}));
 }
 function createIsolatedValidationContext({seed,scenario="fresh-company",saveSnapshot=null}={}){
   const repository=new InMemorySaveRepository();
@@ -346,7 +345,7 @@ function showEmployee(id){
       <div><strong>Personality</strong><br>${personalityDescription?.(e)||"Balanced worker"}<br><small>${(e.personalityArchetypes||[]).slice(0,3).join(" - ")}</small></div>
       <div><strong>Coworker Familiarity</strong><br>${familiaritySummaryForEmployee?.(e)||"Still getting to know the team"}</div>
       <div><strong>Top goals</strong><br>${topGoals}</div>
-      <div><strong>Closest coworker</strong><br>${best?.name||"None"}${social?`<br>Trust ${Math.round(social.trust)}, Respect ${Math.round(social.respect)}, Friendship ${Math.round(social.friendship)}`:""}</div>
+      <div><strong>Closest coworker</strong><br>${best?.name||"None"}${social?`<br>Trust ${Math.round(social.trust)}, Respect ${Math.round(social.respect)}, Comfort ${Math.round(social.comfort)}`:""}</div>
       <div><strong>Why this action?</strong><br>${e.thought||`Currently ${e.action}.`}</div>
       <div><strong>Milestones</strong><br>${e.achievements}</div>
       <div><strong>CEO Opinion</strong><br>Trust ${Math.round(ceo.trust||0)}, Fairness ${Math.round(ceo.fairness||0)}, Support ${Math.round(ceo.support||0)}, Fear ${Math.round(ceo.fear||0)}</div>

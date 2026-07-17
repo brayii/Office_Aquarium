@@ -1,11 +1,12 @@
 const SAVE_KEY=OFFICE_AQUARIUM_CONSTANTS.storage.saveKey;
 const SAVE_VERSION=OFFICE_AQUARIUM_CONSTANTS.storage.saveVersion;
+const AI_SYSTEM_OWNERS=OFFICE_AQUARIUM_CONSTANTS.aiOwners;
 const zones={dev:{x:[9,41],y:[14,40]},lab:{x:[58,91],y:[14,40]},meet:{x:[9,29],y:[64,88]},break:{x:[42,58],y:[64,88]},exec:{x:[72,91],y:[64,88]}};
 const names=["Maya","Leo","Aisha","Noah","Priya","Ethan","Sofia","Marcus"];
 const roles=FOUNDING_ROLES;
 const colors=["#4a78c2","#ef6f6c","#2ab7a9","#d9972b","#7a5af8","#5f9f64","#d65b9e","#52606d"];
 const traits=[["perfectionist","ambitious"],["social","creative"],["focused","introverted"],["cautious","loyal"],["ambitious","social"],["skeptical","focused"],["creative","independent"],["cautious","analytical"]];
-const initialCompany={day:0,minute:OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute,randomState:OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState,nextRuntimeId:OFFICE_AQUARIUM_CONSTANTS.determinism.firstRuntimeId,cash:OFFICE_AQUARIUM_CONSTANTS.startingCompany.cash,board:OFFICE_AQUARIUM_CONSTANTS.startingCompany.board,trust:OFFICE_AQUARIUM_CONSTANTS.startingCompany.trust,chip:OFFICE_AQUARIUM_CONSTANTS.startingCompany.chip,software:OFFICE_AQUARIUM_CONSTANTS.startingCompany.software,quality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.quality,integration:OFFICE_AQUARIUM_CONSTANTS.startingCompany.integration,customers:0,dailyRevenue:0,valuation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuation,phase:OFFICE_AQUARIUM_CONSTANTS.startingCompany.phase,marketSentiment:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketSentiment,marketConfidence:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketConfidence,leadershipReputation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.leadershipReputation,valuationQuality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuationQuality,investorAppetite:OFFICE_AQUARIUM_CONSTANTS.startingCompany.investorAppetite,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastFundraisingMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationStoryDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:OFFICE_AQUARIUM_CONSTANTS.sound.defaultMode,soundEnabled:true,pendingEvent:null,pendingCommunication:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",communicationArchiveMode:"saved",selectedArchiveMessageIndex:null,messageThreads:[],nextMessageThreadId:1,messageFingerprints:{},messageQualityHistory:[],history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,capabilityNeeds:{...DEFAULT_COMPANY_CAPABILITY_NEEDS},capabilityCoverage:{},capabilityGaps:[],capabilityConsequences:{},capabilityPromotionCandidates:[],capabilityFulfillmentOptions:{},capabilityAudit:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},socialRelationships:{},socialMemories:[],emotionalTraces:[],roomPresenceCounters:{},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
+const initialCompany={day:0,minute:OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute,randomState:OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState,nextRuntimeId:OFFICE_AQUARIUM_CONSTANTS.determinism.firstRuntimeId,cash:OFFICE_AQUARIUM_CONSTANTS.startingCompany.cash,board:OFFICE_AQUARIUM_CONSTANTS.startingCompany.board,trust:OFFICE_AQUARIUM_CONSTANTS.startingCompany.trust,chip:OFFICE_AQUARIUM_CONSTANTS.startingCompany.chip,software:OFFICE_AQUARIUM_CONSTANTS.startingCompany.software,quality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.quality,integration:OFFICE_AQUARIUM_CONSTANTS.startingCompany.integration,customers:0,dailyRevenue:0,valuation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuation,phase:OFFICE_AQUARIUM_CONSTANTS.startingCompany.phase,marketSentiment:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketSentiment,marketConfidence:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketConfidence,leadershipReputation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.leadershipReputation,valuationQuality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuationQuality,investorAppetite:OFFICE_AQUARIUM_CONSTANTS.startingCompany.investorAppetite,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastFundraisingMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationStoryDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:OFFICE_AQUARIUM_CONSTANTS.sound.defaultMode,soundEnabled:true,pendingEvent:null,pendingCommunication:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",communicationArchiveMode:"saved",selectedArchiveMessageIndex:null,messageThreads:[],nextMessageThreadId:1,messageFingerprints:{},messageQualityHistory:[],history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,capabilityNeeds:{...DEFAULT_COMPANY_CAPABILITY_NEEDS},capabilityCoverage:{},capabilityGaps:[],capabilityConsequences:{},capabilityPromotionCandidates:[],capabilityFulfillmentOptions:{},capabilityAudit:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},socialAIModelVersion:2,socialRelationships:{},socialMemories:[],emotionalTraces:[],roomPresenceCounters:{},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
 let company,employees,timer=null,debugMode=false,selectedEmployeeId=null,validationMode=false,currentSimulationContext=null,lastValidationReport=null,lastInboxSoundCount=null,musicUnavailable=false,alertsUnavailable=false,pausedBeforeResetPrompt=false;
 function updatePauseButton(){
   const button=document.getElementById("pauseBtn");
@@ -180,7 +181,7 @@ function applyEmployeeEmotionDelta(e,{moraleDelta=0,stressDelta=0,reasonCode="em
   state.frustration=clamp((state.frustration||20)+Math.max(0,stressApplied)*2-Math.max(0,-stressApplied),0,100);
   state.belonging=clamp((state.belonging||55)+Math.max(0,moraleApplied)*.8-Math.max(0,-moraleApplied)*.9,0,100);
   state.recoveryDebt=clamp((state.recoveryDebt||0)+Math.max(0,stressApplied)*.8-Math.max(0,-stressApplied)*1.2,0,100);
-  const trace={type:"emotional_event",employeeId:e.id,oldStress,stressDeltaRequested:requestedStress,stressDeltaScaled:stressScaled,stressDeltaApplied:stressApplied,newStress:e.stress,oldMorale,moraleDeltaRequested:requestedMorale,moraleDeltaScaled:moraleScaled,moraleDeltaApplied:moraleApplied,newMorale:e.morale,reasonCode,sourceEventId,relatedEmployeeIds,blockedByCooldown:false,blockedByCap,status:blockedByCap&&stressApplied===0&&moraleApplied===0?"blocked_by_daily_cap":blockedByCap?"applied_with_cap":"applied",timestamp:ts};
+  const trace={ownerSystem:AI_SYSTEM_OWNERS.emotional,type:"emotional_event",employeeId:e.id,oldStress,stressDeltaRequested:requestedStress,stressDeltaScaled:stressScaled,stressDeltaApplied:stressApplied,newStress:e.stress,oldMorale,moraleDeltaRequested:requestedMorale,moraleDeltaScaled:moraleScaled,moraleDeltaApplied:moraleApplied,newMorale:e.morale,reasonCode,sourceEventId,relatedEmployeeIds,blockedByCooldown:false,blockedByCap,status:blockedByCap&&stressApplied===0&&moraleApplied===0?"blocked_by_daily_cap":blockedByCap?"applied_with_cap":"applied",timestamp:ts};
   trace.uiNotified=notifyEmployeeEmotionChanged(e,trace);
   return logSocialEmotionalTrace(recordEmotionalTrace(trace));
 }
@@ -195,7 +196,7 @@ function applyEmotionalHomeostasis(e,{timestamp=null}={}){
   const newMorale=clamp(moveToward(oldMorale,profile.moraleBaseline,profile.moraleRecoveryRate),0,100);
   const newStress=clamp(moveToward(oldStress,profile.stressBaseline,profile.stressRecoveryRate),0,100);
   e.morale=Number(newMorale.toFixed(4));e.stress=Number(newStress.toFixed(4));
-  const trace={type:"emotional_homeostasis",employeeId:e.id,oldMorale,moraleBaseline:profile.moraleBaseline,moraleDrift:Number((e.morale-oldMorale).toFixed(4)),newMorale:e.morale,oldStress,stressBaseline:profile.stressBaseline,stressDrift:Number((e.stress-oldStress).toFixed(4)),newStress:e.stress,simulationTime:ts};
+  const trace={ownerSystem:AI_SYSTEM_OWNERS.emotional,type:"emotional_homeostasis",employeeId:e.id,oldMorale,moraleBaseline:profile.moraleBaseline,moraleDrift:Number((e.morale-oldMorale).toFixed(4)),newMorale:e.morale,oldStress,stressBaseline:profile.stressBaseline,stressDrift:Number((e.stress-oldStress).toFixed(4)),newStress:e.stress,simulationTime:ts};
   e.lastEmotionalHomeostasis=trace;
   return recordEmotionalTrace(trace);
 }
@@ -239,10 +240,11 @@ function applyEmotionalRecommendation({employeeId,stressDelta=0,moraleDelta=0,re
   const e=(employees||[]).find(x=>x.id===Number(employeeId)&&x.active);
   const requestedStress=Number(stressDelta)||0,requestedMorale=Number(moraleDelta)||0,ts=timestamp||simulationTimestamp();
   if(!e){
-    return logSocialEmotionalTrace({type:"social_emotion_applied",employeeId:Number(employeeId),oldStress:null,stressDeltaRequested:requestedStress,stressDeltaApplied:0,newStress:null,oldMorale:null,moraleDeltaRequested:requestedMorale,moraleDeltaApplied:0,newMorale:null,reasonCode,sourceEventId,relatedEmployeeIds,blockedByCooldown:false,blockedByCap:false,status:"employee_missing",timestamp:ts});
+    return logSocialEmotionalTrace({ownerSystem:AI_SYSTEM_OWNERS.social,type:"social_emotion_applied",employeeId:Number(employeeId),oldStress:null,stressDeltaRequested:requestedStress,stressDeltaApplied:0,newStress:null,oldMorale:null,moraleDeltaRequested:requestedMorale,moraleDeltaApplied:0,newMorale:null,reasonCode,sourceEventId,relatedEmployeeIds,blockedByCooldown:false,blockedByCap:false,status:"employee_missing",timestamp:ts});
   }
   const trace=applyEmployeeEmotionDelta(e,{stressDelta:requestedStress,moraleDelta:requestedMorale,reasonCode,sourceEventId,relatedEmployeeIds,timestamp:ts});
   if(trace){
+    trace.ownerSystem=AI_SYSTEM_OWNERS.social;
     trace.type="social_emotion_applied";
     if(trace.status==="applied_with_cap"&&(trace.moraleDeltaApplied!==0||trace.stressDeltaApplied!==0))trace.status="applied";
     company.lastSocialEmotionalEffect=trace;
@@ -269,6 +271,7 @@ function emptyRelationshipInterpretation(){
 }
 function ensureSocialAISystems(){
   if(!company)return;
+  company.socialAIModelVersion=2;
   company.socialRelationships=company.socialRelationships&&typeof company.socialRelationships==="object"?company.socialRelationships:{};
   company.socialMemories=Array.isArray(company.socialMemories)?company.socialMemories:[];
   company.roomPresenceCounters=company.roomPresenceCounters&&typeof company.roomPresenceCounters==="object"?company.roomPresenceCounters:{};
@@ -501,7 +504,7 @@ function recordSharedExperience(a,b,{type="shared_work_activity",sourceEventId=n
   if((requireSource||experienceType==="direct_help"||experienceType==="blocker_resolved_together")&&!sourceEventId)return null;
   const record=socialRelationshipRecord(a.id,b.id,{create:true}),pairKey=makeRelationshipKey(a.id,b.id),id=`${sourceEventId||`local-${company.day}-${company.minute}`}:${experienceType}:${pairKey}`;
   if((record.recentExperiences||[]).some(x=>x.id===id)){
-    [a,b].forEach(employee=>logSocialEmotionalTrace({type:"social_emotion_applied",employeeId:employee.id,oldStress:employee.stress,stressDeltaRequested:0,stressDeltaApplied:0,newStress:employee.stress,oldMorale:employee.morale,moraleDeltaRequested:0,moraleDeltaApplied:0,newMorale:employee.morale,reasonCode:`experience_${experienceType}`,sourceEventId:id,relatedEmployeeIds:[a.id,b.id].filter(x=>x!==employee.id),blockedByCooldown:false,blockedByCap:false,status:"duplicate_event",timestamp:simulationTimestamp()}));
+    [a,b].forEach(employee=>logSocialEmotionalTrace({ownerSystem:AI_SYSTEM_OWNERS.social,type:"social_emotion_applied",employeeId:employee.id,oldStress:employee.stress,stressDeltaRequested:0,stressDeltaApplied:0,newStress:employee.stress,oldMorale:employee.morale,moraleDeltaRequested:0,moraleDeltaApplied:0,newMorale:employee.morale,reasonCode:`experience_${experienceType}`,sourceEventId:id,relatedEmployeeIds:[a.id,b.id].filter(x=>x!==employee.id),blockedByCooldown:false,blockedByCap:false,status:"duplicate_event",timestamp:simulationTimestamp()}));
     return record;
   }
   const boundedIntensity=clamp(Math.round(Number(intensity)||1),1,5);
@@ -686,7 +689,8 @@ function recordSocialEncounter(a,b,{type="same_room_presence",gain=.25,sourceEve
   }
   record.lastInteractionAt=now;
   record.recentInteractionTypes=[{type,day:company.day,minute:company.minute,sourceEventId:sourceEventId||null,gain:appliedGain},...(record.recentInteractionTypes||[])].slice(0,12);
-  recordSharedExperience(a,b,{type:normalizeSocialExperienceType(type),sourceEventId:sourceEventId||`${type}-${makeRelationshipKey(a.id,b.id)}-${company.day}-${company.minute}`,roomId,participants:[a.id,b.id],tone:null,intensity:type==="direct_help"?2:type==="shared_break"?1:1});
+  const passivePresence=!sourceEventId&&(type==="same_room_presence"||type==="same_meeting"||type==="shared_break");
+  if(!passivePresence)recordSharedExperience(a,b,{type:normalizeSocialExperienceType(type),sourceEventId:sourceEventId||`${type}-${makeRelationshipKey(a.id,b.id)}-${company.day}-${company.minute}`,roomId,participants:[a.id,b.id],tone:null,intensity:type==="direct_help"?2:type==="shared_break"?1:1});
   return record;
 }
 function observeRoomFamiliarity(minutes=5){
@@ -795,7 +799,7 @@ function resetCommunicationUi(){
   if(archiveList)archiveList.innerHTML="";
   if(archiveDetail)archiveDetail.innerHTML="";
 }
-function reset(skipSave=false,randomize=false,seedState=null){document.getElementById("gameOverOverlay")?.classList.add("hidden");company=typeof structuredClone==="function"?structuredClone(initialCompany):JSON.parse(JSON.stringify(initialCompany));resetCommunicationUi();if(Number.isFinite(seedState))company.randomState=seedState>>>0;if(randomize){const climates=[{name:"Cautious market",cash:-1.5,board:4,trust:3},{name:"Investor optimism",cash:2,board:6,trust:-2},{name:"Competitive pressure",cash:0,board:-3,trust:1},{name:"Stable opening",cash:0,board:0,trust:0}];const climate=climates[Math.floor(simulationRandom()*climates.length)];company.cash=clamp(company.cash+climate.cash,14,21);company.board=clamp(company.board+climate.board,58,82);company.trust=clamp(company.trust+climate.trust,55,78);company.valuation=clamp(company.valuation+rand(-4,4),34,50);company.log=[`You became CEO during a ${climate.name.toLowerCase()}. The office is running without direct employee control.`];}employees=names.map((_,i)=>makeEmployee(i));if(randomize){const shuffled=traits.map(x=>[...x]).sort(()=>simulationRandom()-.5);employees.forEach((e,i)=>{e.traits=shuffled[i];e.energy=clamp(e.energy+rand(-8,8),55,95);e.morale=clamp(e.morale+rand(-8,8),52,90);e.focus=clamp(e.focus+rand(-8,8),45,92);});}employees.forEach(a=>employees.forEach(b=>{if(a!==b)a.relationship[b.id]=Math.round(simulationRandom()*55-18)}));company.weekStartSnapshot=captureWeekSnapshot();ensureBibleSystems?.();updateManufacturingAndStakeholders?.();updateCompanyInformationSystem?.();collectDailyMetrics?.();buildOffice();renderDecisionEvent();render();if(!validationMode)restartTimer();if(!skipSave&&!validationMode)saveGame();}
+function reset(skipSave=false,randomize=false,seedState=null){document.getElementById("gameOverOverlay")?.classList.add("hidden");company=typeof structuredClone==="function"?structuredClone(initialCompany):JSON.parse(JSON.stringify(initialCompany));resetCommunicationUi();if(Number.isFinite(seedState))company.randomState=seedState>>>0;if(randomize){const climates=[{name:"Cautious market",cash:-1.5,board:4,trust:3},{name:"Investor optimism",cash:2,board:6,trust:-2},{name:"Competitive pressure",cash:0,board:-3,trust:1},{name:"Stable opening",cash:0,board:0,trust:0}];const climate=climates[Math.floor(simulationRandom()*climates.length)];company.cash=clamp(company.cash+climate.cash,14,21);company.board=clamp(company.board+climate.board,58,82);company.trust=clamp(company.trust+climate.trust,55,78);company.valuation=clamp(company.valuation+rand(-4,4),34,50);company.log=[`You became CEO during a ${climate.name.toLowerCase()}. The office is running without direct employee control.`];}employees=names.map((_,i)=>makeEmployee(i));if(randomize){const shuffled=traits.map(x=>[...x]).sort(()=>simulationRandom()-.5);employees.forEach((e,i)=>{e.traits=shuffled[i];e.energy=clamp(e.energy+rand(-8,8),55,95);e.morale=clamp(e.morale+rand(-8,8),52,90);e.focus=clamp(e.focus+rand(-8,8),45,92);});}company.weekStartSnapshot=captureWeekSnapshot();ensureBibleSystems?.();updateManufacturingAndStakeholders?.();updateCompanyInformationSystem?.();collectDailyMetrics?.();buildOffice();renderDecisionEvent();render();if(!validationMode)restartTimer();if(!skipSave&&!validationMode)saveGame();}
 function saveGame(){try{if(currentSimulationContext?.mode==="isolated-validation")throw new Error("Production save blocked during isolated validation.");saveRepository.write(company,employees);document.getElementById("saveNote").textContent="Saved on this device";}catch(e){document.getElementById("saveNote").textContent="Autosave unavailable";}}
 function loadGame(){try{const data=saveRepository.read();if(!data)return false;company={...saveRepository.clone(initialCompany),...(data.company||{})};const loadedRandomState=Number.isFinite(company.randomState)?(company.randomState>>>0):2463534242;const loadedNextRuntimeId=Math.max(1,Number(company.nextRuntimeId)||1);company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;const migrationEmployeeDefaults=i=>{const savedRandom=company.randomState;company.randomState=(0x9e3779b9+Math.imul(i+1,0x85ebca6b))>>>0;const fresh=makeEmployee(i);company.randomState=savedRandom;return fresh;};const savedEmployees=Array.isArray(data.employees)?data.employees:[];const employeeSlots=Math.max(names.length,...savedEmployees.map(e=>Number(e.id)).filter(Number.isFinite).map(id=>id+1));employees=Array.from({length:employeeSlots},(_,i)=>{const fresh=migrationEmployeeDefaults(i),saved=savedEmployees.find(e=>e.id===i)||{};return{
       ...fresh,...saved,
@@ -818,7 +822,7 @@ function loadGame(){try{const data=saveRepository.read();if(!data)return false;c
       recentEmotionalEvents:Array.isArray(saved.recentEmotionalEvents)?saved.recentEmotionalEvents:fresh.recentEmotionalEvents,
       lastEmotionalReaction:saved.lastEmotionalReaction||fresh.lastEmotionalReaction||null,
       joinedDay:Number.isFinite(saved.joinedDay)?saved.joinedDay:(fresh.joinedDay||0),age:Number.isFinite(saved.age)?saved.age:fresh.age,stayScore:Number.isFinite(saved.stayScore)?saved.stayScore:72,retentionRisk:Number.isFinite(saved.retentionRisk)?saved.retentionRisk:28,jobSearchDays:Number(saved.jobSearchDays)||0,retirementReadiness:Number(saved.retirementReadiness)||0,quarterlyReview:saved.quarterlyReview||null,promotionExpectation:Number.isFinite(saved.promotionExpectation)?saved.promotionExpectation:45,salarySatisfaction:Number.isFinite(saved.salarySatisfaction)?saved.salarySatisfaction:65,recognitionSatisfaction:Number.isFinite(saved.recognitionSatisfaction)?saved.recognitionSatisfaction:60
-    };});company.randomState=loadedRandomState;employees.forEach(e=>{normalizeEmployeeRoleProfile(e);ensureEmployeePersonality(e);});employees.forEach(a=>employees.forEach(b=>{if(a!==b&&typeof a.relationship[b.id]!=="number")a.relationship[b.id]=0;}));company.completedEvents=Array.isArray(company.completedEvents)?company.completedEvents:[];company.costEfficiency=clamp(Number(company.costEfficiency)||1,.72,1.08);company.pilotDays=Number(company.pilotDays)||0;
+    };});company.randomState=loadedRandomState;employees.forEach(e=>{normalizeEmployeeRoleProfile(e);ensureEmployeePersonality(e);e.relationship={};e.social={};});company.completedEvents=Array.isArray(company.completedEvents)?company.completedEvents:[];company.costEfficiency=clamp(Number(company.costEfficiency)||1,.72,1.08);company.pilotDays=Number(company.pilotDays)||0;
 company.openRoles=Array.isArray(company.openRoles)?company.openRoles:[];
 company.newspapers=Array.isArray(company.newspapers)?company.newspapers:[];
 company.weeklyEvents=Array.isArray(company.weeklyEvents)?company.weeklyEvents:[];
@@ -912,34 +916,30 @@ function requestReset(){pausedBeforeResetPrompt=!!company.paused;company.paused=
 function cancelResetPrompt(){document.getElementById("confirmResetOverlay").classList.add("hidden");if(company){company.paused=pausedBeforeResetPrompt;updatePauseButton();}}
 
 function getSocial(e,otherId){
-  if(!e.social)e.social={};
-  if(!e.social[otherId]){
-    const base=Number(e.relationship?.[otherId]||0);
-    e.social[otherId]={
-      trust:clamp(base+rand(-8,8),-100,100),
-      respect:clamp(base+rand(-5,12),-100,100),
-      friendship:clamp(base+rand(-12,10),-100,100),
-      rivalry:clamp(Math.max(0,-base)+rand(0,8),0,100)
-    };
-  }
-  return e.social[otherId];
+  const other=employees?.find(x=>x.id===Number(otherId));
+  const record=other?socialRelationshipRecord(e?.id,other.id,{create:false}):null;
+  if(!record)return {trust:50,respect:50,comfort:50,professionalFriction:0};
+  const rel=record?.lastRelationshipEvaluationAt?record.relationship:evaluateRelationshipInterpretation(record);
+  return {
+    trust:Math.round(rel?.trust??50),
+    respect:Math.round(rel?.respect??50),
+    comfort:Math.round(rel?.comfort??50),
+    professionalFriction:Math.round(rel?.professionalFriction??0)
+  };
 }
 
 function socialScore(e,otherId){
   const s=getSocial(e,otherId);
-  return s.trust*.34+s.respect*.34+s.friendship*.42-s.rivalry*.4;
+  return clamp((s.trust-50)*.32+(s.respect-50)*.30+(s.comfort-50)*.24-s.professionalFriction*.28,-100,100);
 }
 
 function adjustSocial(a,b,delta={}){
-  const sa=getSocial(a,b.id), sb=getSocial(b,a.id);
-  for(const key of ["trust","respect","friendship","rivalry"]){
-    if(delta[key]){
-      sa[key]=clamp(sa[key]+delta[key],key==="rivalry"?0:-100,100);
-      sb[key]=clamp(sb[key]+delta[key],key==="rivalry"?0:-100,100);
-    }
-  }
-  a.relationship[b.id]=Math.round(socialScore(a,b.id));
-  b.relationship[a.id]=Math.round(socialScore(b,a.id));
+  if(!a?.active||!b?.active)return null;
+  const positive=(Number(delta.trust)||0)+(Number(delta.respect)||0)+(Number(delta.comfort)||0);
+  const negative=(Number(delta.professionalFriction)||0)+(Number(delta.rivalry)||0);
+  const tone=negative>positive?"negative":positive>negative?"positive":"neutral";
+  const intensity=clamp(Math.round(Math.max(Math.abs(positive),Math.abs(negative),1)/2),1,3);
+  return recordSharedExperience(a,b,{type:"shared_work_activity",sourceEventId:`legacy-social-adapter-${a.id}-${b.id}-${company.day}-${company.minute}`,participants:[a.id,b.id],tone,intensity});
 }
 
 function addMemory(e,type,text,emotion="neutral",strength=10,subject="company"){
@@ -1057,7 +1057,7 @@ function availableCollaborator(e){
   const need=projectNeedFor(e);
   return employees
     .filter(x=>x.active&&!x.offsite&&x.id!==e.id&&x.stress<88)
-    .map(x=>({x,score:socialScore(e,x.id)*.35+roleCompatibility(e,x,need)+(x.focus||50)*.12-(x.stress||0)*.18+(x.action?.includes("collaborating")?-8:0)}))
+    .map(x=>({x,score:roleCompatibility(e,x,need)+(x.focus||50)*.12+(x.morale||50)*.05-(x.stress||0)*.18+(x.action?.includes("collaborating")?-8:0)}))
     .sort((a,b)=>b.score-a.score)[0]?.x||null;
 }
 

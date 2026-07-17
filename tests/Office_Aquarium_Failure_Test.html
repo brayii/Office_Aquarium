@@ -230,7 +230,7 @@
   <script>
     const SAVE_KEY = "office-aquarium-living-office-v3";
     const BACKUP_KEY = "office-aquarium-failure-test-backup";
-    const SAVE_VERSION = 36;
+    const SAVE_VERSION = 38;
 
     const baseCompany = {
       day: 12,
@@ -417,7 +417,7 @@
         cash: 12,
         trust: 60,
         log: ["Failure test: board confidence is zero. The board should remove the CEO."]
-      });
+      }, foundingEmployees());
       setStatus("CEO removal test save created. Open the main game, continue company, and let time run.");
     };
 
@@ -427,7 +427,7 @@
         board: 60,
         trust: 60,
         log: ["Failure test: cash is below the insolvency threshold. The company should fail."]
-      });
+      }, foundingEmployees());
       setStatus("Company failure test save created. Open the main game, continue company, and let time run.");
     };
 

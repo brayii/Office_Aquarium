@@ -130,6 +130,21 @@ Social and emotional state such as familiarity, trust, respect, comfort, profess
 
 These values may appear in AI Debug.
 
+## Canonical Social State
+
+`company.socialAIModelVersion` identifies the current Social AI schema. Version 2 uses `company.socialRelationships`, `company.socialMemories`, and Social AI traces as the canonical source of relationship history.
+
+Legacy employee-local maps such as `employee.relationship`, `employee.social`, `getSocial()`, `socialScore()`, and `adjustSocial()` are compatibility adapters only. New code should not add direct trust, friendship, rivalry, respect, comfort, or friction values to an employee object. If a feature needs social context, it should record or read a Social AI encounter instead.
+
+Passive co-presence, such as sharing a room, meeting room, or break area, may build familiarity. It must not create emotional events or shared-experience history unless a concrete source event exists.
+
+System ownership is defined in `OFFICE_AQUARIUM_CONSTANTS.aiOwners`:
+
+- Work AI owns work choices and work outcomes.
+- Social AI owns familiarity, relationship interpretation, social preferences, and social traces.
+- The emotional system owns final bounded stress and morale writes.
+- Institutional Learning observes outcomes after they occur.
+
 ## Regression Guardrails
 
 Any future change touching employee AI should verify:
@@ -145,3 +160,5 @@ Any future change touching employee AI should verify:
 - Stress and morale remain bounded.
 
 Dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`, `tests/social-ai-familiarity-test.js`, `tests/social-ai-shared-experiences-test.js`, and `tests/social-ai-relationship-interpretation-test.js`.
+
+Additional boundary coverage lives in `tests/social-ai-boundary-regression-test.js` and `tests/social-emotional-long-run-test.js`.

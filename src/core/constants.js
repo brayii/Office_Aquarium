@@ -51,6 +51,12 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     },
     defaultMode:"both"
   },
+  aiOwners:{
+    work:"work-ai",
+    social:"social-ai",
+    institutional:"institutional-learning",
+    emotional:"emotional-system"
+  },
   projectStatus:{
     proposal:"proposal",
     planning:"planning",
