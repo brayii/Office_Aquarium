@@ -89,7 +89,7 @@ Restarting is permanent for the current local save after confirmation.
 
 Shows what employees are doing right now. Employees may work, meet, test, collaborate, take breaks, or leave the office.
 
-Click an employee in the office to open their detail page. Transparent or faded employees are not active in the office, such as people who are offsite, terminated, resigned, or no longer available.
+Click an employee in the office to open their detail page. A faded employee is temporarily offsite or unavailable. Employees who resign or are terminated are removed from the live office rather than left as transparent copies.
 
 ## Employees
 
@@ -418,7 +418,7 @@ It may learn from:
 - crisis recovery
 - repeated patterns
 
-Learning happens after outcomes are observed. The company does not learn just because a decision was made.
+Learning happens after outcomes are observed. The company does not learn just because a decision was made. Medium- and long-term reviews decide whether evidence is provisional, validated, contradicted, or too weak to change behavior. Repeated reviews of the same event do not count as independent proof.
 
 ---
 

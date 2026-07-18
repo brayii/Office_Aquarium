@@ -324,7 +324,10 @@ function activeValuationShockTotal(){
   company.valuationShocks=company.valuationShocks.filter(s=>company.day-(s.day??company.day)<=Math.max(1,s.decayDays||20));
   return clamp(total,-18,24);
 }
-function updateDailyValuation(){
+function updateDailyValuationCore(force=false){
+  ensureMarketValuationSystems();
+  if(!force&&company.lastValuationUpdateDay===company.day)return company.valuation;
+  company.lastValuationUpdateDay=company.day;
   ensureMarketValuationSystems();updateMarketPerception();
   const health=derivedOperatingHealth();
   const fundamentals=company.valuationDrivers.fundamentalsScore??companyFundamentalsScore(),active=employees.filter(e=>e.active).length,base=18+fundamentals*.42+Math.max(0,active-6)*1.6+(company.customers||0)*.11+(company.dailyRevenue||0)*210;
@@ -335,11 +338,17 @@ function updateDailyValuation(){
   company.marketNoiseState=Number((noisePct*(company.valuation||target)).toFixed(4));
   company.valuation=clamp((company.valuation||target)*.96+target*.04+company.marketNoiseState,1,999);
   company.valuationDrivers={...company.valuationDrivers,valuationTarget:Number(target.toFixed(2)),dailyNoise:Number(company.marketNoiseState.toFixed(3)),activeShock:Number(shock.toFixed(3)),shockMultiplier:Number(shockMultiplier.toFixed(3)),multipliers:{portfolio:portfolioMultiplier,customer:customerMultiplier,revenue:revenueMultiplier,execution:executionMultiplier,market:marketMultiplier,leadership:leadershipMultiplier,risk:riskMultiplier,quality:qualityMultiplier,shock:shockMultiplier}};
+  company.valuationHistory=company.valuationHistory.filter(point=>point.day!==company.day);
   company.valuationHistory.push({day:company.day,valuation:Number(company.valuation.toFixed(2)),dailyRevenue:Number((company.dailyRevenue||0).toFixed(4)),customers:Math.round(company.customers||0),marketSentiment:Math.round(company.marketSentiment),marketConfidence:Math.round(company.marketConfidence),valuationQuality:Math.round(company.valuationQuality),fundamentalsScore:Math.round(fundamentals),leadershipReputation:Math.round(company.leadershipReputation)});
   company.valuationHistory=company.valuationHistory.slice(-1100);
+  return company.valuation;
+}
+function updateDailyValuation(){
+  updateDailyValuationCore();
   updateInvestorReaction();
   updateInvestorRelationsReport();
   evaluateInvestorRelationsForecasts();
+  return company.valuation;
 }
 function maybeRecordValuationStory(){
   ensureMarketValuationSystems();
@@ -386,7 +395,7 @@ function reviewBoardMarketLessons(){
 }
 function boardValuationView(){
   ensureMarketValuationSystems();
-  const report=updateInvestorRelationsReport(true),p=company.boardProfile,v30=valuationChange(30),fund=company.valuationDrivers.fundamentalsScore??companyFundamentalsScore(),risk=company.companyRiskComponents?.total??40,quality=company.valuationQuality,level=clamp((company.valuation||0)*1.2,0,100),trend=clamp(50+v30*1.8,0,100),execution=company.valuationDrivers.executionCredibility??50,cash=clamp(company.cash*5,0,100),customer=company.valuationDrivers.customerSupport??50,leadership=company.leadershipReputation??50,finance=derivedFinanceHealth(),portfolio=derivedOperatingHealth().portfolioHealth??50,investorSignal=company.investorSentiment?.confidence??50,patience=company.investorSentiment?.patience??50;
+  const report=updateInvestorRelationsReport(),p=company.boardProfile,v30=valuationChange(30),fund=company.valuationDrivers.fundamentalsScore??companyFundamentalsScore(),risk=company.companyRiskComponents?.total??40,quality=company.valuationQuality,level=clamp((company.valuation||0)*1.2,0,100),trend=clamp(50+v30*1.8,0,100),execution=company.valuationDrivers.executionCredibility??50,cash=clamp(company.cash*5,0,100),customer=company.valuationDrivers.customerSupport??50,leadership=company.leadershipReputation??50,finance=derivedFinanceHealth(),portfolio=derivedOperatingHealth().portfolioHealth??50,investorSignal=company.investorSentiment?.confidence??50,patience=company.investorSentiment?.patience??50;
   const lessonBias=Object.values(company.boardMarketLessons||{}).reduce((s,l)=>s+(l.belief||0)*((l.confidence||0)/100),0);
   let score=investorSignal*.16+level*(p.valuationBias/100)*.13+trend*.10+quality*.14+fund*.15+customer*.09+execution*(p.executionBias/100)*.12+cash*(p.cashBias/100)*.08+leadership*.06+finance*.05+portfolio*.06+lessonBias-risk*.15-company.boardControlPressure*.07;
   if(quality<42&&v30>8)score-=10;

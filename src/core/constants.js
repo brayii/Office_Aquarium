@@ -46,6 +46,30 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     maxScore:100,
     minScore:0
   },
+  departments:{
+    company:"company",
+    hardware:"hardware",
+    software:"software",
+    quality:"quality",
+    product:"product",
+    finance:"finance",
+    people:"people",
+    operations:"operations",
+    customerSuccess:"customerSuccess",
+    support:"support",
+    core:["hardware","software","quality","product","finance","people"],
+    learning:["hardware","software","quality","product","finance","people","company"],
+    labor:["hardware","software","quality","product","finance","people","operations","customerSuccess","support"]
+  },
+  productPhases:{
+    prototype:"prototype",
+    integration:"integration",
+    customerTrial:"customer trial",
+    pilot:"pilot",
+    launched:"launched",
+    order:["prototype","integration","customer trial","pilot","launched"],
+    commercial:["customer trial","pilot","launched"]
+  },
   social:{
     modelVersion:3,
     neutralInterpretation:{
@@ -155,6 +179,11 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     maxStressEffect:.5
   },
   hiring:{
+    policyModes:{
+      normal:"normal",
+      criticalOnly:"critical-only",
+      frozen:"frozen"
+    },
     requestStartDay:6,
     requestCadenceDays:5,
     requestScoreThreshold:85,
@@ -308,6 +337,102 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     social:"social-ai",
     institutional:"institutional-learning",
     emotional:"emotional-system"
+  },
+  projectLearning:{
+    scoreMin:-10,
+    scoreMax:10,
+    maxEvidence:5,
+    decayDays:720,
+    minimumDecay:.35,
+    keys:[
+      "estimateAccuracy","scopeControl","pilotValue","earlyQA","staffingTiming",
+      "cancellationTiming","sunkCostDiscipline","marketTiming","supplierRisk",
+      "projectSize","crossDepartmentCoordination","customerValidation","knowledgeValue"
+    ]
+  },
+  workforceLearning:{
+    scoreMin:-12,
+    scoreMax:12
+  },
+  institutionalLearning:{
+    minimumAttributionQuality:40,
+    suppressionIndependenceWindowDays:30,
+    reviewWindows:["short","medium","long"],
+    reviewRank:{short:1,medium:2,long:3},
+    stateRank:{
+      unknown:0,
+      prior:1,
+      hypothesis:1,
+      provisional:2,
+      validated:3,
+      contradicted:0,
+      obsolete:0
+    },
+    stateWeights:{
+      validated:1,
+      provisional:.20,
+      hypothesis:.05,
+      prior:.05,
+      contradicted:-.10,
+      obsolete:0,
+      unknown:0
+    },
+    maxLessons:36,
+    maxEvidencePerLesson:6,
+    maxEpisodeKeysPerLesson:12,
+    maxIndependenceGroupsPerLesson:12
+  },
+  riskPillars:{
+    weights:{
+      financial:.20,
+      productDelivery:.20,
+      customerMarket:.15,
+      workforce:.15,
+      operations:.10,
+      governance:.10,
+      strategic:.10
+    },
+    labels:{
+      financial:"Financial",
+      productDelivery:"Product & Delivery",
+      customerMarket:"Customer & Market",
+      workforce:"Workforce",
+      operations:"Operations",
+      governance:"Governance",
+      strategic:"Strategic"
+    }
+  },
+  manufacturing:{
+    fulfillmentThreshold:.62,
+    revenuePenaltyRate:.45,
+    trustPenaltyScale:2.4,
+    customerSentimentPenaltyScale:3,
+    customerTrustPenaltyScale:2
+  },
+  dailyPipeline:{
+    version:1,
+    captureStageHashesInDebugOnly:true,
+    stageOrder:[
+      "employee-outcomes",
+      "work-items",
+      "projects-portfolio",
+      "customers-manufacturing",
+      "finance",
+      "market-labor",
+      "valuation",
+      "investor-reaction",
+      "investor-relations",
+      "board",
+      "workforce",
+      "organizational-friction",
+      "risk-pillars",
+      "crisis-lifecycle",
+      "learning-reviews",
+      "executive-communication",
+      "narrative",
+      "telemetry",
+      "save"
+    ]
   },
   projectStatus:{
     proposal:"proposal",

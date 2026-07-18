@@ -44,9 +44,9 @@ The familiarity system may update only:
 - pair familiarity
 - pair interaction count
 - pair last interaction time
-- small stress deltas
-- small morale deltas
 - debug trace records
+
+Passive room or break-area co-presence stops here. It may build familiarity after the configured exposure threshold, but it does not create a shared experience or emotional recommendation.
 
 It must not directly update:
 
@@ -65,9 +65,9 @@ It must not directly update:
 
 The system observes movement and work. It does not replace them.
 
-## Emotional Output
+## Concrete Encounters
 
-Encounter reactions use the same stress/morale-only contract as the personality system:
+When a separate concrete interaction occurs, later Social AI stages may return the standard stress/morale-only recommendation:
 
 ```js
 {
@@ -80,6 +80,8 @@ Encounter reactions use the same stress/morale-only contract as the personality 
 ```
 
 The central emotional system applies clamping, daily caps, cooldowns, and trace history.
+
+Stage 1 passive familiarity by itself does not call that emotional path.
 
 ## UI
 
@@ -95,6 +97,7 @@ The browser regression test `tests/social-ai-familiarity-test.js` verifies:
 - first encounter creation
 - no fabricated relationship records
 - same-room and break familiarity progression
+- passive co-presence creating no shared-experience or emotional event
 - cooldown behavior
 - bounded familiarity
 - save/load preservation

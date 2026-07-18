@@ -1,5 +1,6 @@
-const DEPARTMENTS=["hardware","software","quality","product","finance","people","company"];
-const PROJECT_LESSON_KEYS=["estimateAccuracy","scopeControl","pilotValue","earlyQA","staffingTiming","cancellationTiming","sunkCostDiscipline","marketTiming","supplierRisk","projectSize","crossDepartmentCoordination","customerValidation","knowledgeValue"];
+const DEPARTMENTS=OFFICE_AQUARIUM_CONSTANTS.departments.learning;
+const PROJECT_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS.projectLearning;
+const PROJECT_LESSON_KEYS=PROJECT_LEARNING_RULES.keys;
 const PROJECT_SOCIAL_EXPERIENCE_RULES=OFFICE_AQUARIUM_CONSTANTS.social.projectExperience;
 const PORTFOLIO_DEMAND_RULES=OFFICE_AQUARIUM_CONSTANTS.portfolioDemand;
 const LEARNING_COVERAGE={
@@ -36,27 +37,46 @@ const LEARNING_COVERAGE={
   customerValidation:{producers:["validation decisions"],consumers:["portfolio recommendations"],ui:["Project Portfolio"]},
   knowledgeValue:{producers:["completed research/projects"],consumers:["proposal benefit estimates"],ui:["Project Portfolio"]}
 };
-function emptyProjectLessons(){return Object.fromEntries(PROJECT_LESSON_KEYS.map(k=>[k,{score:0,confidence:0,successEvidence:0,failureEvidence:0,sampleCount:0,lastObservedDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,effectEstimate:0,variance:1,evidence:[]}]));}
+function emptyProjectLessons(){return Object.fromEntries(PROJECT_LESSON_KEYS.map(k=>[k,{score:0,confidence:0,successEvidence:0,failureEvidence:0,sampleCount:0,lastObservedDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,effectEstimate:0,variance:1,evidence:[],episodeKeys:[],independenceGroups:[],episodeReviews:{}}]));}
 function normalizeProjectLessons(){
   const defaults=emptyProjectLessons(), current=company.projectLessons&&typeof company.projectLessons==="object"?company.projectLessons:{};
   for(const key of PROJECT_LESSON_KEYS){
     const old=current[key];
-    if(old&&typeof old==="object")defaults[key]={...defaults[key],...old,score:clamp(Number(old.score)||0,-10,10),confidence:clamp(Number(old.confidence)||0,0,100)};
-    else defaults[key]={...defaults[key],score:clamp(Number(old)||0,-10,10),effectEstimate:clamp(Number(old)||0,-10,10),confidence:Math.abs(Number(old)||0)>0?35:0,sampleCount:Math.abs(Number(old)||0)>0?1:0};
+    if(old&&typeof old==="object")defaults[key]={...defaults[key],...old,score:clamp(Number(old.score)||0,PROJECT_LEARNING_RULES.scoreMin,PROJECT_LEARNING_RULES.scoreMax),confidence:clamp(Number(old.confidence)||0,0,100)};
+    else defaults[key]={...defaults[key],score:clamp(Number(old)||0,PROJECT_LEARNING_RULES.scoreMin,PROJECT_LEARNING_RULES.scoreMax),effectEstimate:clamp(Number(old)||0,PROJECT_LEARNING_RULES.scoreMin,PROJECT_LEARNING_RULES.scoreMax),confidence:Math.abs(Number(old)||0)>0?35:0,sampleCount:Math.abs(Number(old)||0)>0?1:0};
   }
   company.projectLessons=defaults;
 }
-function reinforceProjectLesson(key,delta,evidence="",confidenceGain=8,outcome="mixed"){
+function reinforceProjectLesson(key,delta,evidence="",confidenceGain=8,outcome="mixed",review={}){
   ensureProjectPortfolio();normalizeProjectLessons();
   if(!PROJECT_LESSON_KEYS.includes(key))return null;
-  const l=company.projectLessons[key], sample=(Number(delta)||0), n=(l.sampleCount||0)+1, oldMean=Number(l.effectEstimate)||0;
+  const l=company.projectLessons[key],sample=(Number(delta)||0);
+  const gate=typeof registerReviewedLearningSample==="function"
+    ?registerReviewedLearningSample(l,review)
+    :{accepted:false,reviewed:false,reason:"review-service-unavailable"};
+  if(!gate.accepted){
+    if(typeof recordLearningEvidence==="function")recordLearningEvidence({
+      domain:"project",
+      eventType:key,
+      action:key,
+      outcome,
+      magnitude:0,
+      confidence:l.confidence||0,
+      projectId:review.projectId||null,
+      evidence,
+      context:{...review,pendingEvidenceOnly:true,reviewResult:gate.reason},
+      contributors:[{type:"unreviewedProjectEvidence",id:key,weight:1}]
+    });
+    return l;
+  }
+  const n=(l.sampleCount||0)+1,oldMean=Number(l.effectEstimate)||0;
   l.sampleCount=n;l.lastObservedDay=company.day;l.successEvidence+=(sample>0?1:0);l.failureEvidence+=(sample<0?1:0);
-  l.effectEstimate=clamp(oldMean+(sample-oldMean)/n,-10,10);
+  l.effectEstimate=clamp(oldMean+(sample-oldMean)/n,PROJECT_LEARNING_RULES.scoreMin,PROJECT_LEARNING_RULES.scoreMax);
   l.variance=clamp(((l.variance||1)*(n-1)+Math.pow(sample-l.effectEstimate,2))/n,0,25);
-  l.score=clamp((l.score||0)*.88+sample*.42,-10,10);
+  l.score=clamp((l.score||0)*.88+sample*.42,PROJECT_LEARNING_RULES.scoreMin,PROJECT_LEARNING_RULES.scoreMax);
   l.confidence=clamp((l.confidence||0)+confidenceGain*(1/(1+Math.sqrt(l.variance||0)))-(outcome==="contradiction"?confidenceGain*.7:0),0,100);
-  l.evidence=Array.isArray(l.evidence)?l.evidence:[];if(evidence&&!l.evidence.includes(evidence))l.evidence.unshift(evidence);l.evidence=l.evidence.slice(0,5);
-  recordLearningEvidence({domain:"project",eventType:key,action:key,outcome,magnitude:sample,confidence:l.confidence,evidence,contributors:[{type:"projectLesson",id:key,weight:1}]});
+  l.evidence=Array.isArray(l.evidence)?l.evidence:[];if(evidence&&!l.evidence.includes(evidence))l.evidence.unshift(evidence);l.evidence=l.evidence.slice(0,PROJECT_LEARNING_RULES.maxEvidence);
+  recordLearningEvidence({domain:"project",eventType:key,action:key,outcome,magnitude:sample,confidence:l.confidence,projectId:review.projectId||null,evidence,context:{...review,reviewResult:gate.reason},contributors:[{type:"projectLesson",id:key,weight:1}]});
   return l;
 }
 function projectLessonBias(key){
@@ -65,8 +85,8 @@ function projectLessonBias(key){
   normalizeProjectLessons();
   const l=company.projectLessons[key]||{};
   const age=Math.max(0,company.day-(l.lastObservedDay??company.day));
-  const decay=clamp(1-age/720,.35,1);
-  return clamp((l.score||0)*(l.confidence||0)/100*decay,-10,10);
+  const decay=clamp(1-age/PROJECT_LEARNING_RULES.decayDays,PROJECT_LEARNING_RULES.minimumDecay,1);
+  return clamp((l.score||0)*(l.confidence||0)/100*decay,PROJECT_LEARNING_RULES.scoreMin,PROJECT_LEARNING_RULES.scoreMax);
 }
 function projectExecutionModifiers(project,state={}){
   const coordination=projectLessonBias("crossDepartmentCoordination"),earlyQA=projectLessonBias("earlyQA"),staffing=projectLessonBias("staffingTiming"),supplier=projectLessonBias("supplierRisk");
@@ -712,7 +732,8 @@ function projectPerformanceUpdate(){
     const beforeProgress=p.progress||0;
     const staffingContribution=(coverage-50)*.012*pace.progressMultiplier-overload*.006;
     const conditionProgress=conditionDelta*.006*pace.progressMultiplier;
-    p.progress=clamp((p.progress||0)*.86+avgProgress*.14*mod.progress*pace.progressMultiplier*lateDrag*(1-overload*.003)+staffingContribution+conditionProgress,0,100);
+    const blendedProgress=(p.progress||0)*.86+avgProgress*.14*mod.progress*pace.progressMultiplier*lateDrag*(1-overload*.003)+staffingContribution+conditionProgress;
+    p.progress=clamp(Math.max(beforeProgress,blendedProgress),0,100);
     if(Math.abs(p.progress-beforeProgress)>.25)recordProjectLedger(p.id,"project-performance","progress",p.progress-beforeProgress,"Aggregated paced work-item progress and staffing coverage");
     let blockers=items.reduce((s,w)=>s+(w.blockedBy?.length||0),0);
     p.quality=clamp((p.quality||55)+(company.quality-55)*.015+conditionDelta*.018-blockers*.08*mod.defectRisk+(coverage-50)*.01-overload*.018,0,100);
@@ -750,7 +771,34 @@ function projectPerformanceUpdate(){
     p.closeoutReadyDays=closeoutReady?Math.min(closeoutNeeded+1,(p.closeoutReadyDays||0)+1):0;
     if(p.closeoutReadyDays>=closeoutNeeded&&p.progress<100){p.progress=100;p.performance.progress=100;recordProjectLedger(p.id,"project-closeout","progress",100-beforeProgress,`Near-complete project accepted after ${closeoutNeeded} readiness checks`);}
     if(riskTrend>72&&p.status!=="blocked")p.status="at risk";
-    if(p.progress>=100){p.status="completed";p.completedDay=company.day;recordProjectSocialExperience(p,allItems,{completed:true});archiveProjectOnce(p,"completed");updateProjectCommercialStats(p);recordWeeklyEvent(`${p.title} completed.`,"project",6);recordMajorHistory(`${p.title} completed and shaped the company portfolio.`,"project",6);if(p.commercialStatus==="ready")recordHistory(`${p.title} is ready for commercial review after completion.`,"product",4);reinforceProjectLesson("estimateAccuracy",budgetVariance<20?.8:-.5,p.title,8,budgetVariance<20?"positive":"contradiction");reinforceProjectLesson("crossDepartmentCoordination",blockers<2?.7:-.4,p.title,7,blockers<2?"positive":"mixed");reinforceProjectLesson("knowledgeValue",(p.hiddenReality?.trueKnowledgeValue||50)>60?.6:.2,p.title,5,"positive");createOrReinforceLesson({key:"project-completion-learning",title:"Completed projects improve future project estimation and coordination.",department:p.proposingDepartment,vector:{planning:.8,documentation:.5,collaboration:.5,estimateAccuracy:.5,crossDepartmentCoordination:.6},outcome:"positive",confidence:70,evidence:p.title,importance:5});}
+    if(p.progress>=100){
+      p.status="completed";
+      p.completedDay=company.day;
+      recordProjectSocialExperience(p,allItems,{completed:true});
+      archiveProjectOnce(p,"completed");
+      updateProjectCommercialStats(p);
+      recordWeeklyEvent(`${p.title} completed.`,"project",6);
+      recordMajorHistory(`${p.title} completed and shaped the company portfolio.`,"project",6);
+      if(p.commercialStatus==="ready")recordHistory(`${p.title} is ready for commercial review after completion.`,"product",4);
+      const completionReview={episodeKey:`project-completion-${p.id}`,independenceGroup:`project-${p.id}`,attributionQuality:clamp(58+(allItems.length?10:0)+(blockers<2?8:0),40,82),reviewWindow:"long",projectId:p.id};
+      reinforceProjectLesson("estimateAccuracy",budgetVariance<20?.8:-.5,p.title,8,budgetVariance<20?"positive":"contradiction",completionReview);
+      reinforceProjectLesson("crossDepartmentCoordination",blockers<2?.7:-.4,p.title,7,blockers<2?"positive":"mixed",completionReview);
+      reinforceProjectLesson("knowledgeValue",(p.hiddenReality?.trueKnowledgeValue||50)>60?.6:.2,p.title,5,"positive",completionReview);
+      createOrReinforceLesson({
+        key:"project-completion-learning",
+        title:"Completed projects improve future project estimation and coordination.",
+        department:p.proposingDepartment,
+        vector:{planning:.8,documentation:.5,collaboration:.5,estimateAccuracy:.5,crossDepartmentCoordination:.6},
+        outcome:budgetVariance<20&&blockers<2?"positive":"mixed",
+        confidence:clamp(62+(budgetVariance<20?8:0)+(blockers<2?6:0),40,82),
+        evidence:`${p.title} completed with budget variance ${budgetVariance} and ${blockers} blocker(s)`,
+        importance:5,
+        episodeKey:`project-completion-${p.id}`,
+        independenceGroup:`project-${p.id}`,
+        attributionQuality:clamp(58+(allItems.length?10:0)+(blockers<2?8:0),40,82),
+        reviewWindow:"long"
+      });
+    }
   });
   if(typeof buildWorkforceAllocationSnapshot==="function")buildWorkforceAllocationSnapshot({updateAwareness:true});
   deriveLegacyProgressFromProjects();

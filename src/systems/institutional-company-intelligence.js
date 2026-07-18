@@ -5,6 +5,7 @@
 // ============================================================
 
 const INSTITUTIONAL_LESSON_KEYS=["testing","collaboration","documentation","escalation","innovation","riskTaking","planning","mentoring","recovery","helpSeeking","workloadBalancing","coaching","performanceManagement","successionPlanning","hiringTiming","retention","burnoutRecovery","terminationTiming","layoffCaution",...PROJECT_LESSON_KEYS];
+const INSTITUTIONAL_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS.institutionalLearning;
 function emptyLessonVector(){return Object.fromEntries(INSTITUTIONAL_LESSON_KEYS.map(k=>[k,0]));}
 function normalizeLessonVector(v={}){const out=emptyLessonVector();for(const k of INSTITUTIONAL_LESSON_KEYS)out[k]=clamp(Number(v[k])||0,-10,10);return out;}
 function lessonAcceptanceFor(e){
@@ -256,7 +257,7 @@ function evaluateLearningEpisode(ep,reviewDay=company.day){
     if(attributionQuality>=40){
       const key=`${ep.subtype||learningEpisodeSubtype(ep.domain,ep.strategy,ep.choiceTitle)}-${ep.projectId||ep.department||"company"}`.toLowerCase().replace(/[^a-z0-9.]+/g,"-").slice(0,82);
       const age=company.day-(ep.createdDay||company.day);
-      createOrReinforceLesson({key,title:`${ep.domain==="communication"?"Communication":"Decision"} learning: ${ep.choiceTitle||ep.decisionTitle||ep.strategy||"company action"}`,department:ep.department||"company",vector:lessonVectorForEpisode(ep,positive),outcome,confidence,evidence:`${state} review after ${age} ${age===1?"day":"days"}: ${outcome}${ep.failureCause?"; cause "+ep.failureCause:""}`,importance:ep.domain==="decision"?4:3,state,episodeKey:`episode-${ep.id}`,attributionQuality,reviewWindow:reviewIndex===1?"medium":"long"});
+      createOrReinforceLesson({key,title:`${ep.domain==="communication"?"Communication":"Decision"} learning: ${ep.choiceTitle||ep.decisionTitle||ep.strategy||"company action"}`,department:ep.department||"company",vector:lessonVectorForEpisode(ep,positive),outcome,confidence,evidence:`${state} review after ${age} ${age===1?"day":"days"}: ${outcome}${ep.failureCause?"; cause "+ep.failureCause:""}`,importance:ep.domain==="decision"?4:3,state,episodeKey:`episode-${ep.id}`,independenceGroup:ep.sourceId||ep.decisionId||ep.messageId||`episode-${ep.id}`,attributionQuality,reviewWindow:reviewIndex===1?"medium":"long"});
     }
   }
   if(ep.observations.length>=ep.reviewSchedule.length)ep.status="resolved";
@@ -337,6 +338,12 @@ function ensureInstitutionalLearning(){
   if(!company)return;
   company.lessons=Array.isArray(company.lessons)?company.lessons:[];
   company.learningEvidence=Array.isArray(company.learningEvidence)?company.learningEvidence:[];
+  company.lessons=company.lessons.filter(lesson=>!lesson?.pendingEvidenceOnly);
+  company.lessons.forEach(lesson=>{
+    lesson.episodeKeys=Array.isArray(lesson.episodeKeys)?lesson.episodeKeys:[];
+    lesson.independenceGroups=Array.isArray(lesson.independenceGroups)?lesson.independenceGroups:[];
+    lesson.episodeReviews=lesson.episodeReviews&&typeof lesson.episodeReviews==="object"?lesson.episodeReviews:{};
+  });
   company.learningCoverage=company.learningCoverage&&typeof company.learningCoverage==="object"?company.learningCoverage:{};
   company.nextLessonId=Number(company.nextLessonId)||1;
   company.departmentLearning=company.departmentLearning&&typeof company.departmentLearning==="object"?company.departmentLearning:{};
@@ -364,12 +371,45 @@ function employeeLessonStrength(e,department){
 }
 function lessonStateWeight(lesson){
   const state=lesson?.state||"unknown";
-  if(state==="validated")return 1;
-  if(state==="provisional")return .20;
-  if(state==="hypothesis"||state==="prior")return .05;
-  if(state==="contradicted")return -.10;
-  if(state==="obsolete")return 0;
-  return 0;
+  return Number(INSTITUTIONAL_LEARNING_RULES.stateWeights[state]??INSTITUTIONAL_LEARNING_RULES.stateWeights.unknown);
+}
+function mergeLessonState(current,incoming){
+  if(!incoming)return current||"provisional";
+  if(incoming==="contradicted"||incoming==="obsolete")return incoming;
+  if(current==="contradicted"||current==="obsolete")return incoming;
+  const ranks=INSTITUTIONAL_LEARNING_RULES.stateRank;
+  return (ranks[incoming]||0)>(ranks[current]||0)?incoming:(current||incoming);
+}
+function registerReviewedLearningSample(record,review={}){
+  const episodeKey=String(review.episodeKey||"").trim();
+  const independenceGroup=String(review.independenceGroup||"").trim();
+  const reviewWindow=String(review.reviewWindow||"").trim();
+  const attributionQuality=Number(review.attributionQuality);
+  const reviewRank=INSTITUTIONAL_LEARNING_RULES.reviewRank[reviewWindow]||0;
+  const reviewed=!!episodeKey&&!!independenceGroup&&
+    attributionQuality>=INSTITUTIONAL_LEARNING_RULES.minimumAttributionQuality&&
+    INSTITUTIONAL_LEARNING_RULES.reviewWindows.includes(reviewWindow)&&reviewWindow!=="short";
+  if(!reviewed)return {accepted:false,reviewed:false,reason:"unreviewed"};
+
+  record.episodeKeys=Array.isArray(record.episodeKeys)?record.episodeKeys:[];
+  record.independenceGroups=Array.isArray(record.independenceGroups)?record.independenceGroups:[];
+  record.episodeReviews=record.episodeReviews&&typeof record.episodeReviews==="object"?record.episodeReviews:{};
+  const previousRank=INSTITUTIONAL_LEARNING_RULES.reviewRank[record.episodeReviews[episodeKey]]||0;
+  if(record.episodeKeys.includes(episodeKey)){
+    if(reviewRank>previousRank)record.episodeReviews[episodeKey]=reviewWindow;
+    return {accepted:false,reviewed:true,reason:"duplicate-episode",upgraded:reviewRank>previousRank};
+  }
+
+  record.episodeKeys.unshift(episodeKey);
+  record.episodeKeys=record.episodeKeys.slice(0,INSTITUTIONAL_LEARNING_RULES.maxEpisodeKeysPerLesson);
+  record.episodeReviews[episodeKey]=reviewWindow;
+  if(record.independenceGroups.includes(independenceGroup)){
+    return {accepted:false,reviewed:true,reason:"dependent-evidence"};
+  }
+
+  record.independenceGroups.unshift(independenceGroup);
+  record.independenceGroups=record.independenceGroups.slice(0,INSTITUTIONAL_LEARNING_RULES.maxIndependenceGroupsPerLesson);
+  return {accepted:true,reviewed:true,reason:"independent-outcome"};
 }
 function applyInstitutionalLessonToEmployee(e,lesson,scale=1){
   if(!e.active)return;
@@ -382,31 +422,64 @@ function applyInstitutionalLessonToEmployee(e,lesson,scale=1){
     addMemory(e,"INSTITUTIONAL_LESSON",lesson.title,lesson.outcome==="negative"?"negative":"neutral",clamp(5+lesson.confidence/18,5,11),"company");
   }
 }
-function createOrReinforceLesson({key,title,department="company",vector={},outcome="mixed",confidence=55,evidence="",importance=3,state=null,episodeKey=null,attributionQuality=null,reviewWindow=null}){
+function createOrReinforceLesson({key,title,department="company",vector={},outcome="mixed",confidence=55,evidence="",importance=3,state=null,episodeKey=null,independenceGroup=null,attributionQuality=null,reviewWindow=null}){
   ensureInstitutionalLearning();
   if(!DEPARTMENTS.includes(department))department="company";
-  const reviewed=!!episodeKey&&Number(attributionQuality??60)>=40;
-  if(!reviewed){confidence=Math.min(Number(confidence)||55,42);state=state==="validated"?"hypothesis":(state||"hypothesis");}
-  else if(reviewWindow==="short"&&state==="validated")state="provisional";
   const existing=company.lessons.find(l=>l.key===key&&l.department===department);
+  const reviewRank=INSTITUTIONAL_LEARNING_RULES.reviewRank[reviewWindow]||0;
+  const reviewed=!!episodeKey&&!!independenceGroup&&
+    Number(attributionQuality)>=INSTITUTIONAL_LEARNING_RULES.minimumAttributionQuality&&
+    INSTITUTIONAL_LEARNING_RULES.reviewWindows.includes(reviewWindow)&&reviewWindow!=="short";
   if(!reviewed){
-    if(existing){
-      existing.evidence=Array.isArray(existing.evidence)?existing.evidence:[];
-      if(evidence&&!existing.evidence.includes(evidence))existing.evidence.unshift(evidence);
-      existing.evidence=existing.evidence.slice(0,6);
-      if(existing.state!=="validated"){existing.state="hypothesis";existing.confidence=Math.min(existing.confidence||42,42);}
-      return existing;
-    }
-    const prior={id:company.nextLessonId++,key,title,department,vector:normalizeLessonVector(vector),outcome,state:"hypothesis",episodeKeys:[],confidence:clamp(confidence,0,42),evidence:evidence?[evidence]:[],createdDay:company.day,lastDay:company.day,reinforcements:0,importance,successEvidence:0,failureEvidence:0,sampleCount:0,effectEstimate:0,variance:1,pendingEvidenceOnly:true};
-    company.lessons.unshift(prior);
-    company.lessons=company.lessons.slice(0,36);
-    return prior;
+    recordLearningEvidence({
+      domain:"institutional",
+      eventType:key,
+      action:"observe",
+      outcome,
+      magnitude:0,
+      confidence:clamp(Number(confidence)||55,0,100),
+      department,
+      evidence,
+      context:{episodeKey:episodeKey||null,independenceGroup:independenceGroup||null,reviewWindow:reviewWindow||null,pendingEvidenceOnly:true},
+      contributors:[{type:"unreviewedEvidence",id:key,weight:1}]
+    });
+    return existing||null;
   }
+  if(reviewWindow==="medium"&&!["contradicted","obsolete"].includes(state))state="provisional";
+  if(reviewWindow==="long"&&(!state||state==="hypothesis"))state=Number(attributionQuality)>=75?"validated":"provisional";
   const incoming=normalizeLessonVector(vector);
   const magnitude=Object.values(incoming).reduce((s,v)=>s+Math.abs(v),0)/Math.max(1,INSTITUTIONAL_LESSON_KEYS.length);
   let lesson;
   if(existing){
-    if(episodeKey&&Array.isArray(existing.episodeKeys)&&existing.episodeKeys.includes(episodeKey))return existing;
+    existing.episodeKeys=Array.isArray(existing.episodeKeys)?existing.episodeKeys:[];
+    existing.independenceGroups=Array.isArray(existing.independenceGroups)?existing.independenceGroups:[];
+    existing.episodeReviews=existing.episodeReviews&&typeof existing.episodeReviews==="object"?existing.episodeReviews:{};
+    const previousReviewRank=INSTITUTIONAL_LEARNING_RULES.reviewRank[existing.episodeReviews[episodeKey]]||0;
+    if(existing.episodeKeys.includes(episodeKey)){
+      if(reviewRank<=previousReviewRank)return existing;
+      const oldWeight=lessonStateWeight(existing),oldState=existing.state;
+      existing.episodeReviews[episodeKey]=reviewWindow;
+      existing.state=mergeLessonState(existing.state,state);
+      existing.confidence=clamp(Math.max(existing.confidence||0,Number(confidence)||0),0,100);
+      existing.lastDay=company.day;
+      if(evidence&&!existing.evidence?.includes(evidence))existing.evidence=[evidence,...(existing.evidence||[])].slice(0,INSTITUTIONAL_LEARNING_RULES.maxEvidencePerLesson);
+      const newWeight=lessonStateWeight(existing),weightDelta=newWeight-oldWeight;
+      if(weightDelta){
+        const dept=company.departmentLearning[department]||company.departmentLearning.company;
+        for(const [k,v] of Object.entries(existing.vector||{}))dept[k]=clamp((dept[k]||0)+v*.16*weightDelta,-10,10);
+        const employeeScale=newWeight?weightDelta/newWeight:0;
+        employees.filter(e=>e.active).forEach(e=>applyInstitutionalLessonToEmployee(e,existing,employeeScale));
+      }
+      if(oldState!==existing.state)recordHistory(`Institutional lesson review: ${existing.title} is now ${existing.state}.`,"learning",Math.max(3,importance));
+      return existing;
+    }
+    if(existing.independenceGroups.includes(independenceGroup)){
+      if(evidence&&!existing.evidence?.includes(evidence))existing.evidence=[evidence,...(existing.evidence||[])].slice(0,INSTITUTIONAL_LEARNING_RULES.maxEvidencePerLesson);
+      existing.episodeKeys.unshift(episodeKey);
+      existing.episodeKeys=existing.episodeKeys.slice(0,INSTITUTIONAL_LEARNING_RULES.maxEpisodeKeysPerLesson);
+      existing.episodeReviews[episodeKey]=reviewWindow;
+      return existing;
+    }
     existing.sampleCount=(existing.sampleCount||existing.reinforcements||1)+1;
     existing.successEvidence=(existing.successEvidence||0)+(outcome==="positive"?1:0);
     existing.failureEvidence=(existing.failureEvidence||0)+(outcome==="negative"?1:0);
@@ -417,21 +490,23 @@ function createOrReinforceLesson({key,title,department="company",vector={},outco
     existing.outcome=existing.successEvidence>existing.failureEvidence*1.4?"positive":existing.failureEvidence>existing.successEvidence*1.4?"negative":"mixed";
     existing.reinforcements=(existing.reinforcements||1)+1;
     existing.lastDay=company.day;
-    existing.state=state||existing.state||((existing.confidence||0)>72&&reviewed?"validated":"provisional");
-    existing.episodeKeys=Array.isArray(existing.episodeKeys)?existing.episodeKeys:[];
-    if(episodeKey)existing.episodeKeys.unshift(episodeKey);
-    existing.episodeKeys=existing.episodeKeys.slice(0,12);
+    existing.state=mergeLessonState(existing.state,state||((existing.confidence||0)>72&&reviewed?"validated":"provisional"));
+    existing.episodeKeys.unshift(episodeKey);
+    existing.episodeKeys=existing.episodeKeys.slice(0,INSTITUTIONAL_LEARNING_RULES.maxEpisodeKeysPerLesson);
+    existing.independenceGroups.unshift(independenceGroup);
+    existing.independenceGroups=existing.independenceGroups.slice(0,INSTITUTIONAL_LEARNING_RULES.maxIndependenceGroupsPerLesson);
+    existing.episodeReviews[episodeKey]=reviewWindow;
     existing.evidence=Array.isArray(existing.evidence)?existing.evidence:[];
     if(evidence&&!existing.evidence.includes(evidence))existing.evidence.unshift(evidence);
-    existing.evidence=existing.evidence.slice(0,6);
+    existing.evidence=existing.evidence.slice(0,INSTITUTIONAL_LEARNING_RULES.maxEvidencePerLesson);
     existing.vector=normalizeLessonVector(Object.fromEntries(INSTITUTIONAL_LESSON_KEYS.map(k=>[k,(existing.vector?.[k]||0)*.92+incoming[k]*.28])));
     lesson=existing;
   }else{
-    lesson={id:company.nextLessonId++,key,title,department,vector:incoming,outcome,state:state||(episodeKey?"provisional":"hypothesis"),episodeKeys:episodeKey?[episodeKey]:[],confidence:clamp(confidence,0,100),evidence:evidence?[evidence]:[],createdDay:company.day,lastDay:company.day,reinforcements:1,importance,successEvidence:outcome==="positive"?1:0,failureEvidence:outcome==="negative"?1:0,sampleCount:1,effectEstimate:outcome==="negative"?-magnitude:magnitude,variance:1};
+    lesson={id:company.nextLessonId++,key,title,department,vector:incoming,outcome,state:state||"provisional",episodeKeys:[episodeKey],independenceGroups:[independenceGroup],episodeReviews:{[episodeKey]:reviewWindow},confidence:clamp(confidence,0,100),evidence:evidence?[evidence]:[],createdDay:company.day,lastDay:company.day,reinforcements:1,importance,successEvidence:outcome==="positive"?1:0,failureEvidence:outcome==="negative"?1:0,sampleCount:1,effectEstimate:outcome==="negative"?-magnitude:magnitude,variance:1};
     company.lessons.unshift(lesson);
-    company.lessons=company.lessons.slice(0,36);
+    company.lessons=company.lessons.slice(0,INSTITUTIONAL_LEARNING_RULES.maxLessons);
   }
-  recordLearningEvidence({domain:"institutional",eventType:key,action:key,outcome,magnitude:lesson.effectEstimate||0,confidence:lesson.confidence,department,evidence,context:{episodeKey:episodeKey||key},contributors:[{type:"institutionalLesson",id:key,weight:.7},{type:"department",id:department,weight:.3}]});
+  recordLearningEvidence({domain:"institutional",eventType:key,action:key,outcome,magnitude:lesson.effectEstimate||0,confidence:lesson.confidence,department,evidence,context:{episodeKey,independenceGroup,reviewWindow},contributors:[{type:"institutionalLesson",id:key,weight:.7},{type:"department",id:department,weight:.3}]});
   const dept=company.departmentLearning[department]||company.departmentLearning.company,stateWeight=lessonStateWeight(lesson);
   for(const [k,v] of Object.entries(lesson.vector))dept[k]=clamp((dept[k]||0)+v*.16*stateWeight,-10,10);
   employees.filter(e=>e.active).forEach(e=>applyInstitutionalLessonToEmployee(e,lesson,existing?0.55:1));

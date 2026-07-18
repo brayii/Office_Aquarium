@@ -153,11 +153,64 @@ async function main() {
     assert(document.getElementById("commInboxList").innerText.includes("Informational workforce update"), "Inbox should list informational update");
     assert(/No reply needed/i.test(document.getElementById("commInboxList").innerText), "Inbox row should clearly mark informational updates as no-reply messages");
 
-    const openedInfo = openQueuedMemoAt(0);
-    assert(openedInfo, "Opening informational update should file it");
-    assert(company.pendingEvent === null, "Opening informational update should not block the active decision slot");
+    const informationalRow = [...document.querySelectorAll("#commInboxList [data-memo-id]")].find(row => row.innerText.includes("Informational workforce update"));
+    assert(!!informationalRow, "Informational update should have an addressable inbox row");
+    informationalRow?.click();
+    const openedInfo = company.pendingEvent?.id === "informational-lifecycle-regression";
+    assert(openedInfo, "Clicking an informational update should display it");
+    assert(company.pendingEvent?.id === "informational-lifecycle-regression", "Informational update should remain active while the CEO reads it");
+    assert(company.communications.length === 0, "Informational update should not move to Old Messages before the CEO files it");
+    assert(!document.getElementById("memoContainer").classList.contains("hidden"), "Opened informational update should show its message body");
+    assert(document.getElementById("memoContainer").innerText.trim().length > 120, "Opened informational update should display a substantive message body");
+    assert(/No reply needed/i.test(document.getElementById("memoContainer").innerText), "Opened informational update should explain that no reply is needed");
+    assert(document.getElementById("decisionGrid").classList.contains("hidden"), "Informational update should not show decision choices");
+    assert(document.getElementById("applyDecision").innerText.includes("File Message"), "Informational update should provide a clear file action");
+    applyDecision();
+    assert(company.pendingEvent === null, "Filing informational update should clear the active reader");
     assert(company.communications.length === 1, "Filing informational update should create one old message");
     assert(company.communications[0].decision === "Filed after review", "Filed informational update should show that the CEO opened it before archiving");
+
+    company.communications = [];
+    company.escalationQueue = [
+      prepareStrategicDecision({ ...event, id: "stable-target-message", generatedCommunication: { ...event.generatedCommunication, subject: "Stable target memo" }, choices: event.choices.map(choice => ({ ...choice })) }),
+      prepareStrategicDecision({ ...event, id: "other-queued-message", generatedCommunication: { ...event.generatedCommunication, subject: "Other queued memo" }, choices: event.choices.map(choice => ({ ...choice })) })
+    ];
+    company.pendingEvent = null;
+    company.pendingCommunication = null;
+    renderDecisionEvent();
+    const stableTargetRow = [...document.querySelectorAll("#commInboxList [data-memo-id]")].find(row => row.innerText.includes("Stable target memo"));
+    assert(!!stableTargetRow, "Rendered inbox should retain the target message ID");
+    company.escalationQueue.unshift(prepareStrategicDecision({ ...event, id: "newly-inserted-urgent-message", title: "Newly inserted memo", choices: event.choices.map(choice => ({ ...choice })) }));
+    stableTargetRow?.click();
+    const openedStableTarget = company.pendingEvent?.id === "stable-target-message";
+    assert(openedStableTarget, "Inbox click should open a memo by stable ID even when queue order changes");
+    assert(company.pendingEvent?.id === "stable-target-message", "Stable-ID opening should display the message the player clicked");
+    company.selected = 0;
+    applyDecision();
+
+    company.communications = [];
+    company.escalationQueue = [prepareStrategicDecision({
+      ...event,
+      id: "superseded-project-message",
+      title: "Project decision that resolved locally",
+      projectDecision: { id: "missing-project", action: "continue" },
+      choices: event.choices.map(choice => ({ ...choice }))
+    })];
+    company.pendingEvent = null;
+    company.pendingCommunication = null;
+    renderDecisionEvent();
+    const supersededRow = document.querySelector("#commInboxList [data-memo-id]");
+    assert(!!supersededRow, "Superseded decision should remain visible in the inbox until opened");
+    supersededRow?.click();
+    const openedSuperseded = company.pendingEvent?.id === "superseded-project-message";
+    assert(openedSuperseded, "A superseded memo should still open for review");
+    assert(company.pendingEvent?.informationalOnly === true, "A superseded decision should become an informational update");
+    assert(company.pendingEvent?.supersededReason, "Superseded update should preserve the reason it no longer needs a decision");
+    assert(!document.getElementById("memoContainer").classList.contains("hidden"), "Superseded update should display instead of disappearing");
+    assert(/no longer requires a CEO decision/i.test(document.getElementById("memoContainer").innerText), "Superseded update should explain why no decision is needed");
+    assert(document.getElementById("decisionGrid").classList.contains("hidden"), "Superseded update should not show obsolete choices");
+    applyDecision();
+    assert(company.communications[0]?.decision === "Filed after review", "Superseded update should be retained in Old Messages after filing");
 
     company.communications = [];
     company.escalationQueue = [

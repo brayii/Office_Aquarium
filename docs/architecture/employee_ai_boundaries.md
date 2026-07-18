@@ -124,6 +124,10 @@ The Social Personality AI does not teach employees how to work. It may only chan
 
 Institutional Learning may later observe team-level patterns, but it must not read hidden relationship values as objective truth or directly manipulate relationships.
 
+Company-wide Institutional Lessons and the typed project/workforce lesson stores are outcome-gated. An event, choice, message, policy approval, countdown, recruiting start, coaching start, or project action may create evidence or a learning episode, but it cannot immediately change behavior. Influence requires an attributable medium- or long-term review with a stable episode ID and independence group. Repeated reviews of the same episode do not count as independent evidence.
+
+Examples of accepted outcome producers include a completed project, completed onboarding, a reviewed delayed project consequence, and successful PIP completion. Merely approving the underlying action is evidence only.
+
 ## Hidden State
 
 Social and emotional state such as familiarity, trust, respect, comfort, professional friction, interaction count, shared-experience history, social battery, frustration, belonging, recognition satisfaction, psychological safety, recovery debt, conflict fatigue, need for quiet focus, and need for social interaction must stay hidden from normal CEO-facing UI.
@@ -166,6 +170,6 @@ Any future change touching employee AI should verify:
 - Old passive-presence records are not migrated into shared-experience evidence.
 - Every AI trace identifies its owning system.
 
-Dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`, `tests/ai-ownership-remediation-test.js`, `tests/social-ai-familiarity-test.js`, `tests/social-ai-shared-experiences-test.js`, and `tests/social-ai-relationship-interpretation-test.js`.
+Dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`, `tests/ai-ownership-remediation-test.js`, `tests/social-ai-familiarity-test.js`, `tests/social-ai-shared-experiences-test.js`, `tests/social-ai-relationship-interpretation-test.js`, `tests/social-ai-social-preferences-test.js`, `tests/social-ai-workplace-reputation-test.js`, `tests/social-ai-emotional-integration-test.js`, and `tests/emotional-homeostasis-test.js`.
 
-Additional boundary coverage lives in `tests/social-ai-boundary-regression-test.js` and `tests/social-emotional-long-run-test.js`.
+Additional boundary coverage lives in `tests/social-ai-boundary-regression-test.js`, `tests/social-emotional-long-run-test.js`, and `tests/institutional-learning-causality-test.js`.

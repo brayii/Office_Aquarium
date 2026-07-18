@@ -48,7 +48,7 @@ The HTML file and ordered JavaScript source files are the runtime source of trut
 - The player-facing runtime is `Office_Aquarium.html` plus ordered source files under `src/`.
 - Browser/mobile release packages are generated under `dist/`.
 - Desktop release packages are generated under `src-tauri/target/`.
-- `misc/` is user-managed and must not be cleaned, moved, or committed automatically.
+- Superseded local specifications and old builds are preserved in `misc/Office_Aquarium_Misc_Legacy_2026-07-17.zip`. The ZIP is historical reference only and must not be treated as runtime or canonical source.
 - The canonical documentation set lives in `docs/`. The project home keeps `README.md`; older root-level specification copies should not be treated as canonical unless explicitly restored and tracked.
 - Private implementation prompts matching `OFFICE_AQUARIUM_CODEX_*.md` and `OFFICE_AQUARIUM_V*_*.md` remain ignored unless explicitly tracked as a canonical project document.
 
@@ -61,6 +61,9 @@ Current simulation integrity rules:
 - Company staffing crisis should require broader, sustained evidence across staffing shortage, recruiting failure, critical roles, project delivery damage, or multiple affected projects.
 - Normal player UI should describe known/reported conditions. Hidden actual state belongs in AI Debug.
 - Derived reporting fields such as `staffingModel`, `riskPillars`, and `workforceAllocationSnapshot` are display or audit helpers and must not become authoritative save/hash state.
+- Daily rollover is owned by `src/systems/daily-pipeline.js`. Every canonical stage must run through `runDailyStage()` in the order defined by `OFFICE_AQUARIUM_CONSTANTS.dailyPipeline.stageOrder`.
+- Valuation and investor reaction update at most once per simulated day unless an explicit validation force flag is used. Reading Board or market views must not consume RNG or create duplicate forecasts.
+- Company-wide, project, and workforce lessons require an attributable reviewed episode and independent evidence group. Unreviewed events may record evidence but cannot change department, employee, project-estimation, recruiting, or onboarding behavior.
 
 ---
 
@@ -430,7 +433,7 @@ This makes it possible to evaluate the simulation over long runs from inside the
 * The Project Portfolio panel now lets the CEO request formal proposal, review, pause, and cancellation memos at any time while preserving the Inbox decision flow.
 * Added constrained CEO strategic initiative requests for hardware, software, business, and internal project families.
 * Project review choices can continue, pause, cancel, reduce scope, expand funding, split into phases, merge compatible projects, or require customer validation when context allows.
-* Project approval, pilot, delay, rejection, continuation, pause, merge, split, validation, reduction, expansion, and cancellation record story/history consequences and feed Institutional Learning.
+* Project approval, pilot, delay, rejection, continuation, pause, merge, split, validation, reduction, expansion, and cancellation record story/history consequences and learning evidence. Typed and institutional lessons change only after reviewed project outcomes or delayed consequences.
 * Project cancellation now stops spend, closes related project work items, affects employee morale and affinity, creates delayed consequences, and can influence board pressure.
 * Added board portfolio review memos for excessive active projects, weak pipeline, concentration risk, at-risk projects, and budget overrun patterns.
 * Added deterministic learning and optimization fixes: simulation-affecting randomness routes through `simulationRandom()`, persistent `randomState` and `nextRuntimeId` are migrated, simulation communication and decision IDs use deterministic runtime IDs, and the obsolete legacy lesson-acceptance helper has been removed.
@@ -472,7 +475,7 @@ Save version 35 adds the market, board, and valuation intelligence layer. Valuat
 * Projects now keep a bounded `causalLedger` for employee work, collaboration, meetings, and project-performance aggregation so AI Debug and tests can trace visible project changes back to a cause.
 * Added the completed deep rollover guard after a reported freeze near day 70 at day rollover.
 * Added `recordSimulationError()`, `company.systemErrors`, `company.lastSimulationError`, and `company.lastDailyCloseStatus`.
-* Split daily rollover into guarded `dailyClose()` and `dailyCloseCore()` so day-close errors are captured, logged, and pause the simulation instead of freezing silently.
+* Split daily rollover into guarded `dailyClose()` and the ordered `dailyCloseCoreOrdered()` pipeline so day-close errors are captured, logged, and pause the simulation instead of freezing silently.
 * Split the simulation tick into guarded `simulateMinute()` and `simulateMinuteCore()` so tick errors are captured and the UI can render the paused/error state.
 * The timer loop now breaks out of the current speed batch after pause, game-over, or simulation error.
 * Projects now track `closeoutReadyDays` and can complete through sustained closeout readiness at 99.5% progress, 99.5% work-item progress with no blockers, 95% closed project work with no blockers, or clean near-deadline closeout. This prevents projects from stabilizing below 100% forever.
@@ -483,6 +486,7 @@ Save version 35 adds the market, board, and valuation intelligence layer. Valuat
 Save version 38 is the current source-of-truth build. It focuses on causal learning integrity, executive-message integrity, customer/market intelligence, and long-run deterministic safety rather than adding another broad foundational system.
 
 * Institutional Learning now uses domain-specific episode channels and attribution quality. A lesson should be reinforced by meaningful evidence, not by a policy countdown, a message being displayed, or a short observation that cannot prove causality.
+* Typed project and workforce learning use the same causal gate. Starting recruiting, coaching, policy, or project actions records evidence only. Completed onboarding, completed projects, successful PIP recovery, and reviewed delayed consequences can update future behavior when attribution and independence requirements are met.
 * Project, workforce, customer, investor-relations, and policy lessons now keep clearer links to the events, decisions, comparisons, and review windows that created them.
 * Employee action learning is weighted toward owned work, resolved blockers, and directly attributable outcomes instead of broad company movement that may have been caused by coworkers.
 * Company communication records now carry explicit links, predicted severity, sender confidence, observed materiality, and later accountability so messages can be evaluated without exposing perfect truth to the player.
@@ -492,7 +496,7 @@ Save version 38 is the current source-of-truth build. It focuses on causal learn
 * Investor-relations learning tracks prediction quality for trend interpretation, concern diagnosis, fundraising timing, volatility interpretation, narrative accuracy, and overreaction bias.
 * Deterministic continuation checks are part of the validation pass. Recent validation confirmed JavaScript syntax, no duplicate named functions, no duplicate HTML IDs, and deterministic continuation from day 50 to day 100.
 
-Known remaining validation work: the current build still benefits from longer 365- and 1,000-day balance matrices, especially around project workload pressure, board confidence, valuation drift, hiring cadence, customer growth, and late-company failure rates. A full modular refactor of the daily-close pipeline remains future cleanup; the current release keeps the standalone HTML architecture.
+Known remaining validation work: the current build still benefits from longer 365- and 1,000-day balance matrices, especially around project workload pressure, board confidence, valuation drift, hiring cadence, customer growth, and late-company failure rates. Daily close is already modularized through the canonical guarded stage pipeline while the release remains an offline HTML application.
 
 ## Implemented in save version 37
 
@@ -585,7 +589,7 @@ Save version 36 tightened workload realism and project pressure.
 * Added deadline-risk and talent-risk issue detection to increase ordinary operating variety.
 * Added an AI Debug playtest checklist for save version, 12x speed watch, archives, vacancies, and story-thread counts.
 * Added mobile modal sizing and button wrapping improvements for CEO decisions and employee debug panels.
-* Added `src/README.md`, `src/release-manifest.json`, and `build/README.md` as the safe source/build consolidation path while preserving the standalone HTML release.
+* Documented the source/build consolidation direction that was later implemented as the current `src/core`, `src/services`, `src/systems`, `src/ui`, `src/facades`, and `src/bootstrap` tree while preserving `Office_Aquarium.html` as the launch file.
 
 ## Implemented in save version 22
 
@@ -695,10 +699,10 @@ Primary room ownership is:
 
 The eight founding roles are only the startup structure. Organization maturity defines growing, scaling, and established role targets. Every canonical role has a reachable established-company target, while actual hiring still requires evidence, CEO headcount approval, recruiting, and onboarding.
 
-Each role contributes differently to:
+Each role contributes differently to project work and company capability, including:
 
-- chip progress
-- software progress
+- hardware product development
+- software and firmware product development
 - integration
 - quality
 - trust
@@ -845,10 +849,10 @@ Examples:
 
 - Chip Architect → chip progress and quality
 - Firmware Engineer → software and integration
-- Software Lead → software and integration
-- Verification Engineer → quality, chip progress, and trust
+- Technical Lead -> software, integration, and coordination
+- Software QA Engineer -> quality, verification, software, and trust
 - Product Manager → integration, customers, and trust
-- QA Engineer → quality and software
+- Software Architect -> architecture, integration, and technical planning
 - Industrial Designer → chip, quality, and trust
 - Finance Analyst -> cash, Investor Confidence, board confidence, and operating efficiency
 
@@ -1554,7 +1558,9 @@ Replacement employees must initialize every AI field correctly.
 
 ---
 
-# 19. Recommended Development Roadmap
+# 19. Historical Development Roadmap
+
+Phases 1 through 7 below are implemented history, not outstanding work. They are retained to explain how the current architecture evolved. Phase 8 remains optional and is not required for the offline release.
 
 ## Phase 1 — Stabilize Current Build
 
@@ -1592,10 +1598,10 @@ Examples:
 
 - Finance Analyst should rarely use the lab.
 - Product Manager should prefer meetings and customer/revenue work.
-- QA Engineer should prefer testing and collaboration.
+- Software QA Engineer should prefer testing and collaboration.
 - Chip Architect should prefer lab work.
-- Software Lead should prefer integration and collaboration.
-- Verification Engineer should prefer testing and quality.
+- Technical Lead should prefer integration and collaboration.
+- Software QA Engineer should prefer testing and quality.
 
 ## Phase 4 — Employee Opinion of CEO
 
@@ -1733,6 +1739,9 @@ Test:
 - migrated passive room overlap does not become relationship evidence
 - Social AI recommendations and Emotional System state writes retain separate owner traces
 - AI Debug, health, valuation, and briefing reads do not advance simulation RNG
+- social preferences use only opportunities that already exist
+- workplace reputation remains multidimensional, evidence-based, and hidden
+- emotional baselines, homeostasis, and anti-saturation keep stress and morale non-monotonic
 
 ## 20.4 Company Systems
 
@@ -1746,6 +1755,9 @@ Test:
 - cost efficiency stays within bounds
 - launch/pilot behavior works
 - directive expiration works
+- all named daily stages execute once in canonical order
+- same-day valuation and investor updates are idempotent
+- Board reads do not create duplicate Investor Relations forecasts
 
 ## 20.5 Communications
 
@@ -1764,6 +1776,7 @@ Test:
 - unread messages remain in the Inbox until opened
 - opening, archiving, deleting, and revisiting old messages preserves the chosen decision
 - decisions do not create duplicate timers or stale pending events
+- informational follow-ups are clearly marked when no CEO reply is required
 
 ## 20.6 Newspaper
 
@@ -2003,6 +2016,8 @@ A change is complete only when:
 - no working system is accidentally removed
 - acceptance criteria are met
 - the source-of-truth HTML and this document are updated if scope changes
+- shared timings, thresholds, statuses, weights, and labels use `src/core/constants.js`
+- new or changed behavior has a true pass/fail regression test
 
 ---
 
@@ -2012,7 +2027,9 @@ Use:
 
 `Office_Aquarium.html`
 
-Do not use earlier versions unless explicitly requested.
+and the ordered source tree under `src/`, with shared rules in `src/core/constants.js`.
+
+Do not use earlier standalone builds or the historical `misc/` archive unless explicitly researching migration history.
 
 This Markdown document should be updated whenever:
 

@@ -4,7 +4,9 @@ const path = require("path");
 const root = path.resolve(__dirname, "..");
 const read = relativePath => fs.readFileSync(path.join(root, relativePath), "utf8");
 const failures = [];
+let checks = 0;
 const assert = (condition, message) => {
+  checks += 1;
   if (!condition) failures.push(message);
 };
 
@@ -43,6 +45,20 @@ assert(Number.isFinite(rules.laborMarket.scarcity.software) && Number.isFinite(r
 assert(rules.employment.benefitsRate > 0 && rules.employment.payrollTaxRate > 0, "Recurring employment-cost rates should be centralized");
 assert(rules.employment.severanceWeeksMin < rules.employment.severanceWeeksMax, "Severance bounds should be centralized");
 assert(rules.aiOwners.work === "work-ai" && rules.aiOwners.social === "social-ai" && rules.aiOwners.emotional === "emotional-system", "AI trace owners should be centralized");
+assert(rules.departments.core.includes("hardware") && rules.departments.learning.includes("company"), "Department identifiers should be centralized");
+assert(rules.productPhases.order[0] === "prototype" && rules.productPhases.order.at(-1) === "launched", "Product phase order should be centralized");
+assert(rules.hiring.policyModes.criticalOnly === "critical-only", "Hiring policy modes should be centralized");
+assert(rules.projectLearning.keys.includes("staffingTiming") && rules.projectLearning.keys.includes("customerValidation"), "Project learning keys should be centralized");
+assert(rules.projectLearning.scoreMin < 0 && rules.projectLearning.scoreMax > 0 && rules.projectLearning.decayDays > 0, "Project learning bounds and decay should be centralized");
+assert(rules.workforceLearning.scoreMin < 0 && rules.workforceLearning.scoreMax > 0, "Workforce learning bounds should be centralized");
+assert(rules.institutionalLearning.reviewRank.long > rules.institutionalLearning.reviewRank.medium, "Institutional review windows should have a canonical order");
+assert(rules.institutionalLearning.stateRank.validated > rules.institutionalLearning.stateRank.provisional, "Institutional lesson states should not regress");
+assert(rules.institutionalLearning.stateWeights.validated > rules.institutionalLearning.stateWeights.provisional, "Validated lessons should influence behavior more than provisional lessons");
+assert(rules.institutionalLearning.suppressionIndependenceWindowDays > 0, "Suppression evidence independence should use a shared review window");
+assert(Math.abs(Object.values(rules.riskPillars.weights).reduce((sum, weight) => sum + weight, 0) - 1) < 0.0001, "Risk-pillar weights should total one");
+assert(rules.manufacturing.fulfillmentThreshold > 0 && rules.manufacturing.fulfillmentThreshold < 1, "Manufacturing fulfillment threshold should be canonical");
+assert(rules.dailyPipeline.stageOrder[0] === "employee-outcomes" && rules.dailyPipeline.stageOrder.at(-1) === "save", "Daily pipeline boundaries should be canonical");
+assert(new Set(rules.dailyPipeline.stageOrder).size === rules.dailyPipeline.stageOrder.length, "Daily pipeline stages should be unique");
 
 const roleDefinitions = read("src/core/role-definitions.js");
 const workforce = read("src/systems/workforce-leadership.js");
@@ -50,6 +66,9 @@ const projects = read("src/systems/project-portfolio.js");
 const operatingHealth = read("src/systems/operating-health-simulation.js");
 const executiveMessages = read("src/systems/executive-messages.js");
 const marketValuation = read("src/systems/market-valuation.js");
+const institutionalLearning = read("src/systems/institutional-company-intelligence.js");
+const dailyPipeline = read("src/systems/daily-pipeline.js");
+const html = read("Office_Aquarium.html");
 const stateStartup = read("src/core/state-startup.js");
 const renderingValidation = read("src/ui/rendering-validation.js");
 const runtimeServices = read("src/services/runtime-services.js");
@@ -72,6 +91,16 @@ assert(/SOCIAL_RULES\.modelVersion/.test(stateStartup), "Social model migration 
 assert(/SOCIAL_RULES\.workInputForbiddenKeys/.test(operatingHealth), "Work AI boundary guard should use shared forbidden input keys");
 assert(/function runwayDaysOrUnknown\(/.test(runtimeServices), "Runway sentinel handling should have one shared conversion helper");
 assert(!/runwayDays\s*\|\|\s*(?:999|[A-Z_]+\.unknownFutureDay)/.test(consumers), "A zero-day runway must not be replaced by the unknown-runway sentinel");
+assert(/PROJECT_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.projectLearning/.test(projects), "Project learning should use shared lesson rules");
+assert(/WORKFORCE_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.workforceLearning/.test(workforce), "Workforce learning should use shared lesson bounds");
+assert(/INSTITUTIONAL_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.institutionalLearning/.test(institutionalLearning), "Institutional learning should use shared review rules");
+assert(/RISK_PILLAR_RULES=OFFICE_AQUARIUM_CONSTANTS\.riskPillars/.test(workforce), "Company risk should use shared pillar rules");
+assert(/HIRING_POLICY_MODES=WORKFORCE_HIRING_RULES\.policyModes/.test(workforce), "Workforce policy behavior should use shared policy modes");
+assert(/DAILY_PIPELINE_STAGE_ORDER=OFFICE_AQUARIUM_CONSTANTS\.dailyPipeline\.stageOrder/.test(dailyPipeline), "Daily close should use the shared stage order");
+assert(/MANUFACTURING_RULES=OFFICE_AQUARIUM_CONSTANTS\.manufacturing/.test(dailyPipeline), "Manufacturing fulfillment should use shared thresholds");
+assert(/dailyCloseCoreOrdered\(\)/.test(workforce), "The guarded daily close should call the canonical ordered pipeline");
+assert(html.indexOf("src/systems/market-valuation.js") < html.indexOf("src/systems/daily-pipeline.js"), "The daily pipeline should load after its market dependency");
+assert(html.indexOf("src/systems/daily-pipeline.js") < html.indexOf("src/facades/simulation-systems.js"), "The daily pipeline should load before compatibility facades");
 
 if (failures.length) {
   console.error(JSON.stringify({ ok: false, failures }, null, 2));
@@ -80,6 +109,6 @@ if (failures.length) {
 
 console.log(JSON.stringify({
   ok: true,
-  checks: 44,
-  sections: ["time", "rooms", "hiring", "projectLifecycle", "executiveInbox", "socialOwnership", "laborMarket", "employment"]
+  checks,
+  sections: ["time", "rooms", "hiring", "projectLifecycle", "executiveInbox", "socialOwnership", "laborMarket", "employment", "institutionalLearning", "riskPillars", "dailyPipeline"]
 }, null, 2));

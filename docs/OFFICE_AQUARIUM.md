@@ -30,8 +30,14 @@ Current practical rules for Codex:
     Debug may expose hidden actual blockers, observed blockers, and
     unreported blockers.
 -   Release outputs are generated under `dist/` and
-    `src-tauri/target/`. The `misc/` folder is user-managed and should
-    not be cleaned or reorganized by Codex.
+    `src-tauri/target/`. Superseded local specifications and old builds
+    are preserved in
+    `misc/Office_Aquarium_Misc_Legacy_2026-07-17.zip`; that archive is
+    historical reference, not runtime source.
+-   Reusable game rules belong in `src/core/constants.js`. Add a missing
+    shared rule there before using it in multiple systems.
+-   Daily rollover uses the named, guarded stage order in
+    `src/systems/daily-pipeline.js`.
 
 ------------------------------------------------------------------------
 
@@ -388,7 +394,7 @@ Version 23 addresses the remaining four major phases without adding an online de
 * Content variety: broader generated work titles, blockers, report subjects, opportunity subjects, and risk categories.
 * Causal continuity: story chains now connect work items, blockers, issue detection, employee reports, CEO memos, and CEO choices.
 * PC/mobile playtesting support: story threads, department briefings, modal sizing, an AI Debug-only executive intelligence snapshot, and AI Debug playtest checklist make long runs easier to inspect.
-* Code consolidation path: `src/README.md`, `src/release-manifest.json`, and `build/README.md` define the future module split while keeping `Office_Aquarium.html` as the playable standalone release.
+* Code consolidation path: this early plan was superseded by the implemented `src/core`, `src/services`, `src/systems`, `src/ui`, `src/facades`, and `src/bootstrap` source tree. `Office_Aquarium.html` remains the launch file.
 
 
 ## Version 24 Phase 8 balance tuning
@@ -413,7 +419,7 @@ Version 26 adds a player-facing Company History panel. It summarizes major miles
 
 ## Version 27 institutional learning
 
-Version 27 adds Institutional Learning. The company now forms lessons from major events and repeated patterns, including CEO decisions, pilot and launch choices, coaching, firing, burnout resignations, quality mistakes, successful collaboration, and long-term historical patterns. Lessons influence departments, veterans, new hires, and Utility AI through bounded behavior bias. The current UI exposes only meaningful strong lessons in the Company Lessons section, while deeper validation lives in AI Debug.
+Version 27 introduced Institutional Learning. In the current implementation, major events and repeated patterns create evidence and review episodes. Only attributable medium- or long-term outcomes can become lessons that influence departments, veterans, new hires, and Utility AI through bounded behavior bias. The current UI exposes only meaningful strong lessons in the Company Lessons section, while deeper validation lives in AI Debug.
 
 
 ## Version 28 work item lifecycle fix
@@ -448,7 +454,7 @@ Version 31.2 keeps save version 31 and extends workforce autonomy. Employees now
 
 Departments now accumulate hiring need evidence over time using staffing gaps, backlog, blocked work, stress, quality burden, customer and manufacturing demand, retirement/succession risk, skill coverage, and finance constraints. High-confidence strategic hiring requests still reach the CEO, but approval starts a recruiting pipeline rather than instantly creating an employee. Recruiting has search delay, offer acceptance risk, onboarding, and hiring history.
 
-Workforce management now also has an explicit `company.workforceLessons` layer. Coaching, PIP recovery or failure, help-seeking, burnout recovery, recruiting, layoffs, termination timing, retention effects, succession planning, and workload balancing all leave durable workforce-specific learning in addition to the general Institutional Learning cards.
+Workforce management now also has an explicit `company.workforceLessons` layer. Coaching, help-seeking, recruiting, layoffs, termination, and workload actions first create evidence. Durable workforce-specific learning changes only after attributable outcomes such as completed onboarding or successful PIP recovery are reviewed; starting an intervention does not count as success.
 
 Crisis deadlines now preserve the two final loss types from the workforce/economy/failure spec. Leadership and burnout governance crises can remove the CEO, while financial, product, reputation, staffing, and operational collapse can end the company. Both outcomes use the normal game-over and Company History path.
 
@@ -472,7 +478,7 @@ Projects now have families, origins, visible business cases, seeded hidden reali
 
 The CEO can inspect the portfolio at any time and request a formal memo for active or proposed projects. Portfolio buttons do not apply actions instantly; they route review, pause, cancel, and proposal decisions through the CEO Inbox so every action is archived, explained, and processed with strategic uncertainty. Project review choices can now continue, pause, cancel, reduce scope, expand funding, split into phases, merge compatible work, or require customer validation when those options are plausible.
 
-Project cancellation is treated as a major strategic event. It stops future project spending, closes related project work items, affects employees who cared about the project, records Company History and Weekly Newspaper context, reinforces project Institutional Learning, and can create delayed board, morale, or market consequences. The board can also request portfolio-level reviews for concentration risk, weak pipeline, excess burn, and repeated project risk.
+Project cancellation is treated as a major strategic event. It stops future project spending, closes related project work items, affects employees who cared about the project, records Company History and Weekly Newspaper context, and can create delayed board, morale, or market consequences. Cancellation lessons are updated only when those delayed consequences are reviewed. The board can also request portfolio-level reviews for concentration risk, weak pipeline, excess burn, and repeated project risk.
 
 The Operating Health panel now derives executive metrics from authoritative simulation state instead of showing independent optimistic bars. Hardware, software, manufacturing, customer, shareholder, morale, trust, team cohesion, finance, and portfolio health are read-only summaries built from projects, employees, departments, customers, finance, manufacturing, board, and market signals. Project cards show Overall Health based on progress, quality, schedule, staffing, risk, and confidence. Portfolio summaries use project weights so strategic active work matters more than paused, completed, or low-priority work. Lifecycle labels distinguish development/readiness/validation before launch from product/manufacturing/customer health after launch, and missing systems show `N/A` rather than false certainty.
 
@@ -512,7 +518,7 @@ The release also improves determinism and performance. Loading preserves saved r
 
 ## Version 34 deep rollover and project closeout fix
 
-Version 34 completes the deep simulation safety patch. It adds `recordSimulationError()`, `company.systemErrors`, `company.lastSimulationError`, `company.lastDailyCloseStatus`, a guarded `simulateMinute()` wrapper, and a guarded `dailyClose()` wrapper around `dailyCloseCore()`. If a rollover or simulation tick throws, the game records the error, pauses, and stops the current speed batch instead of freezing silently.
+Version 34 completes the deep simulation safety patch. It adds `recordSimulationError()`, `company.systemErrors`, `company.lastSimulationError`, `company.lastDailyCloseStatus`, a guarded `simulateMinute()` wrapper, and a guarded `dailyClose()` wrapper. The current implementation delegates rollover to `dailyCloseCoreOrdered()` in `src/systems/daily-pipeline.js`. If a rollover or simulation tick throws, the game records the error, pauses, and stops the current speed batch instead of freezing silently.
 
 The timer loop now stops mid-batch if the company pauses, reaches game over, or records a simulation error. Pressing Resume clears the stored last error so the player can continue after inspecting the issue.
 
@@ -543,3 +549,9 @@ The valuation trend UI was refined to feel more like a real finance chart. Range
 Version 38 is the current build. It strengthens Institutional Learning by requiring meaningful, attributable evidence before lessons influence behavior. Learning episodes now track domains, attribution quality, intervention/comparison context, review windows, failure cause, and later outcomes. Short observations, displayed messages, policy countdowns, or transition completion alone should not validate a lesson.
 
 Executive communication records now preserve explicit links, predicted severity, sender confidence, observed materiality, recommendation accountability, and department-specific evaluation. Customer and market intelligence feeds customer sentiment, revenue, project reviews, valuation, board interpretation, and memo evidence through structured offline simulation state. Recent validation confirmed JavaScript syntax, no duplicate named functions, no duplicate HTML IDs, and deterministic continuation from day 50 to day 100.
+
+The current v38 maintenance pass also makes daily rollover explicit and testable. Nineteen named stages run through `runDailyStage()` in canonical order, with current project, customer, manufacturing, finance, valuation, investor, Board, workforce, risk, crisis, learning, communication, narrative, telemetry, and save state flowing forward once per day. Valuation and investor reactions are idempotent within a day, Board reads do not create duplicate Investor Relations forecasts, and project progress cannot move backward merely because new generated backlog appears.
+
+Institutional Lessons now require an episode key, an independence group, sufficient attribution, and a medium- or long-term review before they affect departments or employees. The same episode cannot inflate evidence counts, a later medium review cannot downgrade a validated lesson, and unreviewed observations remain evidence only. Social Personality AI documentation now covers social preferences, workplace reputation, emotional integration, and personal emotional homeostasis in addition to familiarity, shared experiences, and relationship interpretation.
+
+Typed project and workforce lessons use the same reviewed-evidence gate. Project approvals, scope changes, recruiting starts, coaching starts, and policy choices may be recorded, but do not alter future estimates or behavior until a completed project, completed onboarding, successful recovery, or delayed consequence supplies an attributable independent outcome.

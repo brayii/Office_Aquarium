@@ -7,7 +7,7 @@ Office Aquarium is a standalone offline organization simulation. Open `Office_Aq
 - `Office_Aquarium.html` - main launch file and page markup/styles
 - `src/core/` - shared constants, role definitions, startup state, save migration, employee creation, and shared helpers
 - `src/services/` - reusable runtime services such as saving, sound, timers, and validation sessions
-- `src/systems/` - simulation systems such as projects, customers, workforce, executive messages, learning, and valuation
+- `src/systems/` - simulation systems such as projects, customers, workforce, executive messages, learning, valuation, and the canonical daily pipeline
 - `src/ui/` - rendering, debug views, validation tools, and timer startup
 - `src/facades/` - OOP system facades used by newer code
 - `src/bootstrap/` - browser event bindings and startup wiring
@@ -16,7 +16,7 @@ Office Aquarium is a standalone offline organization simulation. Open `Office_Aq
 - `tests/` - browser and simulation regression tests
 - `dist/` - generated web and desktop frontend packages; safe to delete and rebuild
 - `src-tauri/` - Tauri Windows desktop wrapper and generated release build output
-- `misc/` - user-managed folder; do not reorganize without explicit approval
+- `misc/` - ignored local history; superseded specifications and old builds are preserved in `Office_Aquarium_Misc_Legacy_2026-07-17.zip`
 
 ## Quick Browser Check
 
@@ -54,6 +54,9 @@ The suite checks:
 
 - duplicate HTML IDs and duplicate named JavaScript functions
 - shared constants and their room, calendar, hiring, project-lifecycle, and inbox consumers
+- the exact authoritative daily-stage order and fail-fast rollover behavior
+- Institutional, project, and workforce learning causality, review windows, independent evidence, and bounded influence
+- valuation sensitivity, once-per-day updates, chronological chart ranges, and Investor Relations forecast deduplication
 - browser launch/startup
 - the manual failure-test page and its generated save scenarios
 - day rollover through daily close
@@ -69,6 +72,9 @@ The suite checks:
 - Stage 1 Social Personality AI familiarity records and pair-level encounter boundaries
 - Stage 2 Social Personality AI shared-experience history, dedupe, tone, and intensity boundaries
 - Stage 3 Social Personality AI relationship interpretation, hidden UI boundaries, and stress/morale-only output
+- Stage 4 Social Personality AI opportunity-bound social preferences
+- Stage 5 evidence-based multidimensional workplace reputation
+- emotional homeostasis, personal baselines, anti-saturation, and visible positive/negative social reactions
 - Social AI model v3 ownership, deterministic migration, read-path RNG safety, and Work/Social/Emotional/Institutional trace separation
 - isolated balance validation that cannot mutate the live company save
 - executive memo context and weekly newspaper clarity
@@ -83,6 +89,9 @@ npm run test:staffing-crisis
 npm run test:project
 npm run test:workforce
 npm run test:constants
+npm run test:daily-pipeline
+npm run test:learning-causality
+npm run test:market-valuation
 npm run test:all-role-hiring
 npm run test:failure-page
 npm run test:loss-paths
@@ -98,14 +107,23 @@ npm run test:social-ai
 npm run test:social-boundary
 npm run test:social-experiences
 npm run test:social-relationships
+npm run test:social-preferences
+npm run test:social-reputation
+npm run test:social-emotion
+npm run test:emotional-homeostasis
 npm run test:social-emotional-long-run
 ```
+
+On Windows systems that block the PowerShell `npm.ps1` shim, use `npm.cmd` in the same commands.
 
 The employee work AI and social/personality AI boundary is documented in `docs/architecture/employee_ai_boundaries.md`. Future changes that touch personality, relationships, morale, stress, or employee drama should preserve that boundary unless the design is explicitly revised.
 
 Stage 1 social familiarity behavior is documented in `docs/specs/social_ai_stage_1_familiarity.md`.
 Stage 2 shared-experience behavior is documented in `docs/specs/social_ai_stage_2_shared_experiences.md`.
 Stage 3 relationship-interpretation behavior is documented in `docs/specs/social_ai_stage_3_relationship_interpretation.md`.
+Stage 4 opportunity-bound social preferences are documented in `docs/specs/social_ai_stage_4_social_preferences.md`.
+Stage 5 evidence-based workplace reputation is documented in `docs/specs/social_ai_stage_5_workplace_reputation.md`.
+Emotional baselines and homeostasis are documented in `docs/specs/emotional_homeostasis.md`.
 
 Balance projection tools are developer validation tools, not CEO gameplay controls. In normal play they are hidden. To expose the Developer Tools validation panel in a local browser session, open the game with `?dev=1` or set `officeAquariumDeveloperMode` to `true` in browser storage. These tools run isolated companies in memory and must not reset, save, or mutate the active company.
 
@@ -150,7 +168,7 @@ src-tauri\gen\
 src-tauri\target\
 ```
 
-Do not delete `misc\` unless you explicitly intend to remove your own local files.
+`misc\Office_Aquarium_Misc_Legacy_2026-07-17.zip` is historical reference only. It is not a runtime or packaging dependency.
 
 ### Package for Itch.io Web
 

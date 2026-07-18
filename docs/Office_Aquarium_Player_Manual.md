@@ -15,14 +15,7 @@ The current build uses stricter staffing and crisis rules.
 
 If one active project is short on staff, that usually means the company has a project or workforce problem to watch. It should not automatically mean the whole company is in crisis. A true company crisis requires broader sustained evidence, such as several affected projects, failed recruiting, critical roles left open, worsening delivery, major financial stress, or repeated unresolved shortages.
 
-Project cards report the organization's current view of staffing, blockers, backlog, timing, health, risk, commercial status, and revenue potential. Some hidden details are imperfectly known by employees and managers. AI Debug may show deeper internal values, but normal play should read like executive reporting rather than raw engine output.
-
-Release files are created in:
-
-- `dist/` for web/mobile zip packages
-- `src-tauri/target/` for desktop builds and installers
-
-The `misc/` folder is your private scratch/archive folder and is not part of normal cleanup.
+Project cards report the organization's current view of staffing, blockers, backlog, timing, health, risk, commercial status, and revenue potential. Some hidden details are imperfectly known by employees and managers, so normal play presents executive reporting rather than raw internal values.
 
 ---
 
@@ -228,7 +221,7 @@ The Office panel contains the simulation controls.
 | Resume | Continues simulated time |
 | Sound dropdown | Chooses Muted, Alerts Only, Music Only, or Music + Alerts |
 
-The game automatically pauses when a CEO decision requires your attention.
+New CEO messages wait in the Inbox and do not open or pause the simulation automatically. Pause manually when you want time to read or decide.
 
 Sound is optional. Background music uses the game music loop, while message alerts play when new CEO Inbox items arrive. If audio is unavailable or blocked by the browser, the simulation continues normally.
 
@@ -327,13 +320,13 @@ A memo may include:
 
 The Inbox does not reveal perfect truth. It shows what the organization believes. A memo may be cautious, optimistic, incomplete, biased by department priorities, or wrong. Compare the memo with Operating Health, Project Portfolio, Department Briefings, Company Story, the newspaper, and previous outcomes.
 
-Current memos are written to feel like executive communication, not debug reports. The main message explains the situation first. Supporting context, evidence, uncertainty, and department viewpoints come after the message. Internal severity scores, evidence IDs, audits, and hidden calculations are kept in AI Debug.
+Current memos are written to feel like executive communication, not diagnostic reports. The main message explains the situation first. Supporting context, evidence, uncertainty, and department viewpoints come after the message. Internal severity scores, evidence IDs, audits, and hidden calculations are not shown in normal play.
 
 Choice titles describe the concrete action you are approving, such as delaying a release, approving headcount, reducing scope, increasing validation, shifting budget, or staying on the current plan. The strategy and trade-offs are explained underneath the title.
 
 Recommendations are not guaranteed to be correct. Finance, Product, Engineering, People, Quality, and the Board may value the same evidence differently. Managers may also merge reports, delay weak signals, handle routine issues locally, or suppress a report. Severe, legal, ethics, safety, whistleblower, retaliation, repeated failed escalation, or protected-channel issues can still bypass normal management.
 
-Normal memos do not show internal AI scores. AI Debug may show extra audit information for testing, but the standard Inbox is written as executive communication.
+Normal memos do not show internal AI scores. The standard Inbox is written as executive communication.
 
 Select a decision, then choose Record CEO Decision.
 
@@ -345,7 +338,7 @@ Operating Health is a derived executive summary. It is not a separate set of pro
 
 Some values may show N/A when the company does not yet have enough real evidence. For example, Customer Validation may appear before real customers exist, and Manufacturing Readiness means something different from post-launch Manufacturing Health.
 
-There is no separate Company Intelligence or Release Readiness panel in normal play. The simulation still builds internal intelligence and validation data, but it uses that information behind the scenes or shows it only in AI Debug. This keeps the player-facing interface cleaner: Operating Health shows the state, Project Portfolio shows the work, CEO Inbox presents decisions, and the story/newspaper/history views explain what happened.
+There is no separate Company Intelligence or Release Readiness panel in normal play. The simulation builds internal intelligence behind the scenes. Operating Health shows the state, Project Portfolio shows the work, CEO Inbox presents decisions, and the story/newspaper/history views explain what happened.
 
 It also includes Organizational Dynamics, which summarizes long-running leadership and people signals such as:
 
@@ -408,26 +401,30 @@ Risk grows when multiple systems deteriorate at once.
 
 # 12. Company Metrics
 
-## Chip Project
+## Hardware Product Health
 
-Progress on the hardware side of the product.
+The current health of active hardware-dependent products and projects. It combines reported execution health, quality, staffing coverage, blockers, risk, and relevant company conditions. It may show `N/A` when no real hardware product or project provides enough evidence.
 
-Main contributors include:
+Typical contributors include:
 
+- Hardware Engineer
 - Chip Architect
-- Verification Engineer
+- Electrical Engineer
 - Industrial Designer
+- Manufacturing Engineer
+- Software QA Engineer
+
+## Software Product Health
+
+The current health of active software- and firmware-dependent products and projects. It uses the same derived project evidence rather than a disconnected progress bar. It may show `N/A` when the company has no qualifying software work.
+
+Typical contributors include:
+
+- Software Engineer
 - Firmware Engineer
-
-## Software
-
-Progress on the software and firmware side.
-
-Main contributors include:
-
-- Software Lead
-- Firmware Engineer
-- QA Engineer
+- Software QA Engineer
+- Technical Lead
+- Software Architect
 
 ## Morale
 
@@ -536,8 +533,8 @@ The company is building the first workable product.
 
 Focus on:
 
-- chip progress
-- software progress
+- hardware and software product health
+- active project milestones
 - early quality
 - employee health
 - cash runway
@@ -723,7 +720,7 @@ An employee may gradually become more likely to:
 
 The company does not only remember events. It can learn from them.
 
-Institutional Learning turns repeated experiences and major outcomes into lessons that influence future behavior. These lessons can come from CEO decisions, launches, pilot choices, coaching, firing, burnout resignations, quality mistakes, successful collaboration, and long-term company patterns.
+Institutional Learning turns reviewed outcomes into lessons that may influence future behavior. Evidence can come from CEO decisions, launches, pilot choices, coaching, firing, burnout resignations, quality mistakes, successful collaboration, and long-term company patterns.
 
 Lessons can affect:
 
@@ -737,9 +734,9 @@ Employees do not all accept lessons equally. Personality, department, CEO trust,
 
 The Lessons Learned panel shows the strongest institutional lessons currently shaping the company.
 
-Lessons are evidence-based. The company should not learn just because a policy was approved, a countdown changed, a memo appeared, or a transition finished. A lesson becomes stronger when the simulation can connect a meaningful outcome to an event or repeated pattern.
+Lessons are evidence-based. The company does not learn just because a policy was approved, a countdown changed, a memo appeared, or a transition finished. Medium- and long-term reviews determine whether evidence is provisional, validated, contradicted, obsolete, or too weak to matter. Repeated reviews of the same episode do not count as independent proof.
 
-The current build also validates several learning effects internally. Help-seeking lessons should make collaboration more attractive, recovery lessons should make breaks more attractive, and testing lessons should make lab/testing work more attractive. These validation checks are development information and belong in AI Debug, not the normal Lessons Learned panel.
+The same rule applies to specialized project and workforce learning. Opening recruiting, starting coaching, or approving a project action does not prove success. Completed onboarding, completed projects, successful recovery, and reviewed delayed consequences can become learning evidence.
 
 ---
 
@@ -1257,95 +1254,6 @@ Scroll the top tab bar horizontally and open one section at a time.
 Check the sound dropdown in the Office controls. `Muted` disables all sound, `Alerts Only` keeps message notifications without music, `Music Only` plays the background loop without message alerts, and `Music + Alerts` enables both.
 
 Some browsers block sound until you interact with the page. If the audio files are missing or the browser does not allow local audio, the game will keep running silently.
-
----
-
-# Appendix A. Developer and Balance Tools
-
-These tools are intended for testing rather than ordinary play.
-
-## AI Debug
-
-Opens live diagnostic information for an employee and developer validation, grouped into collapsed sections, including:
-
-- utility scores
-- cooldowns
-- memory bias
-- collaborator candidate
-- action repetition
-- institutional learning validation
-- release validation
-- balance testing
-- operating-health trace
-- executive communication diagnostics
-- customer and market intelligence diagnostics
-- valuation and investor-relations diagnostics
-- causal learning attribution checks
-- deterministic continuation checks
-- action duration
-- CEO opinion
-- career notes
-- balance metrics
-- projection results
-- playtest checklist
-
-## Balance Run
-
-Balance Run and Balance Matrix are developer/debug tools. They appear when AI Debug is enabled.
-
-Runs a temporary seeded long-term simulation and then restores the real company.
-
-It reports:
-
-- final company phase
-- cash
-- active employees
-- stress
-- morale
-- survival risk
-- action diversity
-- learning spread
-- memo counts
-- escalations
-- quality mistakes
-- sickness
-- resignations
-- firings
-- coaching
-- balance flags
-
-## Balance Matrix
-
-Runs several seeded projections and summarizes average results.
-
-It is useful for detecting:
-
-- excessive failure
-- excessive stability
-- repeated memos
-- low action diversity
-- learning drift
-- too much sickness or turnover
-- economic imbalance
-
-Projection tools do not permanently advance the player's saved company.
-
----
-
-# Appendix B. Release Readiness
-
-Release Readiness is no longer shown as a normal player-facing Company panel. It is available inside AI Debug under Release Validation and summarizes checks for:
-
-- desktop layout
-- mobile layout
-- save/load version
-- offline operation
-- long-run validation
-- story continuity
-- company history
-- institutional lessons
-
-This panel is primarily useful during development and playtesting.
 
 ---
 
