@@ -154,16 +154,41 @@ async function main() {
     assert(/No reply needed/i.test(document.getElementById("commInboxList").innerText), "Inbox row should clearly mark informational updates as no-reply messages");
 
     const openedInfo = openQueuedMemoAt(0);
-    assert(openedInfo, "Opening informational update should activate it");
-    assert(company.pendingEvent?.informationalOnly === true, "Informational update should remain marked informational");
-    assert(document.getElementById("decisionGrid").classList.contains("hidden"), "Informational update should not show strategic choice cards");
-    assert(document.getElementById("applyDecision").innerText.includes("File Message"), "Informational update should use a file-message action");
-    assert(/No reply is needed|No reply needed/i.test(document.getElementById("eventCopy").innerText), "Opened informational update should tell the CEO no reply is needed");
-    assert(/No reply needed/i.test(document.getElementById("memoContainer").innerText), "Informational memo body should include a no-reply notice");
-    applyDecision();
-    assert(company.pendingEvent === null, "Filing informational update should clear pending event");
+    assert(openedInfo, "Opening informational update should file it");
+    assert(company.pendingEvent === null, "Opening informational update should not block the active decision slot");
     assert(company.communications.length === 1, "Filing informational update should create one old message");
     assert(company.communications[0].decision === "Filed after review", "Filed informational update should show that the CEO opened it before archiving");
+
+    company.communications = [];
+    company.escalationQueue = [
+      {
+        id: "queued-info-before-decision",
+        repeatable: false,
+        informationalOnly: true,
+        category: "people",
+        title: "Informational blocker update",
+        copy: "No CEO decision is needed.",
+        generatedCommunication: {
+          type: "Executive Information Memo",
+          priority: "FYI",
+          sender: { name: "People Operations", role: "HR" },
+          subject: "Informational blocker update",
+          message: "This was handled locally.",
+          signature: "Regards,\nPeople Operations\nHR"
+        },
+        choices: [{ title: "File this update", detail: "Read and file.", strategy: "information" }]
+      },
+      prepareStrategicDecision({ ...event, id: "decision-behind-info-regression", choices: event.choices.map(choice => ({ ...choice })) })
+    ];
+    company.pendingEvent = null;
+    company.pendingCommunication = null;
+    company.inboxFlow = { day: company.day, openedToday: 0, lastOpenedDay: -999 };
+    const openedDecisionFirst = openNextQueuedMemo();
+    assert(openedDecisionFirst, "Open-next should open a queued decision memo");
+    assert(company.pendingEvent?.id === "decision-behind-info-regression", "Decision memos should open before no-reply informational updates");
+    assert(company.escalationQueue.some(ev => ev.id === "queued-info-before-decision"), "Informational update should remain available after decision memo opens");
+    company.selected = company.pendingEvent.choices.findIndex(choice => choice.title === "Approve one critical hire");
+    applyDecision();
 
     company.communications = [];
     company.escalationQueue = [prepareStrategicDecision({ ...event, id: "mislabeled-decision-regression", informationalOnly: true, choices: event.choices.map(choice => ({ ...choice })) })];

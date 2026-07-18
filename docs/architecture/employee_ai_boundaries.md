@@ -132,11 +132,13 @@ These values may appear in AI Debug.
 
 ## Canonical Social State
 
-`company.socialAIModelVersion` identifies the current Social AI schema. Version 2 uses `company.socialRelationships`, `company.socialMemories`, and Social AI traces as the canonical source of relationship history.
+`company.socialAIModelVersion` identifies the current Social AI schema. Version 3 uses `company.socialRelationships`, `company.socialMemories`, and Social AI traces as the only canonical source of relationship history.
 
-Legacy employee-local maps such as `employee.relationship`, `employee.social`, `getSocial()`, `socialScore()`, and `adjustSocial()` are compatibility adapters only. New code should not add direct trust, friendship, rivalry, respect, comfort, or friction values to an employee object. If a feature needs social context, it should record or read a Social AI encounter instead.
+Legacy employee-local maps such as `employee.relationship` and `employee.social`, plus the old `getSocial()`, `socialScore()`, and `adjustSocial()` APIs, are migration inputs only. They are removed during load and are not production adapters. New code must use the read-only `getRelationshipView()` API or record a source-backed Social AI event. It must not add direct trust, friendship, rivalry, respect, comfort, or friction values to an employee object.
 
 Passive co-presence, such as sharing a room, meeting room, or break area, may build familiarity. It must not create emotional events or shared-experience history unless a concrete source event exists.
+
+The neutral employee goal is `socialConnection`. Old saves migrate the former `friendship` goal without treating social interest as liking or friendship.
 
 System ownership is defined in `OFFICE_AQUARIUM_CONSTANTS.aiOwners`:
 
@@ -144,6 +146,8 @@ System ownership is defined in `OFFICE_AQUARIUM_CONSTANTS.aiOwners`:
 - Social AI owns familiarity, relationship interpretation, social preferences, and social traces.
 - The emotional system owns final bounded stress and morale writes.
 - Institutional Learning observes outcomes after they occur.
+
+Social recommendations and emotional state writes use separate trace records. A Social AI trace records the interpretation and requested emotional change; an Emotional System trace records the bounded change actually applied.
 
 ## Regression Guardrails
 
@@ -158,7 +162,10 @@ Any future change touching employee AI should verify:
 - Every stress or morale change has a traceable source.
 - Duplicate events cannot stack repeatedly.
 - Stress and morale remain bounded.
+- UI and AI Debug reads do not consume simulation RNG or create relationship records.
+- Old passive-presence records are not migrated into shared-experience evidence.
+- Every AI trace identifies its owning system.
 
-Dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`, `tests/social-ai-familiarity-test.js`, `tests/social-ai-shared-experiences-test.js`, and `tests/social-ai-relationship-interpretation-test.js`.
+Dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`, `tests/ai-ownership-remediation-test.js`, `tests/social-ai-familiarity-test.js`, `tests/social-ai-shared-experiences-test.js`, and `tests/social-ai-relationship-interpretation-test.js`.
 
 Additional boundary coverage lives in `tests/social-ai-boundary-regression-test.js` and `tests/social-emotional-long-run-test.js`.

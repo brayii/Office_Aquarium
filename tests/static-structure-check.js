@@ -72,9 +72,14 @@ function checkSharedConstants() {
     [/workdayStartMinute\s*:\s*480/, "workday start constant"],
     [/workdayEndMinute\s*:\s*1200/, "workday end constant"],
     [/neutralScore\s*:\s*50/, "neutral score constant"],
+    [/executiveInbox\s*:/, "executive inbox constants"],
+    [/rooms\s*:/, "room behavior constants"],
+    [/projectLifecycle\s*:/, "project lifecycle constants"],
     [/projectStatus\s*:/, "project status constants"],
     [/messageStatus\s*:/, "message status constants"],
-    [/hiringStatus\s*:/, "hiring status constants"]
+    [/hiringStatus\s*:/, "hiring status constants"],
+    [/modelVersion\s*:\s*3/, "Social AI model version"],
+    [/workInputForbiddenKeys\s*:/, "Work AI social-state exclusions"]
   ];
   const missing = required.filter(([pattern]) => !pattern.test(constants)).map(([, label]) => label);
   if (missing.length) throw new Error(`Shared constants missing required item(s): ${missing.join(", ")}`);
@@ -207,6 +212,31 @@ function checkPublicReleaseUi() {
   return forbiddenPublicUi.length;
 }
 
+function checkAiOwnershipBoundaries() {
+  const startup = read(path.join("src", "core", "state-startup.js"));
+  const operatingHealth = read(path.join("src", "systems", "operating-health-simulation.js"));
+  const forbiddenLegacyFunctions = [
+    [/function\s+getSocial\s*\(/, "getSocial"],
+    [/function\s+socialScore\s*\(/, "socialScore"],
+    [/function\s+adjustSocial\s*\(/, "adjustSocial"]
+  ];
+  const found = forbiddenLegacyFunctions.filter(([pattern]) => pattern.test(startup)).map(([, label]) => label);
+  if (found.length) throw new Error(`Legacy mutable Social AI adapter(s) remain: ${found.join(", ")}`);
+  const required = [
+    [/function\s+getRelationshipView\s*\(/, "read-only relationship view"],
+    [/function\s+recordFamiliarityObservation\s*\(/, "passive familiarity observer"],
+    [/socialAIModelVersion:OFFICE_AQUARIUM_CONSTANTS\.social\.modelVersion/, "canonical Social AI model"],
+    [/function\s+assertWorkAIInputsDoNotContainSocialState\s*\(/, "Work AI ownership guard"]
+  ];
+  const combined = `${startup}\n${operatingHealth}`;
+  const missing = required.filter(([pattern]) => !pattern.test(combined)).map(([, label]) => label);
+  if (missing.length) throw new Error(`Missing AI ownership boundary component(s): ${missing.join(", ")}`);
+  if (/recordSharedExperience\([^)]*\{[^}]*sourceEventId\s*=\s*null[^}]*\}\s*=\s*\{\}\)\s*\{[\s\S]{0,160}sourceEventId\|\|/.test(startup)) {
+    throw new Error("Shared Social AI experiences must not fabricate a source event");
+  }
+  return required.length + forbiddenLegacyFunctions.length;
+}
+
 const htmlIds = checkDuplicateHtmlIds();
 const jsFiles = collectJsFiles("src").concat(collectJsFiles("tests"));
 const syntaxFiles = checkJavaScriptSyntax(jsFiles);
@@ -219,4 +249,5 @@ const randomAndTimers = checkRandomAndTimers(collectJsFiles("src"));
 const causalLearningGuards = checkCausalLearningIntegrity();
 const validationIsolationGuards = checkValidationIsolationGuards(collectJsFiles("src"));
 const publicReleaseUiGuards = checkPublicReleaseUi();
-console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, sharedConstants, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards, validationIsolationGuards, publicReleaseUiGuards }, null, 2));
+const aiOwnershipGuards = checkAiOwnershipBoundaries();
+console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, sharedConstants, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards, validationIsolationGuards, publicReleaseUiGuards, aiOwnershipGuards }, null, 2));

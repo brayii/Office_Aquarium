@@ -54,18 +54,20 @@ async function main() {
     c.currentRoom = "hardware-lab";
 
     const rngBeforeFirstAccess = company.randomState;
-    const viewAB = getSocial(a, b.id);
-    const scoreAB = socialScore(a, b.id);
-    assert(company.randomState === rngBeforeFirstAccess, "Derived social adapter must not consume live RNG");
+    const viewAB = getRelationshipView(a, b);
+    const scoreAB = relationshipPreferenceScore(a, b);
+    assert(company.randomState === rngBeforeFirstAccess, "Canonical relationship view must not consume live RNG");
     assert(Object.keys(company.socialRelationships || {}).length === 0, "Reading social view must not fabricate pair records");
-    assert(!("friendship" in viewAB) && !("rivalry" in viewAB), "Legacy social view must not expose friendship or rivalry");
-    assert(Number.isFinite(scoreAB), "Derived social score should remain finite for compatibility callers");
+    assert(!("friendship" in viewAB) && !("rivalry" in viewAB), "Canonical relationship view must not expose legacy friendship or rivalry");
+    assert(Number.isFinite(scoreAB), "Relationship preference score should remain finite");
 
     const beforePassive = snapshotWork();
     const beforeEmotionCount = (company.socialEmotionTraces || []).length;
     for (let i = 0; i < 4; i++) observeRoomFamiliarity(5);
     const keyAB = makeRelationshipKey(a.id, b.id);
     assert(company.socialRelationships[keyAB]?.familiarity > 0, "Passive same-room exposure should build familiarity");
+    assert(company.socialRelationships[keyAB]?.interactionCount === 0, "Passive same-room exposure should not claim that an interaction occurred");
+    assert(company.socialRelationships[keyAB]?.lastSeenAt, "Passive same-room exposure should record when coworkers were last observed together");
     assert((company.socialRelationships[keyAB].recentExperiences || []).length === 0, "Passive co-presence should not create shared experience history");
     assert((company.socialEmotionTraces || []).length === beforeEmotionCount, "Passive co-presence should not create emotional traces");
     assert(snapshotWork() === beforePassive, "Passive Social AI observation must not change work/project state");
@@ -93,16 +95,27 @@ async function main() {
       negativeExperienceCount: 0,
       recentExperiences: [],
       experienceSummary: {},
-      relationship: { trust: 100, respect: 100, comfort: 100, professionalFriction: 0 },
+      interpretation: { trust: 100, respect: 100, comfort: 100, professionalFriction: 0, confidence: 100 },
       relationshipInputs: {},
       lastRelationshipEvaluationAt: simulationTimestamp(),
       recentInteractionTypes: [],
+      reputationObservations: [],
       cooldowns: {},
       stressHistory: 0,
       moraleHistory: 0
     };
     assert(derivedCohesion() === cohesionBeforeHiddenRelationship, "Hidden relationship interpretation must not directly change company cohesion");
     assert(employeeStayScore(a) === stayBeforeHiddenRelationship, "Hidden relationship interpretation must not directly change retention scoring");
+
+    let workGuardRejected = false;
+    try {
+      assertWorkAIInputsDoNotContainSocialState({ skillFit: 0.8, nested: { relationshipTrust: 72 } });
+    } catch (error) {
+      workGuardRejected = /relationshipTrust/.test(error.message);
+      company.lastSimulationError = null;
+      company.paused = false;
+    }
+    assert(workGuardRejected, "Work AI boundary guard should reject nested Social AI fields");
 
     const work = (company.workItems || []).find(w => w.status === "open");
     if (work) {

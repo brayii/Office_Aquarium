@@ -85,11 +85,14 @@ async function main() {
     assert(positiveTrace && positiveTrace.moraleDeltaApplied !== 0, "Positive social event should create an applied emotional trace");
     unchanged(beforePositive, "Positive social emotion integration");
 
-    const afterPositiveMorale = a.morale, tracesBeforeDuplicate = company.socialEmotionTraces.length;
+    const duplicateRecord = company.socialRelationships[makeRelationshipKey(a.id, b.id)];
+    const afterPositiveMorale = a.morale;
+    const tracesBeforeDuplicate = company.socialEmotionTraces.length;
+    const experiencesBeforeDuplicate = duplicateRecord.recentExperiences.length;
     recordSharedExperience(a, b, { type: "shared_break", sourceEventId: "integration-positive-break", tone: "positive", intensity: 5 });
     assert(a.morale === afterPositiveMorale, "Duplicate social event should not stack morale");
-    assert(company.socialEmotionTraces.length >= tracesBeforeDuplicate, "Duplicate social event should still be traceable");
-    assert((company.socialEmotionTraces || []).some(t => t.status === "duplicate_event" && t.sourceEventId.includes("integration-positive-break")), "Duplicate social event should explain that it was blocked");
+    assert(company.socialEmotionTraces.length === tracesBeforeDuplicate, "Duplicate social event should not create another emotional trace");
+    assert(duplicateRecord.recentExperiences.length === experiencesBeforeDuplicate, "Duplicate social event should not create another shared experience");
 
     const moraleBeforeLater = a.morale;
     recordSharedExperience(a, b, { type: "shared_break", sourceEventId: "integration-later-break", tone: "positive", intensity: 5 });

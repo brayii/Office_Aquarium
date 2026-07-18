@@ -63,11 +63,12 @@ async function main() {
     ensureSocialAISystems();
     assert(company.randomState === rngBeforeMigration, "Relationship interpretation migration should not consume RNG");
 
-    const [a, b, c] = employees.filter(e => e.active);
+    const [a, b, c, d] = employees.filter(e => e.active);
     a.personality = { workPace: 0.8, sociability: -0.2, collaboration: 0.2, riskTolerance: 0.4, adaptability: 0.2, initiative: 0.8, resilience: 0.3, detailOrientation: -0.3, empathy: 0.1, structureNeed: -0.2 };
     b.personality = { workPace: -0.5, sociability: 0.1, collaboration: 0.7, riskTolerance: -0.1, adaptability: 0.1, initiative: 0.1, resilience: 0.4, detailOrientation: 0.9, empathy: 0.4, structureNeed: 0.8 };
     c.personality = { workPace: 0.7, sociability: 0.7, collaboration: 0.6, riskTolerance: 0.2, adaptability: 0.4, initiative: 0.5, resilience: 0.5, detailOrientation: -0.2, empathy: 0.8, structureNeed: -0.3 };
-    [a, b, c].forEach(e => ensureEmployeePersonality(e));
+    d.personality = { ...c.personality };
+    [a, b, c, d].forEach(e => ensureEmployeePersonality(e));
 
     const beforePositive = boundarySnapshot();
     recordSharedExperience(a, b, { type: "direct_help", sourceEventId: "stage3-help-1", tone: "positive", intensity: 3 });
@@ -76,8 +77,8 @@ async function main() {
     unchanged(beforePositive, "Relationship interpretation");
 
     const keyAB = makeRelationshipKey(a.id, b.id);
-    const relAB = company.socialRelationships[keyAB].relationship;
-    assert(["trust", "respect", "comfort", "professionalFriction"].every(k => Number.isFinite(relAB[k]) && relAB[k] >= 0 && relAB[k] <= 100), "Relationship interpretation should maintain four bounded hidden values");
+    const relAB = company.socialRelationships[keyAB].interpretation;
+    assert(["trust", "respect", "comfort", "professionalFriction", "confidence"].every(k => Number.isFinite(relAB[k]) && relAB[k] >= 0 && relAB[k] <= 100), "Relationship interpretation should maintain bounded hidden values and evidence confidence");
     assert(relAB.trust > 0 && relAB.respect > 0, "Helpful shared work should derive trust and respect from history");
     assert(relAB.professionalFriction > 0, "Deadline pressure and work-style mismatch may derive professional friction");
     assert(company.socialRelationships[keyAB].lastRelationshipEvaluationAt, "Relationship interpretation should record the last evaluation time");
@@ -85,7 +86,7 @@ async function main() {
     const firstDerived = JSON.stringify(relAB);
     const firstInputs = JSON.stringify(company.socialRelationships[keyAB].relationshipInputs);
     evaluateRelationshipInterpretation(company.socialRelationships[keyAB]);
-    assert(JSON.stringify(company.socialRelationships[keyAB].relationship) === firstDerived && JSON.stringify(company.socialRelationships[keyAB].relationshipInputs) === firstInputs, "Same history and same personalities should derive deterministic relationship values");
+    assert(JSON.stringify(company.socialRelationships[keyAB].interpretation) === firstDerived && JSON.stringify(company.socialRelationships[keyAB].relationshipInputs) === firstInputs, "Same history and same personalities should derive deterministic relationship values");
 
     const beforeNegative = boundarySnapshot();
     recordSharedExperience(a, c, { type: "interruption_shared", sourceEventId: "stage3-interrupt-1", tone: "negative", intensity: 3 });
@@ -93,9 +94,20 @@ async function main() {
     recordSharedExperience(a, c, { type: "milestone_failure_together", sourceEventId: "stage3-failure-1", tone: "mixed", intensity: 5 });
     unchanged(beforeNegative, "Friction relationship interpretation");
     const keyAC = makeRelationshipKey(a.id, c.id);
-    const relAC = company.socialRelationships[keyAC].relationship;
+    const relAC = company.socialRelationships[keyAC].interpretation;
     assert(relAC.professionalFriction !== relAB.professionalFriction || relAC.comfort !== relAB.comfort, "Different histories should not force all relationships toward the same outcome");
-    assert(relAB.trust >= 35 && relAB.professionalFriction >= 15, "High trust and meaningful friction can coexist");
+
+    for (let i = 0; i < 7; i++) recordSharedExperience(a, b, { type: "direct_help", sourceEventId: `stage3-trust-help-${i}`, tone: "positive", intensity: 3 });
+    for (let i = 0; i < 3; i++) recordSharedExperience(a, b, { type: "deadline_pressure_together", sourceEventId: `stage3-trust-pressure-${i}`, tone: "mixed", intensity: 4 });
+    recordSharedExperience(a, b, { type: "conflict_observed", sourceEventId: "stage3-trust-conflict", tone: "negative", intensity: 3 });
+    const trustWithFriction = company.socialRelationships[keyAB].interpretation;
+    assert(trustWithFriction.trust >= 60 && trustWithFriction.professionalFriction >= 25, "Source-backed history should be able to derive high trust alongside high professional friction");
+
+    const beforeComfort = boundarySnapshot();
+    for (let i = 0; i < 8; i++) recordSharedExperience(c, d, { type: "shared_break", sourceEventId: `stage3-comfort-break-${i}`, tone: "positive", intensity: 2 });
+    unchanged(beforeComfort, "Comfort relationship interpretation");
+    const comfortWithoutRespect = company.socialRelationships[makeRelationshipKey(c.id, d.id)].interpretation;
+    assert(comfortWithoutRespect.comfort >= 65 && comfortWithoutRespect.respect <= 45, "Source-backed social history should be able to derive high comfort without professional respect");
 
     const beforeEmotion = boundarySnapshot();
     const interruptionReaction = relationshipEmotionalReaction(a, c, "interruption");

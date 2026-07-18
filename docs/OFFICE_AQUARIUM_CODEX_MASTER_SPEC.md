@@ -54,6 +54,7 @@ The HTML file and ordered JavaScript source files are the runtime source of trut
 
 Current simulation integrity rules:
 
+- Reusable game rules, statuses, timings, thresholds, and defaults must be defined in `src/core/constants.js` and consumed from there. If a shared rule is missing, add it to that file before wiring consumers; do not copy the value into multiple systems.
 - Project health must use actual project allocation, not only department headcount.
 - Required staffing, missing staffing, uncovered assignments, blockers, backlog, and timing risk must be connected to simulation producers, not static display values.
 - One short-staffed project should create project/workforce pressure, not automatically a company crisis.
@@ -665,16 +666,34 @@ Each employee currently has:
 
 ## 5.3 Employee Roles
 
-Current roles include:
+The canonical recruitable role catalog is:
 
-- Chip Architect
+- Software Engineer
 - Firmware Engineer
-- Software Lead
-- Verification Engineer
-- Product Manager
-- QA Engineer
+- Software QA Engineer
+- Technical Lead
+- Software Architect
+- Hardware Engineer
+- Chip Architect
+- Electrical Engineer
 - Industrial Designer
+- Manufacturing Engineer
+- Product Manager
 - Finance Analyst
+- Manager
+- Director
+- Vice President
+
+Legacy save aliases normalize `Software Lead` to `Technical Lead`, and `QA Engineer` or `Verification Engineer` to `Software QA Engineer`.
+
+Primary room ownership is:
+
+- Software Studio: Software Engineer, Firmware Engineer, Software QA Engineer, Technical Lead, Software Architect
+- Hardware Lab: Hardware Engineer, Chip Architect, Electrical Engineer, Industrial Designer, Manufacturing Engineer
+- Meeting Room: Product Manager and Manager
+- Executive Suite: Finance Analyst, Director, and Vice President
+
+The eight founding roles are only the startup structure. Organization maturity defines growing, scaling, and established role targets. Every canonical role has a reachable established-company target, while actual hiring still requires evidence, CEO headcount approval, recruiting, and onboarding.
 
 Each role contributes differently to:
 
@@ -712,11 +731,11 @@ Current goal dimensions:
 
 - mastery
 - promotion
-- friendship / social connection
+- social connection
 - stability
 - recognition
 
-These legacy goal keys influence action selection. The `friendship` key is used as a social-connection drive, not as a guarantee that employees become friends.
+The canonical key is `socialConnection`. Old saves migrate the former `friendship` key to `socialConnection`. This goal can increase interest in social opportunities, but it does not manufacture friendship, liking, or positive relationship outcomes.
 
 ## 5.6 Employee Memories
 
@@ -747,7 +766,7 @@ Memories decay over time.
 
 ## 5.7 Social Relationships
 
-Current social state is owned by the staged Social Personality AI. `company.socialAIModelVersion = 2` marks the consolidated boundary model.
+Current social state is owned by the staged Social Personality AI. `company.socialAIModelVersion = 3` marks the consolidated ownership and migration model.
 
 The canonical pair-level Social Personality AI stores hidden professional relationship records in `company.socialRelationships[pairKey]`:
 
@@ -755,7 +774,7 @@ The canonical pair-level Social Personality AI stores hidden professional relati
 - Stage 2: shared experience history with tone, intensity, dedupe keys, and source events
 - Stage 3: derived trust, respect, comfort, and professional friction
 
-Legacy employee-local fields such as `employee.relationship`, `employee.social`, `getSocial()`, `socialScore()`, and `adjustSocial()` are compatibility adapters only. New work, hiring, project, and collaboration logic must not write or score direct friendship, rivalry, trust, respect, comfort, or friction values on employee objects.
+Legacy employee-local fields such as `employee.relationship` and `employee.social`, plus the old `getSocial()`, `socialScore()`, and `adjustSocial()` APIs, are migration inputs only. They are removed during save migration and do not exist as production adapters. Read-only callers use `getRelationshipView()`; source-backed social events use `recordSharedExperience()`.
 
 Passive co-presence can increase familiarity, but it must not create shared-experience history or emotional effects unless a concrete source event exists.
 
@@ -767,7 +786,7 @@ Relationships influence:
 - debug visibility in AI Debug
 - natural-language employee profile summaries
 
-Project collaboration matching may still consider legacy social compatibility, but project need, role fit, skills, focus, stress, and availability remain the primary work-facing criteria.
+Relationships do not score collaborator usefulness or work outcomes. Project need, role fit, skills, focus, current morale, current stress, workload, and availability determine collaboration matching and resolution. Social AI may affect later work only through the employee's bounded current stress and morale.
 
 ## 5.8 Utility AI
 
@@ -1373,9 +1392,10 @@ Functions detected in the latest source include:
 - `enterSimulation()`
 - `startNewCompany()`
 - `requestReset()`
-- `getSocial()`
-- `socialScore()`
-- `adjustSocial()`
+- `getRelationshipView()`
+- `recordSharedExperience()`
+- `recordFamiliarityObservation()`
+- `assertWorkAIInputsDoNotContainSocialState()`
 - `addMemory()`
 - `memoryBias()`
 - `decayMemories()`
@@ -1704,12 +1724,15 @@ Test:
 Test:
 
 - canonical social records initialize without fabricated relationships
-- social compatibility adapters are deterministic and do not consume RNG
+- read-only relationship views are deterministic and do not consume RNG
 - passive co-presence increases familiarity only
 - concrete shared experiences can affect stress and morale through the emotional system
 - work AI does not receive direct social, friendship, rivalry, trust, respect, comfort, or friction bonuses
 - save/load preserves canonical social records
 - hidden social values do not leak into normal CEO UI
+- migrated passive room overlap does not become relationship evidence
+- Social AI recommendations and Emotional System state writes retain separate owner traces
+- AI Debug, health, valuation, and briefing reads do not advance simulation RNG
 
 ## 20.4 Company Systems
 

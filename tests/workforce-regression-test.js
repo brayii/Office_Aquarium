@@ -108,6 +108,95 @@ async function main() {
     ensureWorkforceEconomySystems();
     assert(company.recruitingPipeline[0].status === "searching" && company.recruitingPipeline[0].repairedMissingHire, "Accepted record without a matching hire should be repaired back to active search");
 
+    // A successful small company should create scale-up staffing pressure instead of staying at eight to ten people forever.
+    company.cash = 34.3;
+    company.valuation = 120.2;
+    company.customers = 107;
+    company.dailyRevenue = .34;
+    company.phase = "launched";
+    company.finance = { ...(company.finance || {}), runwayDays: 999, netCashFlowDaily: .12 };
+    company.hiringPolicy.mode = "normal";
+    company.hiringRequests = [];
+    company.escalationQueue = [];
+    company.pendingEvent = null;
+    company.day = 10;
+    ensureProjectPortfolio();
+    reauditProjectPortfolioRequirements();
+    updateStaffingModel();
+    updateHiringNeedHistory();
+    const establishedCoverage = organizationalRoleCoverage();
+    assert(establishedCoverage.stage === "established", `Successful $120M company should reach established organization stage, got ${establishedCoverage.stage}`);
+    assert(establishedCoverage.targetHeadcount > 8, `Established company should target meaningful growth beyond eight founders, got ${establishedCoverage.targetHeadcount}`);
+    assert(allRecruitableRoles().every(role => (organizationRoleTargets("established")[role] || 0) >= 1), `Every recruitable role needs an established-company path: ${JSON.stringify(organizationRoleTargets("established"))}`);
+    assert(establishedCoverage.uncommittedRoles.some(row => row.role === "Vice President"), "Established organization plan should expose a Vice President gap when none is employed");
+    const scaledProjectDemand = activeProjects().map(p => ({
+      title: p.title,
+      requiredFte: Object.values(p.requiredHeadcount || {}).reduce((s, v) => s + (Number(v) || 0), 0),
+      scale: p.requirementScale?.demandScale || 1
+    }));
+    assert(scaledProjectDemand.some(p => p.requiredFte >= 6 && p.scale > 1.2), `Growth-stage projects should demand larger teams, got ${JSON.stringify(scaledProjectDemand)}`);
+    const growthAssessments = ["product", "finance", "people", "software"].map(dept => hiringNeedAssessment(dept, company.staffingModel[dept]));
+    assert(growthAssessments.some(a => a.factors.some(f => f.key === "scale-up" && f.score > 20)), "Growth-stage staffing assessment should include a scale-up factor");
+    Object.values(company.hiringNeedHistory || {}).forEach(hist => {
+      if ((hist.lastScore || 0) >= OFFICE_AQUARIUM_CONSTANTS.hiring.requestScoreThreshold) {
+        hist.days = OFFICE_AQUARIUM_CONSTANTS.hiring.requestSustainDays;
+        hist.confidence = Math.max(hist.confidence || 0, OFFICE_AQUARIUM_CONSTANTS.hiring.requestConfidenceThreshold + 8);
+      }
+    });
+    employees.forEach(e => { e.stress = 90; });
+    maybeQueueHiringRequests();
+    assert(company.escalationQueue.some(ev => ev.hiringRequest) || (company.hiringRequests || []).some(r => r.status === "queued"), "Growth-stage staffing pressure should queue a CEO hiring request");
+    (company.hiringRequests || []).filter(request => request.status === hiringRequestStatus("queued")).forEach(request => {
+      const memo = (company.escalationQueue || []).find(event => event.hiringRequest?.requestId === request.id);
+      assert(memo, `Queued ${request.role} request should have a matching CEO memo`);
+      assert(memo?.hiringRequest?.role === request.role, `Queued ${request.role} request produced a ${memo?.hiringRequest?.role || "missing"} memo`);
+      assert(memo?.hiringRequest?.department === request.department, `Queued ${request.role} request changed departments`);
+    });
+    employees.forEach(e => { e.stress = 45; });
+
+    // Executive-scale companies need an explicit path to hire leadership, including a VP.
+    const addExecutiveForCoverage = (role) => {
+      const id = employees.length;
+      const e = { ...employees[0], id, name: `Validation ${role}`, role, active: true, offsite: false, relationship: {}, social: {}, joinedDay: company.day, skills: baseSkillsForRole(role), performanceManagement: { stage: "none" } };
+      employees.push(e);
+      normalizeEmployeeRoleProfile(e);
+      return e;
+    };
+    addExecutiveForCoverage("Manager");
+    addExecutiveForCoverage("Manager");
+    addExecutiveForCoverage("Director");
+    updateTeamsFromEmployees();
+    assert(company.teams.people && Number.isFinite(company.teams.people.output), "People leaders should participate in team intelligence without breaking the daily update");
+    company.valuation = 160;
+    company.customers = 180;
+    company.dailyRevenue = .52;
+    company.cash = 58;
+    company.board = 48;
+    for (let i = 0; i < 3; i += 1) {
+      const project = makeProject({ family: "cloud data platform", status: "execution", scope: 1.4, seed: `vp-scale-${i}` });
+      project.id = `vp-scale-project-${i}`;
+      project.status = "execution";
+      company.projects.push(project);
+    }
+    updateCompanyCapabilitySystem({ force: true });
+    updateStaffingModel();
+    const peopleLeadershipRows = hiringPipelineRows().filter(row => row.dept === "people");
+    assert(roleForHiringNeed("people") === "Vice President" || peopleLeadershipRows.some(row => row.role === "Vice President"), `Executive-scale company should expose a VP hiring path, got ${JSON.stringify(peopleLeadershipRows)}`);
+
+    // A blocked or recently requested top department must not starve every other valid hiring request.
+    company.day = 20;
+    company.escalationQueue = [{ id: "hiring-request-hardware-existing", title: "Hiring request: Electrical Engineer" }];
+    company.pendingEvent = null;
+    company.hiringRequests = [{ day: company.day, department: "hardware", role: "Electrical Engineer", status: "queued", score: 100, confidence: 90 }];
+    Object.entries(company.hiringNeedHistory).forEach(([dept, hist]) => {
+      hist.lastScore = 100;
+      hist.days = OFFICE_AQUARIUM_CONSTANTS.hiring.requestSustainDays;
+      hist.confidence = 90;
+      company.staffingModel[dept].overstaffed = false;
+    });
+    maybeQueueHiringRequests();
+    assert(company.hiringRequests.some(r => r.department !== "hardware" && r.status === "queued"), "An existing top-department request should not starve hiring in every other department");
+
     // No-hidden-cap and forced-success hiring: fill enough approved roles to exceed 20 active employees.
     company.cash = 80;
     company.finance.runwayDays = 999;

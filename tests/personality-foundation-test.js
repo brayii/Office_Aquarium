@@ -90,7 +90,7 @@ async function main() {
     const boundaryResult = evaluateEmployeeEmotionalReaction({
       employee,
       event: { id: "test-social", type: "collaboration-success", intensity: 80, sentiment: "positive", relationshipImpact: 60 },
-      relationshipContext: { coworkerId: coworker.id, socialScore: 72, conflict: 0 },
+      relationshipContext: { coworkerId: coworker.id, relationshipScore: 72, conflict: 0 },
       workloadContext: { pressure: 45, overload: 0, deadlineRisk: 20 },
       roomContext: { crowdedness: 25, noise: 25 }
     });
@@ -99,7 +99,7 @@ async function main() {
     applyEmployeeEmotionalReaction({
       employee,
       event: { id: "test-social", type: "collaboration-success", intensity: 80, sentiment: "positive", relationshipImpact: 60 },
-      relationshipContext: { coworkerId: coworker.id, socialScore: 72, conflict: 0 },
+      relationshipContext: { coworkerId: coworker.id, relationshipScore: 72, conflict: 0 },
       workloadContext: { pressure: 45, overload: 0, deadlineRisk: 20 },
       roomContext: { crowdedness: 25, noise: 25 }
     });

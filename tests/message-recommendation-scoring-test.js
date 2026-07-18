@@ -107,6 +107,11 @@ async function main() {
     let hiringPolicyChoice = recommend(makeHiringPolicyReviewEvent("Recommendation scoring regression test"));
     assert(hiringPolicyChoice !== "Keep normal hiring review", `Tight runway hiring policy should not recommend normal hiring, got ${hiringPolicyChoice}`);
 
+    company.finance = { ...(company.finance || {}), runwayDays: 0, netCashFlowDaily: -0.3 };
+    assert(runwayDaysOrUnknown(company.finance) === 0, "A zero-day runway must remain zero instead of becoming the unknown-runway sentinel");
+    const zeroRunwayChoice = recommend(makeHiringPolicyReviewEvent("Zero runway recommendation regression test"));
+    assert(zeroRunwayChoice !== "Keep normal hiring review", `Zero runway should never recommend normal hiring, got ${zeroRunwayChoice}`);
+
     company.finance = { ...(company.finance || {}), runwayDays: 180, netCashFlowDaily: -0.03 };
     company.hiringNeedHistory = { hardware: { lastScore: 92, confidence: 88 }, software: { lastScore: 86, confidence: 82 }, quality: { lastScore: 84, confidence: 80 } };
     company.portfolioHealth = { ...(company.portfolioHealth || {}), currentlyMissingStaff: 3 };
@@ -148,7 +153,7 @@ async function main() {
     const fundingChoice = recommend(fundingEv);
     assert(fundingChoice !== "Remain privately funded", `Tight runway with strong investor appetite should recommend funding, got ${fundingChoice}`);
 
-    return { ok: failures.length === 0, failures, customerChoice, highCommercialChoice, weakCommercialChoice, hiringPolicyChoice, layoffChoice, fundingChoice };
+    return { ok: failures.length === 0, failures, customerChoice, highCommercialChoice, weakCommercialChoice, hiringPolicyChoice, zeroRunwayChoice, layoffChoice, fundingChoice };
   });
 
   await browser.close();

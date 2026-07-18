@@ -54,14 +54,14 @@ function findValuationHistoryAtOrBefore(targetDay){
   ensureMarketValuationSystems();
   return (company.valuationHistory||[]).filter(h=>Number.isFinite(h.day)&&Number.isFinite(h.valuation)&&h.day<=targetDay).sort((a,b)=>b.day-a.day)[0]||null;
 }
-function valuationChange(days=30){
+function valuationChange(days=OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth){
   ensureMarketValuationSystems();
   const current=Number(company.valuation)||0,latest=(company.valuationHistory||[]).filter(h=>Number.isFinite(h.day)&&Number.isFinite(h.valuation)).sort((a,b)=>b.day-a.day)[0],currentDay=latest?.day??company.day,older=findValuationHistoryAtOrBefore(currentDay-days);
   if(!older||!older.valuation)return 0;
   return ((current-older.valuation)/Math.max(.1,older.valuation))*100;
 }
-function valuationTrend(days=30){const c=valuationChange(days);return c>3?"rising":c<-3?"falling":"steady";}
-function valuationDisplayChange(days=30){
+function valuationTrend(days=OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth){const c=valuationChange(days);return c>3?"rising":c<-3?"falling":"steady";}
+function valuationDisplayChange(days=OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth){
   ensureMarketValuationSystems();
   const hist=(company.valuationHistory||[]).filter(h=>Number.isFinite(h.valuation)&&Number.isFinite(h.day)).slice().sort((a,b)=>a.day-b.day);
   if(hist.length<2)return {change:0,amount:0,days:0,previous:Number(company.valuation)||0,current:Number(company.valuation)||0};
@@ -74,10 +74,10 @@ function valuationRangeText(days,actualDays=days){
   if(actualDays<=0)return "startup";
   if(actualDays<days)return `${actualDays} day${actualDays===1?"":"s"}`;
   if(days===1)return "1 day";
-  if(days===7)return "1 week";
-  if(days===30)return "30 days";
-  if(days===90)return "3 months";
-  if(days===365)return "365 days";
+  if(days===OFFICE_AQUARIUM_CONSTANTS.time.daysPerWeek)return "1 week";
+  if(days===OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth)return `${OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth} days`;
+  if(days===OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth*3)return "3 months";
+  if(days===OFFICE_AQUARIUM_CONSTANTS.time.daysPerYear)return `${OFFICE_AQUARIUM_CONSTANTS.time.daysPerYear} days`;
   return `${days} days`;
 }
 function formatValuationDelta(amount){
@@ -91,15 +91,16 @@ function formatPercentDelta(value){
 function valuationRangeConfig(){
   ensureMarketValuationSystems();
   const selected=company.marketRangeView||"1m";
-  const ytdStart=Math.floor((company.day||0)/365)*365;
+  const daysPerYear=OFFICE_AQUARIUM_CONSTANTS.time.daysPerYear;
+  const ytdStart=Math.floor((company.day||0)/daysPerYear)*daysPerYear;
   const ytdDays=Math.max(1,(company.day||0)-ytdStart);
   const configs={
     "1d":{key:"1d",days:1,label:"1D"},
-    "1w":{key:"1w",days:7,label:"1W"},
-    "1m":{key:"1m",days:30,label:"1M"},
-    "3m":{key:"3m",days:90,label:"3M"},
+    "1w":{key:"1w",days:OFFICE_AQUARIUM_CONSTANTS.time.daysPerWeek,label:"1W"},
+    "1m":{key:"1m",days:OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth,label:"1M"},
+    "3m":{key:"3m",days:OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth*3,label:"3M"},
     ytd:{key:"ytd",days:ytdDays,label:"YTD"},
-    "1y":{key:"1y",days:365,label:"1Y"},
+    "1y":{key:"1y",days:daysPerYear,label:"1Y"},
     all:{key:"all",days:Infinity,label:"All"}
   };
   return configs[selected]||configs["1m"];
@@ -244,7 +245,7 @@ function companyIdentityLabel(){
   if(company.crisis||risk>82||company.cash<2)return "Distressed Company";
   if((company.restructuringRequests||[]).some(r=>company.day-(r.day||0)<45)||company.hiringPolicy?.mode==="frozen")return "Restructuring Company";
   if(launched&&company.customers>360&&company.dailyRevenue>.9&&active>=18)return "Industry Leader";
-  if(launched&&((company.customers>180&&portfolio>65)||(age>365&&company.customers>80&&portfolio>58)))return "Established Technology Company";
+  if(launched&&((company.customers>180&&portfolio>65)||(age>OFFICE_AQUARIUM_CONSTANTS.time.daysPerYear&&company.customers>80&&portfolio>58)))return "Established Technology Company";
   if(launched&&company.customers>80)return "Market Challenger";
   if(company.customers>25||company.dailyRevenue>.08||(age>180&&company.customers>10))return "Growing Technology Company";
   if(company.customers>0||company.phase==="pilot"||company.phase==="customer trial")return "Early Commercial Company";

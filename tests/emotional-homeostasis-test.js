@@ -125,6 +125,11 @@ async function main() {
     const traces = new Map(employees.map(emp => [emp.id, { minMorale: emp.morale, maxMorale: emp.morale, minStress: emp.stress, maxStress: emp.stress, atMorale100: 0, atStress0: 0 }]));
     const targetDay = 70;
     for (let i = 0; i < 50000 && company.day < targetDay && !company.gameOver && !company.lastSimulationError; i += 1) {
+      // This suite measures emotional movement; loss-path timing is covered by dedicated crisis tests.
+      if (company.crisis) {
+        company.crisis.deadlineDay = Math.max(company.crisis.deadlineDay || 0, targetDay + 30);
+        company.crisisDays = Math.max(0, company.crisis.deadlineDay - company.day);
+      }
       company.paused = false;
       simulateMinute(false);
       employees.filter(emp => emp.active).forEach(emp => {
@@ -142,14 +147,14 @@ async function main() {
     const nonMonotonic = summaries.filter(t => t.maxMorale - t.minMorale > 2 && t.maxStress - t.minStress > 2).length;
     const pinnedMorale = summaries.filter(t => t.atMorale100 > 40).length;
     const pinnedStressZero = summaries.filter(t => t.atStress0 > 40).length;
-    assert(company.day >= targetDay, "Long-run emotional test should reach the target day");
+    assert(company.day >= targetDay, `Long-run emotional test should reach day ${targetDay}; stopped on day ${company.day}, gameOver ${!!company.gameOver}, failure ${company.failureCode || "none"}, error ${company.lastSimulationError?.message || company.lastSimulationError || "none"}`);
     assert(nonMonotonic >= Math.max(2, Math.floor(summaries.length / 3)), "Long-run traces should show varied rises and falls");
     assert(pinnedMorale < Math.ceil(summaries.length / 2), "Most employees should not remain pinned at 100 morale");
     assert(pinnedStressZero < Math.ceil(summaries.length / 2), "Most employees should not remain pinned at zero stress");
     assert((company.emotionalTraces || []).some(t => t.type === "emotional_homeostasis"), "Homeostatic updates should be logged");
     assert((company.emotionalTraces || []).some(t => t.type === "emotional_event" || t.type === "social_emotion_applied"), "Event effects should be logged");
 
-    return { ok: failures.length === 0, failures, profiles: firstProfiles, longRun: { day: company.day, nonMonotonic, pinnedMorale, pinnedStressZero } };
+    return { ok: failures.length === 0, failures, profiles: firstProfiles, longRun: { day: company.day, gameOver:!!company.gameOver, failureCode:company.failureCode||null, lastSimulationError:company.lastSimulationError||null, nonMonotonic, pinnedMorale, pinnedStressZero } };
   });
 
   await browser.close();

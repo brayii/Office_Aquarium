@@ -25,12 +25,15 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
   },
   time:{
     minutesPerDay:1440,
+    daysPerWeek:7,
+    daysPerMonth:30,
+    daysPerQuarter:91,
+    daysPerYear:365,
+    weeksPerYear:52,
     workdayStartMinute:480,
     workdayEndMinute:1200,
     offsiteReturnCutoffMinute:1020,
-    unknownFutureDay:999,
-    quarterlyReviewDays:91,
-    annualReviewDays:365
+    unknownFutureDay:999
   },
   defaults:{
     neutralScore:50,
@@ -44,18 +47,62 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     minScore:0
   },
   social:{
-    neutralRelationship:{
+    modelVersion:3,
+    neutralInterpretation:{
       trust:50,
       respect:50,
       comfort:50,
-      professionalFriction:0
+      professionalFriction:0,
+      confidence:0
     },
+    experienceTypes:[
+      "shared_work_activity","shared_meeting","shared_break","conversation","direct_help",
+      "help_request","blocker_resolved_together","deadline_pressure_together",
+      "milestone_success_together","milestone_failure_together","recognition_shared",
+      "interruption_shared","conflict_observed","crisis_response_together",
+      "onboarding_support","mentoring_interaction"
+    ],
+    experienceAliases:{
+      shared_work_event:"shared_work_activity",
+      first_meeting:"conversation",
+      onboarding_introduction:"onboarding_support",
+      professional_disagreement:"conflict_observed"
+    },
+    passiveLegacyExperienceTypes:["same_room_presence","same_meeting","room_presence","co_presence"],
+    maxRecentExperiences:20,
+    maxRecentInteractionTypes:12,
+    maxSocialMemories:120,
+    maxPreferenceHistory:80,
+    maxPreferenceDebugEntries:24,
+    maxEmotionTraces:80,
+    maxReputationObservations:36,
+    maxReputationChanges:12,
     familiarityKnownThreshold:15,
     passiveBreakThresholdMinutes:20,
     passiveRoomThresholdMinutes:60,
+    passiveBreakFamiliarityGain:.8,
+    passiveRoomFamiliarityGain:.35,
     socialNeedThreshold:55,
+    projectExperience:{
+      cooldownDays:7,
+      pressureScheduleVariance:18,
+      severeScheduleVariance:35,
+      pressureRisk:68,
+      severeRisk:84,
+      pressureCoverage:72,
+      severeCoverage:55,
+      pressureOverload:12,
+      severeWorkItemOverdueDays:10,
+      qualityFailureIntensity:2,
+      collaborationDeadlineLeadDays:7,
+      collaborationTeamPressure:68
+    },
     minFamiliarity:0,
-    maxFamiliarity:100
+    maxFamiliarity:100,
+    workInputForbiddenKeys:[
+      "social","relationship","friendship","rivalry","trust","respect",
+      "comfort","friction","reputation","affinity","familiarity"
+    ]
   },
   cohesion:{
     collaborationBase:45,
@@ -72,6 +119,180 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     maxScore:95,
     supportScore:66,
     opposeScore:42
+  },
+  executiveInbox:{
+    dailyDecisionMemoLimit:1,
+    maxQueuedMemosBeforeRandomEvents:4,
+    recentDecisionPressureDays:5,
+    recentDecisionPressureLimit:4,
+    randomEventChancePerMinute:.004,
+    randomEventCooldownMinutes:360,
+    decisionCooldownMinutes:720
+  },
+  rooms:{
+    capacities:{
+      "software-studio":8,
+      "hardware-lab":6,
+      "meeting-room":8,
+      "break-area":6,
+      "executive-suite":5
+    },
+    fallbackCapacity:6,
+    maxCongestion:2,
+    rerouteThreshold:1.25,
+    rerouteMinimumImprovement:.25,
+    correctRoomProductivity:1,
+    wrongRoomProductivity:.86,
+    congestionProductivityPenalty:.18,
+    minProductivity:.55,
+    maxProductivity:1.12,
+    wrongRoomFocusPenalty:.08,
+    congestionFocusPenalty:.12,
+    maxFocusPenalty:.5,
+    congestionStressPenalty:.16,
+    breakAreaRecovery:.06,
+    minStressEffect:-.12,
+    maxStressEffect:.5
+  },
+  hiring:{
+    requestStartDay:6,
+    requestCadenceDays:5,
+    requestScoreThreshold:85,
+    requestSustainDays:3,
+    requestConfidenceThreshold:62,
+    duplicateRequestWindowDays:28,
+    requestReviewWindowDays:35,
+    recentHireDisplayDays:45,
+    resolvedRequestCleanupDays:45,
+    requestStatuses:{
+      queued:"queued",
+      approved:"approved-recruiting",
+      delayed:"delayed",
+      rejected:"rejected",
+      suppressed:"suppressed-policy",
+      orphaned:"orphaned"
+    },
+    activeRecruitingStatuses:["requisition","searching","interviewing","offer","exception","paused-policy"],
+    advancingRecruitingStatuses:["requisition","searching","interviewing","offer"],
+    policyPausableStatuses:["requisition","searching","interviewing","offer","paused-policy"],
+    pipelineActiveLimit:48,
+    pipelineHistoryLimit:16,
+    initialRecruitingCost:.18,
+    searchExceptionDays:90,
+    searchExceptionAttempts:5,
+    contractorCoverageDays:30,
+    contractorRepairCoverageDays:14,
+    contractorDailyCost:.018,
+    missingHireRepairWindowDays:60,
+    onboarding:{
+      defaultDurationDays:28,
+      baseDurationDays:34,
+      minDurationDays:18,
+      maxDurationDays:36,
+      mentorSupportMaxDays:18,
+      startingProductivityPercent:20,
+      minProductivity:.2
+    },
+    freezeReview:{
+      startDay:12,
+      cadenceDays:6,
+      runwayThresholdDays:62,
+      cashThreshold:6,
+      minimumSearchAgeDays:4
+    },
+    scaleUpCashThreshold:24,
+    scaleUpValuationThreshold:95,
+    scaleUpCustomerThreshold:75,
+    scaleUpRevenueThreshold:.08,
+    minimumScaleTeam:12
+  },
+  laborMarket:{
+    departments:["hardware","software","quality","product","finance","people","operations","customerSuccess","support"],
+    scarcity:{
+      hardware:12,
+      software:8,
+      quality:5,
+      product:0,
+      finance:-4,
+      people:-2,
+      operations:2,
+      customerSuccess:0,
+      support:-6
+    },
+    baseline:{
+      salaryPressure:45,
+      averageQuality:55,
+      timeToFillDays:18,
+      acceptanceRate:68,
+      contractorAvailability:55,
+      remoteAvailability:58
+    }
+  },
+  employment:{
+    benefitsRate:.24,
+    payrollTaxRate:.08,
+    equipmentAnnual:.018,
+    trainingAnnual:.012,
+    officeAnnual:.016,
+    insuranceAnnual:.009,
+    severanceWeeksMin:2,
+    severanceWeeksMax:5,
+    salarySatisfaction:65
+  },
+  portfolioDemand:{
+    scaleCashThreshold:24,
+    scaleValuationThreshold:95,
+    scaleCustomerThreshold:75,
+    scaleRevenueThreshold:.08,
+    maxProjectHeadcount:12,
+    maxLegacyProjectHeadcount:8,
+    majorProjectDemandBonus:.35,
+    launchedDemandBonus:.25
+  },
+  leadershipScale:{
+    vpValuationThreshold:110,
+    vpCustomerThreshold:100,
+    vpRevenueThreshold:.18,
+    vpEmployeeThreshold:14,
+    vpActiveProjectThreshold:3,
+    executiveScalePressureMax:30
+  },
+  organizationGrowth:{
+    stageOrder:["startup","growing","scaling","established"],
+    maxDepartmentTarget:10,
+    learningInfluenceMax:8,
+    thresholds:{
+      growing:{minimumSignals:2,day:30,cash:20,valuation:60,customers:20,dailyRevenue:.025,activeProjects:2,phases:["integration","customer trial","pilot","launched"]},
+      scaling:{minimumSignals:3,day:60,cash:24,valuation:90,customers:60,dailyRevenue:.07,activeProjects:3,phases:["pilot","launched"]},
+      established:{minimumSignals:3,day:90,cash:30,valuation:110,customers:100,dailyRevenue:.18,activeProjects:4,phases:["launched"]}
+    },
+    roleTargets:{
+      startup:{
+        "Software Engineer":1,"Firmware Engineer":1,"Software QA Engineer":1,"Technical Lead":0,"Software Architect":0,
+        "Hardware Engineer":1,"Chip Architect":1,"Electrical Engineer":0,"Industrial Designer":1,"Manufacturing Engineer":0,
+        "Product Manager":1,"Finance Analyst":1,"Manager":0,"Director":0,"Vice President":0
+      },
+      growing:{
+        "Software Engineer":2,"Firmware Engineer":2,"Software QA Engineer":2,"Technical Lead":1,"Software Architect":0,
+        "Hardware Engineer":2,"Chip Architect":1,"Electrical Engineer":1,"Industrial Designer":1,"Manufacturing Engineer":1,
+        "Product Manager":1,"Finance Analyst":1,"Manager":1,"Director":0,"Vice President":0
+      },
+      scaling:{
+        "Software Engineer":3,"Firmware Engineer":2,"Software QA Engineer":2,"Technical Lead":1,"Software Architect":1,
+        "Hardware Engineer":3,"Chip Architect":1,"Electrical Engineer":2,"Industrial Designer":1,"Manufacturing Engineer":2,
+        "Product Manager":2,"Finance Analyst":2,"Manager":2,"Director":1,"Vice President":0
+      },
+      established:{
+        "Software Engineer":3,"Firmware Engineer":2,"Software QA Engineer":3,"Technical Lead":2,"Software Architect":1,
+        "Hardware Engineer":3,"Chip Architect":1,"Electrical Engineer":2,"Industrial Designer":1,"Manufacturing Engineer":2,
+        "Product Manager":3,"Finance Analyst":2,"Manager":2,"Director":1,"Vice President":1
+      }
+    },
+    roleSequence:[
+      "Manager","Technical Lead","Electrical Engineer","Manufacturing Engineer","Software QA Engineer",
+      "Software Engineer","Firmware Engineer","Hardware Engineer","Product Manager","Finance Analyst",
+      "Software Architect","Director","Chip Architect","Industrial Designer","Vice President"
+    ]
   },
   sound:{
     modes:{
@@ -105,6 +326,11 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     failed:"failed",
     rejected:"rejected",
     merged:"merged"
+  },
+  projectLifecycle:{
+    activeStatuses:["approved","planning","prototype","execution","verification","pilot","scaling","at risk","blocked"],
+    activeIncludingPausedStatuses:["approved","planning","prototype","execution","verification","pilot","scaling","at risk","blocked","paused"],
+    terminalStatuses:["completed","canceled","failed","rejected","merged"]
   },
   messageStatus:{
     queuedForCeo:"queued-for-ceo",

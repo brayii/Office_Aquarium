@@ -354,6 +354,23 @@ Approving a hiring request approves a role or headcount, not a specific candidat
 
 Staffing signals are warnings from the organization. They may represent needs still under department review, needs being reviewed by Finance or People, requests queued for the CEO, approved recruiting, paused recruiting, or onboarding.
 
+## How the Company Grows
+
+The company begins with eight founders, but it is not intended to remain an eight-person startup. As projects, customers, revenue, valuation, and operating complexity grow, the organization moves through startup, growing, scaling, and established staffing plans.
+
+Those plans create evidence-based requests for specialist and leadership roles. The CEO still decides whether to approve each position. Delaying or rejecting a role preserves cash, but the missing capability remains real and may return later with stronger evidence.
+
+| Primary Room | Roles That Commonly Work There |
+|---|---|
+| Software Studio | Software Engineer, Firmware Engineer, Software QA Engineer, Technical Lead, Software Architect |
+| Hardware Lab | Hardware Engineer, Chip Architect, Electrical Engineer, Industrial Designer, Manufacturing Engineer |
+| Meeting Room | Product Manager, Manager |
+| Executive Suite | Finance Analyst, Director, Vice President |
+
+Managers, Directors, and Vice Presidents are company employees. They often move between the Meeting Room and Executive Suite while coordinating teams, projects, budgets, and executive communication.
+
+Recruiting can take several weeks, and onboarding takes additional time. A wealthy or highly valued company therefore grows through a visible pipeline rather than adding employees instantly.
+
 ---
 
 # 11. Stress, Burnout, and Turnover

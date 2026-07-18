@@ -43,6 +43,7 @@ desktop.ini
 # Local Codex implementation specs
 OFFICE_AQUARIUM_CODEX_*.md
 OFFICE_AQUARIUM_AI_*.md
+OFFICE_AQUARIUM_DEEP_AI_*.md
 OFFICE_AQUARIUM_V*_*.md
 
 # User-managed scratch/archive folder

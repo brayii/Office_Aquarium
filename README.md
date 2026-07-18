@@ -5,7 +5,7 @@ Office Aquarium is a standalone offline organization simulation. Open `Office_Aq
 ## Project Layout
 
 - `Office_Aquarium.html` - main launch file and page markup/styles
-- `src/core/` - startup state, save migration, employee creation, shared helpers
+- `src/core/` - shared constants, role definitions, startup state, save migration, employee creation, and shared helpers
 - `src/services/` - reusable runtime services such as saving, sound, timers, and validation sessions
 - `src/systems/` - simulation systems such as projects, customers, workforce, executive messages, learning, and valuation
 - `src/ui/` - rendering, debug views, validation tools, and timer startup
@@ -53,12 +53,14 @@ The report runner executes each test group in order and prints:
 The suite checks:
 
 - duplicate HTML IDs and duplicate named JavaScript functions
+- shared constants and their room, calendar, hiring, project-lifecycle, and inbox consumers
 - browser launch/startup
 - the manual failure-test page and its generated save scenarios
 - day rollover through daily close
 - save/load continuation
 - deterministic replay from a saved day-50 state to day 100
 - workforce, hiring pipeline, and onboarding behavior
+- all 15 canonical roles reaching CEO approval, recruiting, onboarding, room assignment, and save/load
 - staffing crisis, project allocation, and blocker reconciliation
 - project health, backlog, blocker, archive, and timing behavior
 - organizational friction, risk pillars, and loss/crisis paths
@@ -67,6 +69,7 @@ The suite checks:
 - Stage 1 Social Personality AI familiarity records and pair-level encounter boundaries
 - Stage 2 Social Personality AI shared-experience history, dedupe, tone, and intensity boundaries
 - Stage 3 Social Personality AI relationship interpretation, hidden UI boundaries, and stress/morale-only output
+- Social AI model v3 ownership, deterministic migration, read-path RNG safety, and Work/Social/Emotional/Institutional trace separation
 - isolated balance validation that cannot mutate the live company save
 - executive memo context and weekly newspaper clarity
 - absence of recorded simulation errors during the regression run
@@ -79,6 +82,8 @@ Useful targeted checks:
 npm run test:staffing-crisis
 npm run test:project
 npm run test:workforce
+npm run test:constants
+npm run test:all-role-hiring
 npm run test:failure-page
 npm run test:loss-paths
 npm run test:risk
@@ -88,6 +93,7 @@ npm run test:validation-isolation
 npm run test:long-run
 npm run test:regression
 npm run test:personality
+npm run test:ai-ownership
 npm run test:social-ai
 npm run test:social-boundary
 npm run test:social-experiences

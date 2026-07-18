@@ -63,7 +63,7 @@ async function main() {
 
     const beforeBoundary = companyBoundarySnapshot();
     const beforeMovement = employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action }));
-    const first = recordSocialEncounter(a, b, { type: "shared_work_event", gain: 2, sourceEventId: "unit-work-1", roomId: "software-studio", cooldownMinutes: 120 });
+    const first = recordSocialEncounter(a, b, { type: "shared_work_activity", gain: 2, sourceEventId: "unit-work-1", roomId: "software-studio", cooldownMinutes: 120 });
     assert(first && first.interactionCount === 1, "First valid encounter should create exactly one pair record");
     assert(first.firstMetAt && company.socialMemories.some(m => m.type === "first_met" && m.employeeIds.includes(a.id) && m.employeeIds.includes(b.id)), "First meeting should create a hidden first_met memory");
     assert(first.familiarity > 0 && first.familiarity <= 100, "Familiarity should increase and remain bounded");
@@ -76,16 +76,22 @@ async function main() {
     assert(projectSnapshot() === beforeBoundary.projects, "Social familiarity must not change project state");
 
     const afterFirstFamiliarity = first.familiarity;
-    recordSocialEncounter(a, b, { type: "shared_work_event", gain: 2, sourceEventId: "unit-work-1", roomId: "software-studio", cooldownMinutes: 120 });
+    recordSocialEncounter(a, b, { type: "shared_work_activity", gain: 2, sourceEventId: "unit-work-1", roomId: "software-studio", cooldownMinutes: 120 });
     assert(company.socialRelationships[keyAB].familiarity === afterFirstFamiliarity, "Source-event cooldown should prevent repeated stacking");
 
     const beforeRoomRecords = Object.keys(company.socialRelationships).length;
     a.currentRoom = "hardware-lab";
     b.currentRoom = "hardware-lab";
+    const interactionCountBeforeRoom = company.socialRelationships[keyAB].interactionCount;
+    const experiencesBeforeRoom = company.socialRelationships[keyAB].recentExperiences.length;
+    const emotionCountBeforeRoom = (company.socialEmotionTraces || []).length;
     for (let i = 0; i < 11; i++) observeRoomFamiliarity(5);
     assert(Object.keys(company.socialRelationships).length === beforeRoomRecords, "Same-room exposure should not apply before the threshold");
     observeRoomFamiliarity(5);
-    assert(company.socialRelationships[keyAB].interactionCount >= 2, "Same-room exposure should eventually add a controlled interaction");
+    assert(company.socialRelationships[keyAB].interactionCount === interactionCountBeforeRoom, "Same-room exposure should not count as an actual interaction");
+    assert(company.socialRelationships[keyAB].recentExperiences.length === experiencesBeforeRoom, "Same-room exposure should not create relationship evidence");
+    assert((company.socialEmotionTraces || []).length === emotionCountBeforeRoom, "Same-room exposure should not create emotional reactions");
+    assert(company.socialRelationships[keyAB].lastSeenAt, "Same-room exposure should update last-seen context");
     const afterRoomFamiliarity = company.socialRelationships[keyAB].familiarity;
     for (let i = 0; i < 12; i++) observeRoomFamiliarity(5);
     assert(company.socialRelationships[keyAB].familiarity === afterRoomFamiliarity, "Same-room cooldown should prevent per-tick stacking");
@@ -95,17 +101,18 @@ async function main() {
     c.currentRoom = "break-area";
     for (let i = 0; i < 4; i++) observeRoomFamiliarity(5);
     assert(company.socialRelationships[keyAC] && company.socialRelationships[keyAC].familiarity > 0, "Shared break should create pair familiarity after meaningful break time");
+    assert(company.socialRelationships[keyAC].interactionCount === 0, "Sharing a break room should not imply a shared conversation");
 
     const socialIntrovert = { ...a, id: 1001, personality: { workPace: 0, sociability: -0.9, collaboration: -0.7, riskTolerance: 0, adaptability: 0, initiative: 0, resilience: 0, detailOrientation: 0, empathy: 0, structureNeed: 0.8 }, emotionalState: defaultEmotionalState({ sociability: -0.9, structureNeed: 0.8 }) };
     const socialConnector = { ...a, id: 1002, personality: { workPace: 0, sociability: 0.9, collaboration: 0.8, riskTolerance: 0, adaptability: 0, initiative: 0, resilience: 0, detailOrientation: 0, empathy: 0.7, structureNeed: -0.5 }, emotionalState: defaultEmotionalState({ sociability: 0.9, collaboration: 0.8, empathy: 0.7 }) };
-    const introvertReaction = socialEncounterEmotion(socialIntrovert, b, "shared_break", 1);
-    const connectorReaction = socialEncounterEmotion(socialConnector, b, "shared_break", 1);
+    const introvertReaction = socialExperienceReaction(socialIntrovert, b, "shared_break", 3, "positive");
+    const connectorReaction = socialExperienceReaction(socialConnector, b, "shared_break", 3, "positive");
     assert(introvertReaction.moraleDelta !== connectorReaction.moraleDelta || introvertReaction.stressDelta !== connectorReaction.stressDelta, "Personality may change emotional reaction");
     assert(Object.keys(introvertReaction).sort().join(",") === "moraleDelta,reasonCode,relatedEmployeeIds,sourceEventId,stressDelta", "Social emotion output should be stress/morale trace only");
-    assert(Math.abs(introvertReaction.moraleDelta) <= 1.2 && Math.abs(introvertReaction.stressDelta) <= 1.2, "Ordinary encounters should have small emotional deltas");
+    assert(Math.abs(introvertReaction.moraleDelta) <= 3 && Math.abs(introvertReaction.stressDelta) <= 4, "Shared-experience emotion should remain bounded");
 
     company.socialRelationships[keyAB].familiarity = 150;
-    ensureSocialAISystems();
+    ensureSocialAISystems({ forceNormalize: true });
     assert(company.socialRelationships[keyAB].familiarity === 100, "Familiarity should be bounded at 100");
 
     Object.values(company.socialRelationships || {}).forEach(record => evaluateRelationshipInterpretation(record));

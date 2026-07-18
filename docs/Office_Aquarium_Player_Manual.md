@@ -262,6 +262,17 @@ The Office screen shows employees moving through:
 
 Employee labels show what they are currently doing. Busy employees display activity animation and thought text appears in the office. Select an employee to open the detailed profile.
 
+Roles have a primary workplace, although meetings, collaboration, breaks, and project needs can move employees elsewhere:
+
+| Primary Workplace | Roles |
+|---|---|
+| Software Studio | Software Engineer, Firmware Engineer, Software QA Engineer, Technical Lead, Software Architect |
+| Hardware Lab | Hardware Engineer, Chip Architect, Electrical Engineer, Industrial Designer, Manufacturing Engineer |
+| Meeting Room | Product Manager, Manager |
+| Executive Suite | Finance Analyst, Director, Vice President |
+
+The founding company starts with eight employees. Successful companies develop through larger staffing plans and can eventually employ every canonical role. Leadership positions appear as the company gains more projects, customers, revenue, valuation, and coordination needs. The CEO approves positions; HR recruits and onboards the people.
+
 ## Employees
 
 The Employee Minds panel shows each employee's current condition.

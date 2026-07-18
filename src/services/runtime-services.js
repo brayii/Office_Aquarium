@@ -1,3 +1,12 @@
+function finiteNumberOr(value,fallback){
+  const parsed=Number(value);
+  return Number.isFinite(parsed)?parsed:fallback;
+}
+
+function runwayDaysOrUnknown(finance=company?.finance){
+  return finiteNumberOr(finance?.runwayDays,OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay);
+}
+
 class SaveRepository{
   constructor(key,version){this.key=key;this.version=version;}
   clone(value){return typeof structuredClone==="function"?structuredClone(value):JSON.parse(JSON.stringify(value));}

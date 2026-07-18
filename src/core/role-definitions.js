@@ -1,10 +1,5 @@
-const ROOM_CAPACITY={
-  "software-studio":8,
-  "hardware-lab":6,
-  "meeting-room":8,
-  "break-area":6,
-  "executive-suite":5
-};
+const ROOM_RULES=OFFICE_AQUARIUM_CONSTANTS.rooms;
+const ROOM_CAPACITY=ROOM_RULES.capacities;
 const ROOM_ZONE_MAP={
   "software-studio":"dev",
   "hardware-lab":"lab",
@@ -139,7 +134,7 @@ function roleLeadershipLevel(role){return Number(roleDefinition(role)?.leadershi
 function roomForZone(zone){return ZONE_ROOM_MAP[zone]||null;}
 function zoneForRoom(room){return ROOM_ZONE_MAP[room]||"dev";}
 function roomOccupancy(room){const zone=zoneForRoom(room);return (employees||[]).filter(e=>e.active&&!e.offsite&&e.zone===zone).length;}
-function roomCongestion(room){return clamp(roomOccupancy(room)/Math.max(1,ROOM_CAPACITY[room]||6),0,2);}
+function roomCongestion(room){return clamp(roomOccupancy(room)/Math.max(1,ROOM_CAPACITY[room]||ROOM_RULES.fallbackCapacity),0,ROOM_RULES.maxCongestion);}
 function baseSkillsForRole(role){
   const common={architecture:35,verification:35,firmware:35,software:35,hardware:35,leadership:35,communication:45,finance:25,product:30};
   return {...common,...(roleDefinition(role)?.skills||{})};
@@ -164,6 +159,79 @@ function roleRecruitingDifficulty(role){
 function rolesForDepartment(dept){
   return allRecruitableRoles().filter(role=>roleDepartment(role)===dept);
 }
+function organizationMaturityStage(){
+  const rules=globalThis.OFFICE_AQUARIUM_CONSTANTS?.organizationGrowth||{};
+  const order=Array.isArray(rules.stageOrder)&&rules.stageOrder.length?rules.stageOrder:["startup","growing","scaling","established"];
+  if(typeof company==="undefined"||!company)return order[0];
+  const terminalStatuses=OFFICE_AQUARIUM_CONSTANTS.projectLifecycle.terminalStatuses;
+  const activeProjectCount=(company.projects||[]).filter(p=>p&&!terminalStatuses.includes(p.status)).length;
+  const values={
+    day:Number(company.day)||0,
+    cash:Number(company.cash)||0,
+    valuation:Number(company.valuation)||0,
+    customers:Number(company.customers)||0,
+    dailyRevenue:Number(company.dailyRevenue)||0,
+    activeProjects:activeProjectCount,
+    phase:String(company.phase||"prototype")
+  };
+  let stage=order[0],signalsByStage={};
+  order.slice(1).forEach(candidate=>{
+    const threshold=rules.thresholds?.[candidate]||{};
+    const signals=[
+      values.day>=Number(threshold.day??Infinity),
+      values.cash>=Number(threshold.cash??Infinity),
+      values.valuation>=Number(threshold.valuation??Infinity),
+      values.customers>=Number(threshold.customers??Infinity),
+      values.dailyRevenue>=Number(threshold.dailyRevenue??Infinity),
+      values.activeProjects>=Number(threshold.activeProjects??Infinity),
+      (threshold.phases||[]).includes(values.phase)
+    ].filter(Boolean).length;
+    signalsByStage[candidate]=signals;
+    if(signals>=Number(threshold.minimumSignals||1))stage=candidate;
+  });
+  const previousStage=company.organizationMaturity?.stage;
+  if(order.indexOf(previousStage)>order.indexOf(stage))stage=previousStage;
+  company.organizationMaturity={stage,signalsByStage,activeProjectCount,updatedDay:company.day};
+  return stage;
+}
+function organizationRoleTargets(stage=organizationMaturityStage()){
+  const targets=globalThis.OFFICE_AQUARIUM_CONSTANTS?.organizationGrowth?.roleTargets?.[stage]||{};
+  return Object.fromEntries(allRecruitableRoles().map(role=>[role,Math.max(0,Number(targets[role])||0)]));
+}
+function committedRoleCount(role){
+  role=canonicalRole(role);
+  if(typeof company==="undefined"||!company)return 0;
+  const hiringRules=OFFICE_AQUARIUM_CONSTANTS.hiring;
+  const pipelineStatuses=new Set(hiringRules.activeRecruitingStatuses);
+  const queuedStatus=hiringRules.requestStatuses.queued;
+  const recruiting=(company.recruitingPipeline||[]).filter(item=>pipelineStatuses.has(item.status)&&canonicalRole(item.role)===role).length;
+  const queued=(company.hiringRequests||[]).filter(item=>item.status===queuedStatus&&canonicalRole(item.role)===role).length;
+  return recruiting+queued;
+}
+function organizationalRoleCoverage(stage=organizationMaturityStage()){
+  const targets=organizationRoleTargets(stage),active=typeof employees==="undefined"?[]:(employees||[]).filter(e=>e.active);
+  const roles=allRecruitableRoles().map(role=>{
+    const target=targets[role]||0;
+    const activeCount=active.filter(e=>canonicalRole(e.role)===role).length;
+    const committed=committedRoleCount(role);
+    return {role,department:roleDepartment(role),target,active:activeCount,committed,missingActive:Math.max(0,target-activeCount),missingCommitted:Math.max(0,target-activeCount-committed)};
+  });
+  return {
+    stage,
+    targetHeadcount:roles.reduce((sum,row)=>sum+row.target,0),
+    activeHeadcount:active.length,
+    roles,
+    missingRoles:roles.filter(row=>row.missingActive>0),
+    uncommittedRoles:roles.filter(row=>row.missingCommitted>0)
+  };
+}
+function organizationalRoleGapForDepartment(dept){
+  const coverage=organizationalRoleCoverage(),sequence=globalThis.OFFICE_AQUARIUM_CONSTANTS?.organizationGrowth?.roleSequence||allRecruitableRoles();
+  return coverage.uncommittedRoles.filter(row=>row.department===dept).sort((a,b)=>{
+    const aOrder=sequence.indexOf(a.role),bOrder=sequence.indexOf(b.role);
+    return (aOrder<0?999:aOrder)-(bOrder<0?999:bOrder)||b.missingCommitted-a.missingCommitted;
+  })[0]||null;
+}
 function roleForDepartmentHire(dept){
   const preferred={
     hardware:["Hardware Engineer","Electrical Engineer","Chip Architect","Manufacturing Engineer","Industrial Designer"],
@@ -171,13 +239,26 @@ function roleForDepartmentHire(dept){
     quality:["Software QA Engineer"],
     product:["Product Manager"],
     finance:["Finance Analyst"],
-    people:["Manager","Director"]
+    people:["Manager","Director","Vice President"]
   }[dept]||rolesForDepartment(dept);
   return preferred.slice().sort((a,b)=>(employees||[]).filter(e=>e.active&&canonicalRole(e.role)===a).length-(employees||[]).filter(e=>e.active&&canonicalRole(e.role)===b).length)[0];
 }
 function roleForCompanyCapability(capability){
   const roles=COMPANY_CAPABILITY_TO_ROLES[capability]||[];
   if(!roles.length)return roleForDepartmentHire(COMPANY_CAPABILITY_DEPARTMENT[capability]||"people");
+  const scale=globalThis.OFFICE_AQUARIUM_CONSTANTS?.leadershipScale||{};
+  const activeCount=(employees||[]).filter(e=>e.active).length;
+  const terminalStatuses=OFFICE_AQUARIUM_CONSTANTS.projectLifecycle.terminalStatuses;
+  const activeProjectCount=(company?.projects||[]).filter(p=>p&&!terminalStatuses.includes(p.status)).length;
+  const executiveScale=(Number(company?.valuation)||0)>=scale.vpValuationThreshold
+    ||(Number(company?.customers)||0)>=scale.vpCustomerThreshold
+    ||(Number(company?.dailyRevenue)||0)>=scale.vpRevenueThreshold
+    ||activeCount>=scale.vpEmployeeThreshold
+    ||activeProjectCount>=scale.vpActiveProjectThreshold;
+  if(executiveScale&&["portfolioGovernance","executiveCommunication","successionCoverage"].includes(capability)&&roles.includes("Vice President")){
+    const vpCount=(employees||[]).filter(e=>e.active&&canonicalRole(e.role)==="Vice President").length;
+    if(vpCount===0)return "Vice President";
+  }
   return roles.slice().sort((a,b)=>(employees||[]).filter(e=>e.active&&canonicalRole(e.role)===a).length-(employees||[]).filter(e=>e.active&&canonicalRole(e.role)===b).length)[0];
 }
 function roleCapabilityContribution(role,capability,employee=null){
@@ -240,23 +321,47 @@ function roomForAction(e,action,ctx={}){
   if(action==="break"||action==="socialize"||action==="complain")return "break-area";
   if(action==="meeting")return "meeting-room";
   if(action==="collaborate")return (e.stress>78||e.energy<32)&&roleSecondaryRooms(e.role).includes("break-area")?"break-area":"meeting-room";
-  if(action==="lab")return roomCongestion("hardware-lab")>1.25&&rolePrimaryRoom(e.role)==="software-studio"?"software-studio":"hardware-lab";
+  if(action==="lab")return roomCongestion("hardware-lab")>ROOM_RULES.rerouteThreshold&&rolePrimaryRoom(e.role)==="software-studio"?"software-studio":"hardware-lab";
   if(action==="home")return null;
   const work=ctx?.work, type=String(work?.type||work?.assignedTeam||"").toLowerCase();
   let room=rolePrimaryRoom(e.role);
   if(/hardware|chip|manufactur|prototype|validation|verification/.test(type)&&["hardware-lab","software-studio"].includes(room))room="hardware-lab";
   if(/plan|review|blocker|coordination/.test(type))room="meeting-room";
   const alternatives=roleSecondaryRooms(e.role).filter(r=>r!=="break-area"||e.energy<28||e.stress>82);
-  if(roomCongestion(room)>1.25&&alternatives.length){
+  if(roomCongestion(room)>ROOM_RULES.rerouteThreshold&&alternatives.length){
     const better=alternatives.slice().sort((a,b)=>roomCongestion(a)-roomCongestion(b))[0];
-    if(roomCongestion(better)+.25<roomCongestion(room))room=better;
+    if(roomCongestion(better)+ROOM_RULES.rerouteMinimumImprovement<roomCongestion(room))room=better;
   }
   return room;
 }
 function roomEffectFor(e,action,room){
   const congestion=roomCongestion(room);
   const correct=room===roomForAction(e,action,workContext?.(e)||{})||room===rolePrimaryRoom(e.role)||roleSecondaryRooms(e.role).includes(room);
-  return {room,capacity:ROOM_CAPACITY[room]||6,occupancy:roomOccupancy(room),congestion,correct,productivity:clamp((correct?1:.86)-(Math.max(0,congestion-1)*.18),.55,1.12),focus:clamp((correct?0:.08)+Math.max(0,congestion-1)*.12,0,.5),stress:clamp(Math.max(0,congestion-1)*.16-(room==="break-area"&&congestion<1?.06:0),-.12,.5)};
+  return {
+    room,
+    capacity:ROOM_CAPACITY[room]||ROOM_RULES.fallbackCapacity,
+    occupancy:roomOccupancy(room),
+    congestion,
+    correct,
+    productivity:clamp(
+      (correct?ROOM_RULES.correctRoomProductivity:ROOM_RULES.wrongRoomProductivity)
+        -(Math.max(0,congestion-1)*ROOM_RULES.congestionProductivityPenalty),
+      ROOM_RULES.minProductivity,
+      ROOM_RULES.maxProductivity
+    ),
+    focus:clamp(
+      (correct?0:ROOM_RULES.wrongRoomFocusPenalty)
+        +Math.max(0,congestion-1)*ROOM_RULES.congestionFocusPenalty,
+      0,
+      ROOM_RULES.maxFocusPenalty
+    ),
+    stress:clamp(
+      Math.max(0,congestion-1)*ROOM_RULES.congestionStressPenalty
+        -(room==="break-area"&&congestion<1?ROOM_RULES.breakAreaRecovery:0),
+      ROOM_RULES.minStressEffect,
+      ROOM_RULES.maxStressEffect
+    )
+  };
 }
 function applyRoomTickEffects(e){
   const room=roomForZone(e.zone);

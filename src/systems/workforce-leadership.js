@@ -1,12 +1,27 @@
-const LABOR_MARKET_DEPARTMENTS=["hardware","software","quality","product","finance","people","operations","customerSuccess","support"];
+const LABOR_MARKET_RULES=OFFICE_AQUARIUM_CONSTANTS.laborMarket;
+const LABOR_MARKET_DEPARTMENTS=LABOR_MARKET_RULES.departments;
+const WORKFORCE_HIRING_RULES=OFFICE_AQUARIUM_CONSTANTS.hiring;
+const WORKFORCE_TIME_RULES=OFFICE_AQUARIUM_CONSTANTS.time;
+const LEADERSHIP_SCALE_RULES=OFFICE_AQUARIUM_CONSTANTS.leadershipScale;
+const WORKFORCE_ACTIVE_RECRUITING_STATUSES=new Set(WORKFORCE_HIRING_RULES.activeRecruitingStatuses);
+const WORKFORCE_ADVANCING_RECRUITING_STATUSES=new Set(WORKFORCE_HIRING_RULES.advancingRecruitingStatuses);
+const WORKFORCE_POLICY_PAUSABLE_STATUSES=new Set(WORKFORCE_HIRING_RULES.policyPausableStatuses);
 function defaultLaborMarketSegment(dept){
   const world=company?.worldState||{},base=world.talentMarket??50;
-  const scarcity={hardware:12,software:8,quality:5,product:0,finance:-4,people:-2,operations:2,customerSuccess:0,support:-6}[dept]||0;
-  return {candidateSupply:clamp(base-scarcity+rand(-6,6),15,95),salaryPressure:clamp(45+scarcity+rand(-5,9),15,95),competition:clamp((world.competitorAggression??50)+scarcity*.6+rand(-8,8),10,95),averageQuality:clamp(55+base*.12-scarcity*.15+rand(-5,7),25,95),timeToFill:clamp(18+scarcity*.7+(50-base)*.25+rand(-3,5),6,90),acceptanceRate:clamp(68-scarcity*.35+(base-50)*.18+rand(-6,6),12,95),contractorAvailability:clamp(55-scarcity*.2+rand(-8,8),10,95),remoteAvailability:clamp(58+rand(-10,10),10,95),lastUpdatedDay:company?.day||0};
+  const scarcity=LABOR_MARKET_RULES.scarcity[dept]||0,b=LABOR_MARKET_RULES.baseline;
+  return {candidateSupply:clamp(base-scarcity+rand(-6,6),15,95),salaryPressure:clamp(b.salaryPressure+scarcity+rand(-5,9),15,95),competition:clamp((world.competitorAggression??50)+scarcity*.6+rand(-8,8),10,95),averageQuality:clamp(b.averageQuality+base*.12-scarcity*.15+rand(-5,7),25,95),timeToFill:clamp(b.timeToFillDays+scarcity*.7+(50-base)*.25+rand(-3,5),6,90),acceptanceRate:clamp(b.acceptanceRate-scarcity*.35+(base-50)*.18+rand(-6,6),12,95),contractorAvailability:clamp(b.contractorAvailability-scarcity*.2+rand(-8,8),10,95),remoteAvailability:clamp(b.remoteAvailability+rand(-10,10),10,95),lastUpdatedDay:company?.day||0};
+}
+function laborMarketBaseline(dept){
+  const world=company?.worldState||{},base=world.talentMarket??50;
+  const scarcity=LABOR_MARKET_RULES.scarcity[dept]||0,b=LABOR_MARKET_RULES.baseline;
+  return {candidateSupply:clamp(base-scarcity,15,95),salaryPressure:clamp(b.salaryPressure+scarcity,15,95),competition:clamp((world.competitorAggression??50)+scarcity*.6,10,95),averageQuality:clamp(b.averageQuality+base*.12-scarcity*.15,25,95),timeToFill:clamp(b.timeToFillDays+scarcity*.7+(50-base)*.25,6,90),acceptanceRate:clamp(b.acceptanceRate-scarcity*.35+(base-50)*.18,12,95),contractorAvailability:clamp(b.contractorAvailability-scarcity*.2,10,95),remoteAvailability:b.remoteAvailability,lastUpdatedDay:company?.day||0};
 }
 function ensureLaborMarket(){
   company.laborMarket=company.laborMarket&&typeof company.laborMarket==="object"?company.laborMarket:{};
-  LABOR_MARKET_DEPARTMENTS.forEach(dept=>{company.laborMarket[dept]={...defaultLaborMarketSegment(dept),...(company.laborMarket[dept]||{})};});
+  LABOR_MARKET_DEPARTMENTS.forEach(dept=>{
+    const existing=company.laborMarket[dept];
+    company.laborMarket[dept]=existing?{...laborMarketBaseline(dept),...existing}:defaultLaborMarketSegment(dept);
+  });
 }
 function updateLaborMarketDaily(){
   ensureLaborMarket();
@@ -24,6 +39,106 @@ function updateLaborMarketDaily(){
   });
 }
 function laborMarketForDepartment(dept){ensureLaborMarket();return company.laborMarket?.[dept]||defaultLaborMarketSegment(dept);}
+function hiringRequestStatus(name){
+  return WORKFORCE_HIRING_RULES.requestStatuses?.[name]||name;
+}
+function activeRecruitingStatusSet(){
+  return WORKFORCE_ACTIVE_RECRUITING_STATUSES;
+}
+function hiringRequestMatches(record,department,role,requestId=null){
+  if(!record)return false;
+  const sameRole=canonicalRole(record.role)===canonicalRole(role);
+  const sameDepartment=record.department===department;
+  if(requestId&&record.id===requestId)return sameRole&&sameDepartment;
+  return sameRole&&sameDepartment;
+}
+function resolveHiringRequestStatus(department,role,status,details={}){
+  company.hiringRequests=Array.isArray(company.hiringRequests)?company.hiringRequests:[];
+  role=canonicalRole(role);
+  const requestId=details.requestId||null,queuedStatus=hiringRequestStatus("queued");
+  let records=requestId?company.hiringRequests.filter(record=>record.id===requestId&&hiringRequestMatches(record,department,role,requestId)):[];
+  if(!records.length)records=company.hiringRequests.filter(record=>record.status===queuedStatus&&hiringRequestMatches(record,department,role));
+  if(!records.length){
+    const record={id:requestId||nextSimulationId(`hiring-request-${department}`),day:company.day,department,role,status};
+    company.hiringRequests.unshift(record);
+    records=[record];
+  }
+  records.forEach(record=>Object.assign(record,{status,resolvedDay:company.day,...details,id:record.id||requestId||nextSimulationId(`hiring-request-${department}`)}));
+  return records[0];
+}
+function reconcileHiringRequestDecision(event,choice){
+  const request=event?.hiringRequest;
+  if(!request)return null;
+  let status=null;
+  if(choice?.deferHiring)status=hiringRequestStatus("delayed");
+  else if(choice?.rejectHiring)status=hiringRequestStatus("rejected");
+  else if(choice?.hire||choice?.hireRole)status=hiringRequestStatus("approved");
+  if(!status)return null;
+  const record=resolveHiringRequestStatus(request.department,request.role,status,{requestId:request.requestId||event.id||null,decisionDay:company.day});
+  company.hiringRequests=(company.hiringRequests||[]).filter(other=>other===record||!(
+    !other.id
+    &&other.status===status
+    &&hiringRequestMatches(other,request.department,request.role)
+    &&(Number(other.day)||0)===Number(company.day)
+  ));
+  return record;
+}
+function hiringRequestHasActiveMemo(record){
+  const events=[...(company.escalationQueue||[]),company.pendingEvent].filter(Boolean);
+  return events.some(event=>{
+    const request=event.hiringRequest;
+    if(!request)return false;
+    const sameRole=canonicalRole(request.role)===canonicalRole(record.role);
+    const sameDepartment=request.department===record.department;
+    if(!sameRole||!sameDepartment)return false;
+    return !record.id||!request.requestId||request.requestId===record.id;
+  });
+}
+function repairHiringRequestIntegrity(){
+  if(!company||!Array.isArray(company.hiringRequests))return;
+  const queuedStatus=hiringRequestStatus("queued"),approvedStatus=hiringRequestStatus("approved");
+  const activeStatuses=activeRecruitingStatusSet();
+  const duplicateResolutions=new Set();
+  company.hiringRequests.forEach((record,index)=>{
+    if(record.status!==queuedStatus)return;
+    const role=canonicalRole(record.role);
+    if(!roleDefinition(role)){
+      record.status=hiringRequestStatus("orphaned");
+      record.resolvedDay=company.day;
+      record.repairReason="invalid role";
+      return;
+    }
+    if(hiringRequestHasActiveMemo(record))return;
+    const pipeline=(company.recruitingPipeline||[]).find(item=>activeStatuses.has(item.status)
+      &&item.department===record.department
+      &&canonicalRole(item.role)===role
+      &&(!record.id||!item.hiringRequestId||item.hiringRequestId===record.id));
+    if(pipeline){
+      record.status=approvedStatus;
+      record.approvedDay=record.approvedDay??pipeline.day??company.day;
+      record.pipelineId=record.pipelineId||pipeline.id;
+      return;
+    }
+    const terminalIndex=company.hiringRequests.findIndex((other,otherIndex)=>otherIndex!==index
+      &&[hiringRequestStatus("delayed"),hiringRequestStatus("rejected")].includes(other.status)
+      &&hiringRequestMatches(other,record.department,role)
+      &&(Number(other.day)||0)>=(Number(record.day)||0));
+    if(terminalIndex>=0){
+      const terminal=company.hiringRequests[terminalIndex];
+      record.status=terminal.status;
+      record.resolvedDay=terminal.resolvedDay??terminal.day??company.day;
+      record.decisionDay=terminal.day??company.day;
+      record.repairReason="merged duplicate CEO hiring decision";
+      duplicateResolutions.add(terminalIndex);
+      return;
+    }
+    record.status=hiringRequestStatus("orphaned");
+    record.resolvedDay=company.day;
+    record.repairReason="queued request had no live CEO memo or recruiting search";
+    company.hiringRequestHistory?.unshift({day:company.day,role,department:record.department,status:"repaired-orphaned-request",requestId:record.id||null});
+  });
+  if(duplicateResolutions.size)company.hiringRequests=company.hiringRequests.filter((_,index)=>!duplicateResolutions.has(index));
+}
 function repairRecruitingPipelineIntegrity(){
   if(!company||!Array.isArray(company.recruitingPipeline)||!Array.isArray(employees))return;
   company.recruitingPipeline.forEach(item=>{
@@ -31,7 +146,7 @@ function repairRecruitingPipelineIntegrity(){
     if(!roleDefinition(role))return;
     if(item.status==="contractor"){
       item.contractorCoverage=true;
-      item.contractorCoverageUntil=Number(item.contractorCoverageUntil)||company.day+14;
+      item.contractorCoverageUntil=Number(item.contractorCoverageUntil)||company.day+WORKFORCE_HIRING_RULES.contractorRepairCoverageDays;
       item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.dueDay=Math.max(company.day+3,Number(item.dueDay)||company.day+7);
       item.repairedFromContractorStatus=true;
       company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"repaired-contractor-search"});
@@ -39,7 +154,7 @@ function repairRecruitingPipelineIntegrity(){
     if(item.status==="accepted"){
       const filledDay=Number.isFinite(item.filledDay)?item.filledDay:null;
       const matchingHire=filledDay!==null&&employees.some(e=>e&&e.active&&canonicalRole(e.role)===role&&Math.abs((Number(e.joinedDay)||0)-filledDay)<=1&&(e.careerHistory||[]).some(h=>/Hired as|Backfilled as|Selected by HR/i.test(String(h))));
-      if(!matchingHire&&company.day-(filledDay??item.day??company.day)<60){
+      if(!matchingHire&&company.day-(filledDay??item.day??company.day)<WORKFORCE_HIRING_RULES.missingHireRepairWindowDays){
         item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.dueDay=company.day+stageDaysForRecruiting(item,"searching");item.repairedMissingHire=true;
         company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"repaired-missing-hire"});
       }
@@ -61,6 +176,7 @@ function ensureWorkforceEconomySystems(){
   company.successionRisks=Array.isArray(company.successionRisks)?company.successionRisks:[];
   company.recruitingPipeline=Array.isArray(company.recruitingPipeline)?company.recruitingPipeline:[];
   repairRecruitingPipelineIntegrity();
+  repairHiringRequestIntegrity();
   company.restructuringRequests=Array.isArray(company.restructuringRequests)?company.restructuringRequests:[];
   company.hiringExceptions=Array.isArray(company.hiringExceptions)?company.hiringExceptions:[];
   ensureLaborMarket();
@@ -74,11 +190,12 @@ function ensureWorkforceEconomySystems(){
   Object.entries(workforceDefaults).forEach(([k,v])=>{company.workforceLessons[k]={...v,...(company.workforceLessons[k]||{})};});
   company.companyRiskComponents={financial:0,people:0,product:0,customer:0,operational:0,leadership:0,staffing:0,total:0,label:"Stable",...(company.companyRiskComponents||{})};
   employees.forEach(e=>{
-    e.employment={...defaultEmploymentForRole(e.role),...(e.employment||{})};
+    const existingEmployment=e.employment&&typeof e.employment==="object"?e.employment:null;
+    e.employment=existingEmployment?{...employmentBaselineForRole(e.role,existingEmployment.annualSalary),...existingEmployment}:defaultEmploymentForRole(e.role);
     e.employment.salarySatisfaction=Number.isFinite(e.employment.salarySatisfaction)?e.employment.salarySatisfaction:(Number.isFinite(e.salarySatisfaction)?e.salarySatisfaction:65);
     e.salarySatisfaction=e.employment.salarySatisfaction;
     e.retention={stayScore:e.stayScore??72,riskLevel:"stable",searching:(e.jobSearchDays||0)>0,searchDays:e.jobSearchDays||0,lastReviewDay:e.quarterlyReview?.day??-999,salarySatisfaction:e.salarySatisfaction??65,careerSatisfaction:e.recognitionSatisfaction??60,leadershipFit:e.opinionOfCEO?.trust??55,cultureFit:e.morale??60,...(e.retention||{})};
-    e.careerLifecycle={age:e.age??30,yearsAtCompany:Math.max(0,Math.floor(((company.day||0)-(e.joinedDay||0))/365)),retirementReadiness:e.retirementReadiness||0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0,...(e.careerLifecycle||{})};
+    e.careerLifecycle={age:e.age??30,yearsAtCompany:Math.max(0,Math.floor(((company.day||0)-(e.joinedDay||0))/WORKFORCE_TIME_RULES.daysPerYear)),retirementReadiness:e.retirementReadiness||0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0,...(e.careerLifecycle||{})};
     e.burnoutResponse={helpAttempts:0,delegationAttempts:0,recoveryAttempts:0,managerEscalated:false,lastHelpDay:-999,lastRecoveryDay:-999,unresolvedDays:0,...(e.burnoutResponse||{})};
     e.performanceManagement={stage:"none",coachingAttempts:0,pipAttempts:0,pipStartDay:null,pipDueDay:null,lastActionDay:-999,documentedIssues:0,improvementScore:0,hrReviewed:false,terminationEligible:false,...(e.performanceManagement||{})};
     e.managerHistory=Array.isArray(e.managerHistory)?e.managerHistory:[];
@@ -121,7 +238,7 @@ function capabilityLearningBias(capability){
   },0);
 }
 function activeCapabilityProjects(){
-  return typeof activeProjects==="function"?activeProjects():(company.projects||[]).filter(p=>!["completed","canceled","rejected","merged"].includes(p.status));
+  return typeof activeProjects==="function"?activeProjects():(company.projects||[]).filter(p=>!OFFICE_AQUARIUM_CONSTANTS.projectLifecycle.terminalStatuses.includes(p.status));
 }
 function updateCompanyCapabilityNeeds(){
   ensureCompanyCapabilityModel();
@@ -130,9 +247,19 @@ function updateCompanyCapabilityNeeds(){
   const missingAssignments=projectGaps?.totals?.missingAssignments||0,blocked=projectGaps?.totals?.actualBlockedWork??(company.workItems||[]).filter(w=>w.status==="open"&&(w.blockedBy||[]).length).length;
   const onboarding=active.filter(e=>e.performanceManagement?.stage==="onboarding").length,retention=active.filter(e=>(e.retentionRisk||0)>55).length,retirement=active.filter(e=>(e.retirementReadiness||0)>55).length;
   const lessons=Object.keys(DEFAULT_COMPANY_CAPABILITY_NEEDS).reduce((out,k)=>(out[k]=capabilityLearningBias(k),out),{});
+  const scale=LEADERSHIP_SCALE_RULES;
+  const executiveScalePressure=clamp(
+    Math.max(0,(Number(company.valuation)||0)-scale.vpValuationThreshold)*.22+
+    Math.max(0,(Number(company.customers)||0)-scale.vpCustomerThreshold)*.10+
+    Math.max(0,(Number(company.dailyRevenue)||0)-scale.vpRevenueThreshold)*42+
+    Math.max(0,active.length-scale.vpEmployeeThreshold)*3+
+    Math.max(0,projects.length-scale.vpActiveProjectThreshold)*8,
+    0,
+    scale.executiveScalePressureMax
+  );
   company.capabilityNeeds={
-    managementCapacity:clamp(18+active.length*3+avgStress()*.22+blocked*4+missingAssignments*5+Math.max(0,active.length-8)*5-lessons.managementCapacity,0,100),
-    portfolioGovernance:clamp(8+projects.length*15+Math.max(0,projects.length-2)*10+Math.max(0,avgProjectRisk-55)*.35+missingAssignments*4-lessons.portfolioGovernance,0,100),
+    managementCapacity:clamp(18+active.length*3+avgStress()*.22+blocked*4+missingAssignments*5+Math.max(0,active.length-8)*5+executiveScalePressure*.25-lessons.managementCapacity,0,100),
+    portfolioGovernance:clamp(8+projects.length*15+Math.max(0,projects.length-2)*10+Math.max(0,avgProjectRisk-55)*.35+missingAssignments*4+executiveScalePressure*.65-lessons.portfolioGovernance,0,100),
     financialPlanning:clamp(18+(finance.runwayDays<120?22:finance.runwayDays<220?10:0)+Math.max(0,-Number(finance.netCashFlowDaily||0))*180+projects.length*4+(company.hiringRequests||[]).length*2-lessons.financialPlanning,0,100),
     manufacturingReadiness:clamp((company.phase==="launched"||company.phase==="pilot"||company.customers>0?36:14)+Math.max(0,(manufacturing.supplyRisk||35)-45)*.55+Math.max(0,60-(manufacturing.readiness||55))*.45+projects.filter(p=>/hardware|chip|manufacturing|yield|processor|accelerator/i.test(`${p.family} ${p.title}`)).length*8-lessons.manufacturingReadiness,0,100),
     customerSupportCapacity:clamp(12+Math.min(44,(company.customers||0)*.35)+Math.max(0,65-(company.customerSentiment||company.trust||60))*.4+(company.phase==="launched"?16:0)-lessons.customerSupportCapacity,0,100),
@@ -140,7 +267,7 @@ function updateCompanyCapabilityNeeds(){
     mentoringCapacity:clamp(10+onboarding*18+active.filter(e=>e.stress>70).length*7+Math.max(0,active.length-8)*4+retention*5-lessons.mentoringCapacity,0,100),
     successionCoverage:clamp(8+retirement*22+retention*8+(company.openRoles||[]).length*10+active.filter(e=>e.careerLifecycle?.successionRisk>45).length*14-lessons.successionCoverage,0,100),
     crossProjectCoordination:clamp(10+projects.length*11+missingAssignments*4+blocked*3+Math.max(0,(company.portfolioHealth?.concentrationRisk||0)-60)*.25-lessons.crossProjectCoordination,0,100),
-    executiveCommunication:clamp(10+(company.boardGovernance?.strikes||0)*18+Math.max(0,55-(company.board||55))*.36+(company.escalationQueue||[]).length*3+(company.crisis?22:0)-lessons.executiveCommunication,0,100)
+    executiveCommunication:clamp(10+(company.boardGovernance?.strikes||0)*18+Math.max(0,55-(company.board||55))*.36+(company.escalationQueue||[]).length*3+(company.crisis?22:0)+executiveScalePressure-lessons.executiveCommunication,0,100)
   };
   company.capabilityLearningSignals=lessons;
   return company.capabilityNeeds;
@@ -230,7 +357,7 @@ function applyCompanyCapabilityPressure(){
   const gap=cap=>company.capabilityGaps?.find(g=>g.capability===cap)?.gap||0;
   const management=gap("managementCapacity"),portfolio=gap("portfolioGovernance"),finance=gap("financialPlanning"),manufacturing=gap("manufacturingReadiness"),technical=gap("technicalLeadership"),mentoring=gap("mentoringCapacity"),support=gap("customerSupportCapacity"),exec=gap("executiveCommunication");
   if(management>18){employees.filter(e=>e.active).forEach(e=>applyEmployeeEmotionDelta(e,{stressDelta:management*.006,reasonCode:"management-capacity-gap",sourceEventId:`capability-${company.day}`,ignoreCooldown:true}));if(company.teams?.people)company.teams.people.pressure=clamp((company.teams.people.pressure||40)+management*.012,0,100);}
-  if(portfolio>18)(company.projects||[]).filter(p=>!["completed","canceled","rejected","merged"].includes(p.status)).forEach(p=>{p.visibleRisk=clamp((p.visibleRisk||50)+portfolio*.006,0,100);});
+  if(portfolio>18)(company.projects||[]).filter(p=>!OFFICE_AQUARIUM_CONSTANTS.projectLifecycle.terminalStatuses.includes(p.status)).forEach(p=>{p.visibleRisk=clamp((p.visibleRisk||50)+portfolio*.006,0,100);});
   if(finance>18&&company.finance){company.finance.forecastConfidence=clamp((company.finance.forecastConfidence??68)-finance*.015,0,100);}
   if(manufacturing>18&&company.manufacturing){company.manufacturing.readiness=clamp((company.manufacturing.readiness||50)-manufacturing*.006,0,100);company.manufacturing.supplyRisk=clamp((company.manufacturing.supplyRisk||35)+manufacturing*.008,0,100);}
   if(technical>18){company.integration=clamp((company.integration||0)-technical*.004,0,100);}
@@ -243,6 +370,62 @@ function capabilityHiringSignalForDepartment(dept){
   const candidate=(company.capabilityGaps||[]).filter(g=>g.department===dept).sort((a,b)=>b.gap-a.gap)[0];
   if(!candidate)return null;
   return {...candidate,score:clamp(candidate.gap*1.35,0,92),role:candidate.role||roleForCompanyCapability(candidate.capability)};
+}
+function organizationGrowthLearningBias(){
+  const maxInfluence=OFFICE_AQUARIUM_CONSTANTS.organizationGrowth.learningInfluenceMax;
+  const lessons=["hiringTiming","workloadBalancing","successionPlanning"].map(key=>company.workforceLessons?.[key]).filter(Boolean);
+  if(!lessons.length)return 0;
+  const weighted=lessons.reduce((sum,lesson)=>sum+(Number(lesson.score)||0)*clamp((Number(lesson.confidence)||0)/100,.15,1),0)/lessons.length;
+  return clamp(weighted*1.4,-maxInfluence,maxInfluence);
+}
+function organizationRoleHiringSignalForDepartment(dept){
+  const gap=organizationalRoleGapForDepartment(dept);
+  if(!gap)return null;
+  const coverage=organizationalRoleCoverage(),stageIndex=OFFICE_AQUARIUM_CONSTANTS.organizationGrowth.stageOrder.indexOf(coverage.stage);
+  const learningBias=organizationGrowthLearningBias();
+  const score=clamp(58+Math.max(0,stageIndex)*8+gap.missingActive*7+(gap.active===0?10:0)+learningBias,0,96);
+  return {
+    ...gap,
+    stage:coverage.stage,
+    targetHeadcount:coverage.targetHeadcount,
+    score,
+    learningBias,
+    label:`${gap.role} coverage`,
+    evidence:`${coverage.stage} organization plan targets ${gap.target} ${gap.role}${gap.target===1?"":"s"}; ${gap.active} active and ${gap.committed} already approved or recruiting`
+  };
+}
+function staffingScaleUpSignal(dept){
+  const rules=WORKFORCE_HIRING_RULES;
+  const activeCount=employees.filter(e=>e.active).length;
+  const cash=Number(company.cash)||0;
+  const valuation=Number(company.valuation)||0;
+  const customers=Number(company.customers)||0;
+  const dailyRevenue=Number(company.dailyRevenue)||0;
+  const runway=runwayDaysOrUnknown(company.finance);
+  const scaleGap=Math.max(0,rules.minimumScaleTeam-activeCount);
+  const signals=[
+    cash>=rules.scaleUpCashThreshold,
+    valuation>=rules.scaleUpValuationThreshold,
+    customers>=rules.scaleUpCustomerThreshold,
+    dailyRevenue>=rules.scaleUpRevenueThreshold,
+    runway>120
+  ].filter(Boolean).length;
+  if(!signals&&!scaleGap)return {score:0,evidence:""};
+  const deptWeight={hardware:.75,software:.95,quality:.85,product:1,finance:1,people:.9}[dept]||.75;
+  const cashSignal=Math.max(0,cash-rules.scaleUpCashThreshold)*.70;
+  const valuationSignal=Math.max(0,valuation-rules.scaleUpValuationThreshold)*.34;
+  const customerSignal=Math.max(0,customers-rules.scaleUpCustomerThreshold)*.22;
+  const revenueSignal=Math.max(0,dailyRevenue-rules.scaleUpRevenueThreshold)*52;
+  const runwaySignal=runway>120?8:0;
+  const score=clamp((scaleGap*7+cashSignal+valuationSignal+customerSignal+revenueSignal+runwaySignal)*deptWeight,0,72);
+  const evidence=[
+    scaleGap?`${activeCount} active employee${activeCount===1?"":"s"} vs ${rules.minimumScaleTeam} scale-up baseline`:null,
+    cash>=rules.scaleUpCashThreshold?`$${cash.toFixed(1)}M cash gives the company room to add capacity`:null,
+    valuation>=rules.scaleUpValuationThreshold?`$${valuation.toFixed(1)}M valuation increases operating expectations`:null,
+    customers>=rules.scaleUpCustomerThreshold?`${Math.round(customers)} customers increase support and coordination load`:null,
+    dailyRevenue>=rules.scaleUpRevenueThreshold?`$${dailyRevenue.toFixed(3)}M/day revenue can support selective hiring`:null
+  ].filter(Boolean).join("; ");
+  return {score,evidence};
 }
 function updateCompanyCapabilitySystem(options={}){
   const force=!!options.force||!!options.createSupport;
@@ -263,6 +446,7 @@ function updateStaffingModel(){
   const active=activeProjects?.()||[];
   computeProjectCapacityState(active);
   const projectDemand=Object.fromEntries(departments.map(d=>[d,active.reduce((s,p)=>s+(Number(p.requiredHeadcount?.[d])||((p.requiredDepartments||[]).includes(d)?1:0))*1.2,0)]));
+  const organizationCoverage=organizationalRoleCoverage();
   for(const dept of departments){
     const items=(company.workItems||[]).filter(w=>w.status==="open"&&(w.assignedTeam===dept||(dept==="quality"&&["hardware","software"].includes(w.assignedTeam)&&w.type==="quality")));
     const backlog=items.length,blockedWork=items.filter(w=>(w.blockedBy||[]).length).length;
@@ -272,17 +456,22 @@ function updateStaffingModel(){
     const deptLoad=groups[dept].reduce((s,e)=>s+(e.workload?.projectLoad||0),0);
     const deptOverload=groups[dept].reduce((s,e)=>s+(e.workload?.projectOverload||0),0);
     const capacityGap=Math.max(0,(projectDemand[dept]||0)-deptCapacity);
+    const scaleUp=staffingScaleUpSignal(dept);
     const workload=Math.round((company.teams?.[dept]?.pressure||avgStress())+backlog*7+blockedWork*12+customerLoad*5+(projectDemand[dept]||0)*9+capacityGap*22+deptOverload*18);
     const base={hardware:1,software:2,quality:1,product:1,finance:1,people:0}[dept]||1;
-    const minimumHealthy=clamp(base+Math.floor(phaseDemand/2)+Math.min(2,Math.floor(workload/70))+Math.min(2,customerLoad)+Math.min(2,manufacturingDemand)+Math.min(3,Math.floor(projectDemand[dept]||0)),dept==="people"?0:1,8);
+    const organizationTarget=organizationCoverage.roles.filter(row=>row.department===dept).reduce((sum,row)=>sum+row.target,0);
+    const calculatedMinimum=base+Math.floor(phaseDemand/2)+Math.min(2,Math.floor(workload/70))+Math.min(2,customerLoad)+Math.min(2,manufacturingDemand)+Math.min(3,Math.floor(projectDemand[dept]||0))+Math.min(2,Math.floor(scaleUp.score/28));
+    const minimumHealthy=clamp(Math.max(calculatedMinimum,organizationTarget),dept==="people"?0:1,OFFICE_AQUARIUM_CONSTANTS.organizationGrowth.maxDepartmentTarget);
     const managementCapacity=Math.max(1,employees.filter(e=>e.active&&(e.skills?.leadership||0)>55).length);
     const maximumUseful=minimumHealthy+managementCapacity+1;
     const current=groups[dept]?.length||0;
     const skillCoverage=clamp(current?groups[dept].reduce((s,e)=>s+(Math.max(...Object.values(e.skills||{general:40}))),0)/current:0,0,100);
     const activeProjectCount=active.filter(p=>(p.requiredDepartments||[]).includes(dept)||(Number(p.requiredHeadcount?.[dept])||0)>0).length;
     const capSignal=capabilityHiringSignalForDepartment(dept);
-    company.staffingModel[dept]={current,minimumHealthy,maximumUseful,workload,backlog,blockedWork,customerLoad,phaseDemand,activeProjectCount,projectDemand:Number((projectDemand[dept]||0).toFixed(1)),projectCapacity:Number(deptCapacity.toFixed(1)),projectLoad:Number(deptLoad.toFixed(1)),projectOverload:Number(deptOverload.toFixed(1)),capacityGap:Number(capacityGap.toFixed(1)),skillCoverage,managementCapacity,capabilityGap:capSignal?capSignal.gap:0,capabilityNeed:capSignal?.capability||null,capabilityRole:capSignal?.role||null,understaffed:current<minimumHealthy||capacityGap>.35||deptOverload>.25||!!(capSignal&&capSignal.gap>28),overstaffed:current>maximumUseful&&deptOverload<.1&&!capSignal};
+    const organizationRoleGaps=organizationCoverage.uncommittedRoles.filter(row=>row.department===dept);
+    company.staffingModel[dept]={current,minimumHealthy,maximumUseful,workload,backlog,blockedWork,customerLoad,phaseDemand,scaleUpScore:Number(scaleUp.score.toFixed(1)),scaleUpEvidence:scaleUp.evidence,organizationStage:organizationCoverage.stage,organizationTarget,organizationRoleGaps:organizationRoleGaps.map(row=>row.role),activeProjectCount,projectDemand:Number((projectDemand[dept]||0).toFixed(1)),projectCapacity:Number(deptCapacity.toFixed(1)),projectLoad:Number(deptLoad.toFixed(1)),projectOverload:Number(deptOverload.toFixed(1)),capacityGap:Number(capacityGap.toFixed(1)),skillCoverage,managementCapacity,capabilityGap:capSignal?capSignal.gap:0,capabilityNeed:capSignal?.capability||null,capabilityRole:capSignal?.role||null,understaffed:current<minimumHealthy||organizationRoleGaps.length>0||capacityGap>.35||deptOverload>.25||scaleUp.score>=46||!!(capSignal&&capSignal.gap>28),overstaffed:current>maximumUseful&&deptOverload<.1&&!capSignal&&organizationRoleGaps.length===0&&scaleUp.score<24};
   }
+  company.organizationMaturity={...(company.organizationMaturity||{}),stage:organizationCoverage.stage,targetHeadcount:organizationCoverage.targetHeadcount,activeHeadcount:organizationCoverage.activeHeadcount,missingRoleCount:organizationCoverage.missingRoles.length,updatedDay:company.day};
 }
 function calculateLivingFinance(){
   ensureWorkforceEconomySystems();updateStaffingModel();
@@ -360,7 +549,7 @@ function updateDepartmentFrictionDaily(){
       if(["technicalDebt","reviewBottleneck","toolFrustration","maintenanceDebt","deliveryFragility","supportFatigue","burnoutClusters"].includes(key))drift+=stress>66?.18:stress<42?-.10:0;
       if(key==="scopeCreep"||key==="priorityConflict")drift+=scopePressure*.015-(culture.communication||50)*.003;
       if(key==="roadmapClarity"||key==="stakeholderAlignment"||key==="requirementQuality")drift+=(culture.communication||50)*.004-scopePressure*.014;
-      if(key==="forecastConfidence"||key==="capitalPlanningQuality")drift+=(company.finance?.runwayDays||90)<80?-.22:.05;
+      if(key==="forecastConfidence"||key==="capitalPlanningQuality")drift+=runwayDaysOrUnknown(company.finance)<80?-.22:.05;
       if(key==="supplierReliability")drift-=((company.market?.supplyPressure||40)-50)*.010;
       if(key==="renewalConfidence"||key==="accountRelationshipStrength")drift+=((company.customerSentiment||company.trust||60)-55)*.006;
       values[key]=clamp(values[key]+drift,0,100);
@@ -430,7 +619,7 @@ function maybeCreateBackgroundEvent(){
     {department:"product",title:"Customer requirement shifted",description:"A customer contact asked whether the next release can support a different workflow.",severity:clamp((company.customerSentiment||60)-15+rand(-8,22),25,78),strategic:activeProjects?.().length>2,recoveryPaths:["Clarify the requirement","Defer the request","Trade off a lower-value feature"]},
     {department:"hardware",title:"Undocumented dependency surfaced",description:"Engineering found a dependency that had been living in informal knowledge instead of the project plan.",severity:clamp(frictionAverage("hardware",["undocumentedKnowledge","knowledgeConcentration"])+rand(-10,18),28,82),strategic:false,recoveryPaths:["Document the dependency","Pair senior and junior staff","Delay the affected milestone"]},
     {department:"people",title:"Mentor load increased",description:"People Operations noticed experienced employees spending more time helping newer staff than planned.",severity:clamp(frictionAverage("people",["mentoringCapacity","burnoutClusters"])+rand(-8,18),25,80),strategic:false,recoveryPaths:["Rebalance mentoring","Slow onboarding expectations","Protect senior focus time"]},
-    {department:"finance",title:"Budget assumption needs review",description:"Finance found that one recurring cost is less predictable than expected.",severity:clamp(frictionAverage("finance",["forecastConfidence","recurringCostUncertainty"])+rand(-10,20),28,82),strategic:(company.finance?.runwayDays||999)<80,recoveryPaths:["Revise the forecast","Delay discretionary spending","Ask the board for guidance"]}
+    {department:"finance",title:"Budget assumption needs review",description:"Finance found that one recurring cost is less predictable than expected.",severity:clamp(frictionAverage("finance",["forecastConfidence","recurringCostUncertainty"])+rand(-10,20),28,82),strategic:runwayDaysOrUnknown(company.finance)<80,recoveryPaths:["Revise the forecast","Delay discretionary spending","Ask the board for guidance"]}
   ];
   const event={...candidates[Math.floor(simulationRandom()*candidates.length)]};
   event.id=company.nextBackgroundEventId=Math.max(1,Number(company.nextBackgroundEventId)||1);
@@ -482,7 +671,7 @@ function updateCompanyRiskComponents(){
 }
 function activeProjectListForAllocation(){
   if(typeof activeProjects==="function")return activeProjects();
-  return (company.projects||[]).filter(p=>!["completed","canceled","rejected","merged"].includes(p.status));
+  return (company.projects||[]).filter(p=>!OFFICE_AQUARIUM_CONSTANTS.projectLifecycle.terminalStatuses.includes(p.status));
 }
 function employeeAvailableProjectFte(e){
   if(!e||!e.active)return 0;
@@ -602,9 +791,9 @@ function buildWorkforceAllocationSnapshot(options={}){
   return snapshot;
 }
 function coverageStatusForProjectGap(project,dept,role){
-  const recruiting=(company.recruitingPipeline||[]).find(r=>r.department===dept&&r.role===role&&["requisition","searching","interviewing","offer","exception","paused-policy"].includes(r.status));
+  const recruiting=(company.recruitingPipeline||[]).find(r=>r.department===dept&&r.role===role&&WORKFORCE_ACTIVE_RECRUITING_STATUSES.has(r.status));
   const queued=(company.escalationQueue||[]).some(ev=>String(ev.id||"").includes("hiring-request")&&(String(ev.id||"").includes(dept)||String(ev.title||"").includes(role)))||String(company.pendingEvent?.id||"").includes(`hiring-request-${dept}`);
-  const review=(company.hiringRequests||[]).find(r=>r.department===dept&&r.role===role&&company.day-(r.day||0)<35);
+  const review=(company.hiringRequests||[]).find(r=>r.department===dept&&r.role===role&&company.day-(r.day||0)<WORKFORCE_HIRING_RULES.requestReviewWindowDays);
   if(recruiting)return `recruiting: ${recruiting.status}`;
   if(queued)return "CEO memo queued";
   if(review?.status==="suppressed-policy")return "suppressed by policy";
@@ -654,10 +843,10 @@ function recordSuppressedHiringNeed(dept,role,reason,score=0,confidence=0){
 function applyHiringPolicyToRecruiting(){
   ensureWorkforceEconomySystems();updateStaffingModel();
   (company.recruitingPipeline||[]).forEach(item=>{
-    if(!["requisition","searching","interviewing","offer","paused-policy"].includes(item.status))return;
+    if(!WORKFORCE_POLICY_PAUSABLE_STATUSES.has(item.status))return;
     const st=company.staffingModel?.[item.department]||{};
     const allowed=hiringPolicyAllows(item.department,st,item.role);
-    if(["requisition","searching","interviewing","offer"].includes(item.status)&&!allowed.allowed){
+    if(WORKFORCE_ADVANCING_RECRUITING_STATUSES.has(item.status)&&!allowed.allowed){
       item.prePauseStatus=item.status;
       item.status="paused-policy";item.pausedByPolicyDay=company.day;item.policyReason=allowed.reason;
       company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"paused-policy",reason:allowed.reason});
@@ -680,8 +869,8 @@ function makeHiringPolicyReviewEvent(reason="CEO requested review"){
   const activeRecruiting=(company.recruitingPipeline||[]).filter(r=>r.status==="searching").length;
   const paused=(company.recruitingPipeline||[]).filter(r=>r.status==="paused-policy").length;
   const severeNeeds=Object.entries(company.staffingModel||{}).filter(([dept,st])=>hiringPolicyAllows(dept,st,roleForHiringNeed(dept)).critical).length;
-  const runway=company.finance?.runwayDays||999;
-  const runwayText=runway>=999?"positive":`${runway} ${runway===1?"day":"days"}`;
+  const runway=runwayDaysOrUnknown(company.finance);
+  const runwayText=runway>=WORKFORCE_TIME_RULES.unknownFutureDay?"positive":`${runway} ${runway===1?"day":"days"}`;
   const message=`People and Finance are asking you to set the hiring rule, not approve a specific candidate. Current policy is ${hiringPolicyLabel()}. Runway is ${runwayText}. There are ${needs.length} staffing item${needs.length===1?"":"s"} being watched, ${activeRecruiting} active search${activeRecruiting===1?"":"es"}, ${paused} paused search${paused===1?"":"es"}, and ${severeNeeds} critical pressure area${severeNeeds===1?"":"s"}. Reason for review: ${reason}.`;
   return {id:`hiring-policy-review-${company.day}-${Math.floor(simulationRandom()*9999)}`,repeatable:false,category:"people",title:"Hiring Policy Review",copy:message,hiringPolicyReview:true,generatedCommunication:{type:"Hiring Policy Review",priority:"Decision Needed",sender:{name:"People and Finance Review",role:"Operating Council"},subject:"Hiring Policy Review",message,recs:[["Finance",runway<90?"Pause ordinary headcount growth until runway improves":"Keep hiring tied to evidence instead of using a blanket freeze",runway<90?82:64],["People",paused>0?"Resolve paused roles before morale and delivery suffer":"Let HR execute approved roles without asking the CEO about every candidate",72],["Departments",severeNeeds>0?"Keep critical bottleneck roles eligible even if growth hiring is restricted":"Current staffing pressure can be handled under normal review",severeNeeds>0?78:58]],impacts:["This sets the company-wide rule for future hiring requests","It does not approve or reject a specific candidate","Unmet staffing needs remain visible and still affect workload","Active recruiting may continue, pause, or resume depending on policy"]},choices:[
     {title:"Freeze new headcount",detail:"Stop ordinary new roles and pause non-critical recruiting. Safety, compliance, vacancy, and severe bottleneck exceptions can still reach the CEO.",effect:{cash:.08,board:2,trust:-.5},directive:"cuts",days:30,people:{stress:2,morale:-2},hiringPolicy:{mode:"frozen",reviewDays:30,reason:"CEO froze new headcount after policy review"},opinion:{support:-1,fairness:-1,trust:-1},strategy:"finance",benefits:["protects runway","slows payroll growth","signals cash discipline"],risks:["unmet staffing needs keep building","project delays may worsen","retention risk can rise"],uncertainty:"Material",estimatedConfidence:runway<90?76:52},
@@ -705,8 +894,10 @@ function hiringPipelineRows(){
     const hist=company.hiringNeedHistory?.[dept]||{};
     if(shortage>0||hist.lastScore>=60){
       const role=roleForHiringNeed(dept);
-      const recent=(company.hiringRequests||[]).filter(r=>r.department===dept&&company.day-(r.day||0)<35).sort((a,b)=>(b.day||0)-(a.day||0))[0];
-      const recruiting=(company.recruitingPipeline||[]).find(r=>r.department===dept&&["requisition","searching","interviewing","offer","exception","paused-policy"].includes(r.status));
+      const organizationSignal=organizationRoleHiringSignalForDepartment(dept);
+      const recent=(company.hiringRequests||[]).filter(r=>r.department===dept&&canonicalRole(r.role)===canonicalRole(role)&&company.day-(r.day||0)<WORKFORCE_HIRING_RULES.requestReviewWindowDays).sort((a,b)=>(b.day||0)-(a.day||0))[0];
+      const recruiting=(company.recruitingPipeline||[]).find(r=>r.department===dept&&canonicalRole(r.role)===canonicalRole(role)&&activeRecruitingStatusSet().has(r.status))
+        ||(company.recruitingPipeline||[]).find(r=>r.department===dept&&activeRecruitingStatusSet().has(r.status));
       let status="Need Identified";
       if(hasPendingMemo(dept,role)||recent?.status==="queued")status="Memo Queued for CEO";
       else if(hist.lastScore>=85)status="Preparing CEO Memo";
@@ -719,27 +910,27 @@ function hiringPipelineRows(){
         const elapsed=company.day-(recruiting.searchStartedDay||recruiting.day||company.day);
         status=recruiting.status==="paused-policy"?"Paused by Hiring Policy":recruiting.status==="exception"?"Exception Memo":recruiting.status==="requisition"?"Requisition Opened":recruiting.status==="interviewing"?"Interviewing":recruiting.status==="offer"?"Offer Outstanding":"Candidate Search";
       }
-      const signalCount=shortage>0?shortage:1;
-      const labelRole=shortage>0?role:"capacity signal";
+      const signalCount=recruiting?1:(organizationSignal?.role===role?Math.max(1,organizationSignal.missingCommitted):shortage>0?shortage:1);
+      const labelRole=recruiting?(recruiting.role||role):shortage>0?role:"capacity signal";
       const narrative=hiringNeedNarrative(dept,st,role);
       const fillDays=Number(recruiting?.expectedFillDays)||0;
-      rows.push({dept,role:labelRole,count:signalCount,status,reason:recruiting?`${recruiting.project?.title||"department need"}; expected fill ${fillDays||"?"} ${fillDays===1?"day":"days"}; target day ${recruiting.dueDay}`:narrative.reason,evidence:recruiting?[`Market condition: ${recruiting.market||"average"}`,`Target fill day ${recruiting.dueDay}`]:narrative.evidence,confidence:Math.round(hist.confidence||0),actualRole:role});
+      rows.push({dept,role:labelRole,count:signalCount,status,reason:recruiting?`${recruiting.project?.title||"department need"}; expected fill ${fillDays||"?"} ${fillDays===1?"day":"days"}; target day ${recruiting.dueDay}`:narrative.reason,evidence:recruiting?[`Market condition: ${recruiting.market||"average"}`,`Target fill day ${recruiting.dueDay}`]:narrative.evidence,confidence:Math.round(hist.confidence||0)});
     }
   }
   (company.openRoles||[]).forEach(role=>{
     const dept=roleDepartment(role);
     if(!rows.some(r=>r.role===role&&["Memo Queued for CEO","Recruiting"].includes(r.status)))rows.push({dept,role,count:1,status:"Replacement Needed",reason:"vacancy/backfill after departure",confidence:70});
   });
-  (company.recruitingPipeline||[]).filter(r=>["requisition","searching","interviewing","offer","exception","paused-policy"].includes(r.status)).forEach(r=>{
+  (company.recruitingPipeline||[]).filter(r=>WORKFORCE_ACTIVE_RECRUITING_STATUSES.has(r.status)).forEach(r=>{
     const status=r.status==="paused-policy"?"Paused by Hiring Policy":r.status==="exception"?"Exception Memo":r.status==="requisition"?"Requisition Opened":r.status==="interviewing"?"Interviewing":r.status==="offer"?"Offer Outstanding":"Candidate Search";
     if(!rows.some(row=>row.role===r.role&&["Requisition Opened","Candidate Search","Interviewing","Offer Outstanding","Exception Memo","Paused by Hiring Policy"].includes(row.status))){const fillDays=Number(r.expectedFillDays)||0;rows.push({dept:r.department,role:r.role,count:1,status,reason:r.status==="paused-policy"?(r.policyReason||"suppressed by hiring policy"):`HR is actively recruiting for ${articleFor(r.role)} ${r.role}.`,evidence:r.status==="paused-policy"?[r.policyReason||"Suppressed by hiring policy"]:[`${r.project?.title||r.market||"average market"}`,`expected fill ${fillDays||"?"} ${fillDays===1?"day":"days"}`, `target day ${r.dueDay}`],confidence:70});}
   });
-  employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||21)).forEach(e=>{
+  employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||WORKFORCE_HIRING_RULES.onboarding.defaultDurationDays)).forEach(e=>{
     rows.push({dept:roleDepartment(e.role),role:e.role,count:1,status:"Onboarding",reason:`${e.name} is ramping into the role.`,evidence:[`joined on day ${e.joinedDay}`,`productivity ${e.onboarding?.productivity||Math.round(onboardingProductivity(e)*100)}%`,`mentor ${employees.find(m=>m.id===e.onboarding?.mentorId)?.name||"none"}`],confidence:80});
   });
   employees.filter(e=>{
     if(!e.active||e.performanceManagement?.stage==="onboarding")return false;
-    const recent=company.day-(e.joinedDay||0)<=45;
+    const recent=company.day-(e.joinedDay||0)<=WORKFORCE_HIRING_RULES.recentHireDisplayDays;
     const hired=(e.careerHistory||[]).some(h=>/Hired as|Selected by HR|Completed onboarding/i.test(String(h)));
     return recent&&hired;
   }).forEach(e=>{
@@ -775,19 +966,21 @@ function staffingShortageSummary(){
 function workforceFinancialPressureHtml(){
   ensureWorkforceEconomySystems();updateCompanyRiskComponents();
   const allocation=buildWorkforceAllocationSnapshot();
+  const maturity=organizationalRoleCoverage();
   const f=company.finance,s=company.staffingModel||{},below=Object.entries(s).filter(([,v])=>v.understaffed).map(([k])=>k),above=Object.entries(s).filter(([,v])=>v.overstaffed).map(([k])=>k),activeEmployees=employees.filter(e=>e.active).length,inOffice=employees.filter(e=>e.active&&!e.offsite).length;
   const searching=employees.filter(e=>e.active&&(e.retention?.searching||e.jobSearchDays>0)).length;
   const retiring=employees.filter(e=>e.active&&(e.retirementReadiness||0)>60).length;
-  const requisitions=(company.recruitingPipeline||[]).filter(r=>r.status==="requisition").length,recruiting=(company.recruitingPipeline||[]).filter(r=>r.status==="searching").length,interviewing=(company.recruitingPipeline||[]).filter(r=>r.status==="interviewing").length,offers=(company.recruitingPipeline||[]).filter(r=>r.status==="offer").length,pausedRecruiting=(company.recruitingPipeline||[]).filter(r=>r.status==="paused-policy").length,recentHiringActions=(company.hiringRequests||[]).filter(r=>company.day-(r.day||0)<35&&["delayed","approved-recruiting","rejected"].includes(r.status)).length;
-  const activeRecruitingItems=(company.recruitingPipeline||[]).filter(r=>["requisition","searching","interviewing","offer"].includes(r.status));
+  const requisitions=(company.recruitingPipeline||[]).filter(r=>r.status==="requisition").length,recruiting=(company.recruitingPipeline||[]).filter(r=>r.status==="searching").length,interviewing=(company.recruitingPipeline||[]).filter(r=>r.status==="interviewing").length,offers=(company.recruitingPipeline||[]).filter(r=>r.status==="offer").length,pausedRecruiting=(company.recruitingPipeline||[]).filter(r=>r.status==="paused-policy").length,recentHiringActions=(company.hiringRequests||[]).filter(r=>company.day-(r.day||0)<WORKFORCE_HIRING_RULES.requestReviewWindowDays&&["delayed","approved-recruiting","rejected"].includes(r.status)).length;
+  const activeRecruitingItems=(company.recruitingPipeline||[]).filter(r=>WORKFORCE_ADVANCING_RECRUITING_STATUSES.has(r.status));
   const avgFill=activeRecruitingItems.length?Math.round(activeRecruitingItems.reduce((sum,r)=>sum+(r.expectedFillDays||expectedRecruitingDays(r)),0)/activeRecruitingItems.length):0;
   const pipeline=hiringPipelineRows();
   const identified=pipeline.filter(r=>["Need Identified","Department Review","Finance/HR Review"].includes(r.status)).reduce((s,r)=>s+r.count,0),preparing=pipeline.filter(r=>r.status==="Preparing CEO Memo").reduce((s,r)=>s+r.count,0),queuedMemos=pipeline.filter(r=>r.status==="Memo Queued for CEO").reduce((s,r)=>s+r.count,0);
   const suppressed=pipeline.filter(r=>r.status==="Suppressed by Hiring Policy").reduce((s,r)=>s+r.count,0);
-  const coaching=employees.filter(e=>e.active&&["informal-coaching","formal-coaching"].includes(e.performanceManagement?.stage)).length,pips=employees.filter(e=>e.active&&e.performanceManagement?.stage==="pip").length,onboarding=employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||21)).length,recentHires=employees.filter(e=>e.active&&company.day-(e.joinedDay||0)<=45&&(e.careerHistory||[]).some(h=>/Hired as|Selected by HR|Completed onboarding/i.test(String(h)))).length;
+  const coaching=employees.filter(e=>e.active&&["informal-coaching","formal-coaching"].includes(e.performanceManagement?.stage)).length,pips=employees.filter(e=>e.active&&e.performanceManagement?.stage==="pip").length,onboarding=employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&company.day-(e.joinedDay||0)<(e.onboarding?.duration||WORKFORCE_HIRING_RULES.onboarding.defaultDurationDays)).length,recentHires=employees.filter(e=>e.active&&company.day-(e.joinedDay||0)<=WORKFORCE_HIRING_RULES.recentHireDisplayDays&&(e.careerHistory||[]).some(h=>/Hired as|Selected by HR|Completed onboarding/i.test(String(h)))).length;
   const burnout=employees.filter(e=>e.active&&e.stress>=75).length,terminations=(company.terminationNotifications||[]).filter(n=>company.day-(n.day||0)<45).length,layoffs=(company.layoffHistory||[]).filter(n=>company.day-(n.day||0)<60).reduce((s,n)=>s+(n.count||0),0);
   return `<strong>Workforce and Financial Pressure</strong><br><small>
     Employees ${activeEmployees} (${inOffice} in office); vacancies/backfills ${(company.openRoles||[]).length}; payroll $${f.payrollDaily.toFixed(3)}M/day; total cost $${f.totalDailyCost.toFixed(3)}M/day<br>
+    Organization stage: ${maturity.stage.replace(/\b\w/g,c=>c.toUpperCase())}; workforce plan ${maturity.activeHeadcount} active / ${maturity.targetHeadcount} target; ${maturity.missingRoles.length} role gap${maturity.missingRoles.length===1?"":"s"}<br>
     Net cash flow $${f.netCashFlowDaily.toFixed(3)}M/day; runway ${f.runwayDays>=999?"positive":`${f.runwayDays} ${f.runwayDays===1?"day":"days"}`}; unpaid payroll ${company.unpaidPayrollDays||0} ${(company.unpaidPayrollDays||0)===1?"day":"days"}<br>
     Understaffed: ${below.length?below.join(", "):"none"} | Overstaffed: ${above.length?above.join(", "):"none"}<br>
     ${staffingShortageSummary()}<br>
@@ -856,7 +1049,7 @@ function processBurnoutResponseDaily(e){
     b.helpAttempts++;b.lastHelpDay=company.day;
     e.helpSeekingHistory.unshift({day:company.day,type:"help",helperId:helper?.id??null,stress:Math.round(e.stress)});
     if(helper){
-      recordSharedExperience(e,helper,{type:"help_request",sourceEventId:`help-${e.id}-${company.day}`,emotionalWeight:1,outcome:"positive",importance:3,evidence:`${helper.name} helped ${e.name} respond to workload pressure.`});
+      recordSharedExperience(e,helper,{type:"help_request",sourceEventId:`help-${e.id}-${company.day}`,tone:"positive",intensity:2});
       applyEmployeeEmotionDelta(helper,{moraleDelta:1.5,reasonCode:"help-given",sourceEventId:`help-${e.id}-${company.day}`,ignoreCooldown:true});
     }
     applyEmployeeEmotionDelta(e,{stressDelta:-5,moraleDelta:2,reasonCode:"help-received",sourceEventId:`help-${e.id}-${company.day}`,ignoreCooldown:true});
@@ -940,9 +1133,14 @@ function hiringNeedScore(dept,st){
   const customerDemand=(dept==="product"||dept==="finance")?Math.min(28,(company.customers||0)/6):0;
   const manufacturingDemand=(dept==="hardware"||dept==="quality")?Math.max(0,(company.manufacturing?.supplyRisk||0)-45)*.22:0;
   const capSignal=capabilityHiringSignalForDepartment(dept);
-  return clamp((st.minimumHealthy-st.current)*24+(st.backlog||0)*3.8+(st.blockedWork||0)*8+stressTrend+qualityBurden+customerDemand+manufacturingDemand+retirementRisk+successionRisk+skillGap+(capSignal?.score||0)-financeConstraint-(st.overstaffed?30:0),0,100);
+  const organizationSignal=organizationRoleHiringSignalForDepartment(dept);
+  return clamp((st.minimumHealthy-st.current)*24+(st.backlog||0)*3.8+(st.blockedWork||0)*8+stressTrend+qualityBurden+customerDemand+manufacturingDemand+retirementRisk+successionRisk+skillGap+(capSignal?.score||0)+(organizationSignal?.score||0)-financeConstraint-(st.overstaffed?30:0),0,100);
 }
 function roleForHiringNeed(dept){
+  const vacancy=(company.openRoles||[]).map(canonicalRole).find(role=>roleDefinition(role)&&roleDepartment(role)===dept);
+  if(vacancy)return vacancy;
+  const organizationSignal=organizationRoleHiringSignalForDepartment(dept);
+  if(organizationSignal?.role)return organizationSignal.role;
   const capSignal=capabilityHiringSignalForDepartment(dept);
   return capSignal?.role||roleForDepartmentHire(dept);
 }
@@ -963,9 +1161,13 @@ function hiringNeedAssessment(dept,st={}){
   const projectMissing=Number(allocDept.missingAssignments)||0;
   const projectMissingFte=Number(allocDept.missingProjectFte)||0;
   const capabilitySignal=capabilityHiringSignalForDepartment(dept);
+  const organizationSignal=organizationRoleHiringSignalForDepartment(dept);
+  const scaleUp=staffingScaleUpSignal(dept);
   const roleGapEvidence=(allocDept.criticalRoleGaps||[]).slice(0,3).map(g=>`${g.projectTitle||"Project"} needs ${g.missingAssignments} ${g.role} assignment${g.missingAssignments===1?"":"s"}`).join("; ");
   const factors=[
+    {key:"organization-growth",score:organizationSignal?.score||0,text:`the ${organizationSignal?.stage||"current"} company structure is missing ${articleFor(organizationSignal?.role||"role")} ${organizationSignal?.role||"required role"}`,evidence:organizationSignal?.evidence||""},
     {key:"company-capability",score:capabilitySignal?.score||0,text:`the company has a ${String(capabilitySignal?.label||"capability").toLowerCase()} gap`,evidence:capabilitySignal?`${capabilitySignal.label} need ${capabilitySignal.need}, coverage ${capabilitySignal.coverage}; recommended role ${capabilitySignal.role}`:""},
+    {key:"scale-up",score:scaleUp.score,text:"the company has outgrown its current operating team",evidence:scaleUp.evidence},
     {key:"staffing-gap",score:staffingGap*24,text:dept==="people"?"People Operations has no dedicated coordination capacity":`${teamDisplayName(dept)} is below its healthy staffing range`,evidence:(st.current||0)>0?`${st.current} current vs ${st.minimumHealthy||0} healthy staffing target`:`no current ${teamDisplayName(dept)} staff assigned`},
     {key:"project-allocation-gap",score:projectMissing*18+projectMissingFte*10,text:`${teamDisplayName(dept)} has uncovered project assignments`,evidence:roleGapEvidence||`${projectMissing} project assignment${projectMissing===1?"":"s"} uncovered`},
     {key:"project-demand",score:projectDemand*9,text:`${teamDisplayName(dept)} is carrying project-driven coordination demand`,evidence:`${activeProjects} active project${activeProjects===1?"":"s"} ${activeProjects===1?"requires":"require"} ${teamDisplayName(dept)} support`},
@@ -1003,7 +1205,7 @@ function updateHiringNeedHistory(){
     const score=Math.round(assessment.score),hist=company.hiringNeedHistory[dept]||{days:0,lastScore:0,peak:0,confidence:0};
     hist.days=score>=60?(hist.days||0)+1:Math.max(0,(hist.days||0)-1);
     hist.lastScore=score;hist.peak=Math.max(score,hist.peak||0);
-    const signals=[st.current<st.minimumHealthy,st.backlog>5,st.blockedWork>0,st.workload>70,st.skillCoverage<58,company.finance?.runwayDays>45].filter(Boolean).length;
+    const signals=[st.current<st.minimumHealthy,(st.organizationRoleGaps||[]).length>0,st.backlog>5,st.blockedWork>0,st.workload>70,st.skillCoverage<58,company.finance?.runwayDays>45].filter(Boolean).length;
     hist.confidence=clamp(hist.days*8+signals*9+(score-hist.days)*.12,0,100);
     hist.factors=assessment.factors.slice(0,4);
     company.hiringNeedHistory[dept]=hist;
@@ -1018,7 +1220,7 @@ function recruitingProjectFor(department,role){
 function recruitingHealthScore(item){
   const lesson=company.workforceLessons?.hiringTiming||{score:0,confidence:0};
   const policyPenalty=company.hiringPolicy?.mode==="frozen"?-18:company.hiringPolicy?.mode==="critical-only"?-7:0;
-  const runway=company.finance?.runwayDays||999;
+  const runway=runwayDaysOrUnknown(company.finance);
   const marketBoost=((company.marketConfidence??50)-50)*.16+((company.valuationQuality??50)-50)*.12+((company.worldState?.talentMarket??50)-50)*.14-((company.boardControlPressure??0)*.04);
   const labor=laborMarketForDepartment(item.department||roleDepartment(item.role));
   return clamp(50+(company.trust-55)*.28+(company.board-55)*.16+(company.culture?.communication-50)*.18+(company.culture?.workLife-50)*.12+(lesson.score||0)*1.8+(lesson.confidence||0)*.04+(runway<60?-12:runway<100?-5:3)+policyPenalty+marketBoost+(labor.candidateSupply-50)*.12+(labor.acceptanceRate-50)*.10-(labor.competition-50)*.09-(company.unpaidPayrollDays||0)*20,0,100);
@@ -1050,11 +1252,13 @@ function advanceRecruitingStage(item,status){
 }
 function onboardingProductivity(e){
   if(!e?.onboarding)return 1;
-  const age=company.day-(e.onboarding.startDay??e.joinedDay??company.day),duration=e.onboarding.duration||28;
+  const onboardingRules=WORKFORCE_HIRING_RULES.onboarding;
+  const age=company.day-(e.onboarding.startDay??e.joinedDay??company.day),duration=e.onboarding.duration||onboardingRules.defaultDurationDays;
   const base=clamp(age/duration,0,1);
-  const ramp=.2+base*.8;
-  e.onboarding.productivity=clamp(Math.round(ramp*100),20,100);
-  return clamp(ramp,0.2,1);
+  const minimum=onboardingRules.minProductivity;
+  const ramp=minimum+base*(1-minimum);
+  e.onboarding.productivity=clamp(Math.round(ramp*100),onboardingRules.startingProductivityPercent,100);
+  return clamp(ramp,minimum,1);
 }
 function completeDueOnboarding(){
   employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&e.onboarding&&company.day-(e.onboarding.startDay??e.joinedDay)>=e.onboarding.duration).forEach(e=>{
@@ -1077,16 +1281,25 @@ function startRecruiting(role,mode="specialist",department=null,options={}){
   role=canonicalRole(role);
   if(!roleDefinition(role))return null;
   department=department||roleDepartment(role);
+  const pendingRequest=(company.hiringRequests||[]).find(record=>(!options.hiringRequestId||record.id===options.hiringRequestId)&&record.status===hiringRequestStatus("queued")&&hiringRequestMatches(record,department,role));
+  const effectiveRequestId=options.hiringRequestId||pendingRequest?.id||null;
+  const hasPendingApproval=!!effectiveRequestId||!!pendingRequest;
+  const existing=(company.recruitingPipeline||[]).find(item=>activeRecruitingStatusSet().has(item.status)&&item.department===department&&canonicalRole(item.role)===role);
+  const requestAlreadyLinked=!!pendingRequest?.pipelineId&&pendingRequest.pipelineId===existing?.id;
+  if(existing&&(!hasPendingApproval||requestAlreadyLinked)){
+    if(hasPendingApproval)resolveHiringRequestStatus(department,role,hiringRequestStatus("approved"),{requestId:effectiveRequestId,approvedDay:company.day,pipelineId:existing.id});
+    return existing;
+  }
   const markets=["excellent","healthy","average","tight","very tight"],market=markets[Math.floor(simulationRandom()*markets.length)];
   const labor=laborMarketForDepartment(department);
   const backfill=!!options.backfill;
-  const item={id:nextSimulationId("recruit"),day:company.day,searchStartedDay:company.day,stageStartedDay:company.day,dueDay:company.day+1,role,department,mode,status:"requisition",stage:"requisition",source:options.source||(backfill?"vacancy-backfill":"approved-headcount"),backfill,costPaid:.18,attempts:0,market,competition:Math.round(clamp(labor.competition+rand(-9,9),5,100)),salaryInflation:Math.round(clamp((labor.salaryPressure-45)*.35+rand(0,8),0,35)),salaryCompetitiveness:Math.round(rand(48,82)),talentAvailability:Math.round(clamp(labor.candidateSupply+rand(-10,10),5,100)),laborMarketSnapshot:{...labor},exceptionQueued:false,candidate:null,project:recruitingProjectFor(department,role),expectedFillDays:null,declines:0};
+  const item={id:nextSimulationId("recruit"),hiringRequestId:effectiveRequestId,day:company.day,searchStartedDay:company.day,stageStartedDay:company.day,dueDay:company.day+1,role,department,mode,status:"requisition",stage:"requisition",source:options.source||(backfill?"vacancy-backfill":"approved-headcount"),backfill,costPaid:WORKFORCE_HIRING_RULES.initialRecruitingCost,attempts:0,market,competition:Math.round(clamp(labor.competition+rand(-9,9),5,100)),salaryInflation:Math.round(clamp((labor.salaryPressure-45)*.35+rand(0,8),0,35)),salaryCompetitiveness:Math.round(rand(48,82)),talentAvailability:Math.round(clamp(labor.candidateSupply+rand(-10,10),5,100)),laborMarketSnapshot:{...labor},exceptionQueued:false,candidate:null,project:recruitingProjectFor(department,role),expectedFillDays:null,declines:0};
   item.expectedFillDays=expectedRecruitingDays(item);
   item.dueDay=company.day+stageDaysForRecruiting(item,"requisition");
   company.recruitingPipeline.unshift(item);
   company.hiringRequestHistory.unshift({day:company.day,role,department,status:"approved-recruiting",confidence:company.hiringNeedHistory?.[department]?.confidence||60});
-  (company.hiringRequests||[]).filter(r=>r.department===department&&r.role===role&&r.status==="queued"&&company.day-(r.day||0)<45).forEach(r=>{r.status="approved-recruiting";r.approvedDay=company.day;});
-  company.cash=clamp(company.cash-.18,0,999);
+  if(hasPendingApproval)resolveHiringRequestStatus(department,role,hiringRequestStatus("approved"),{requestId:effectiveRequestId,approvedDay:company.day,pipelineId:item.id});
+  company.cash=clamp(company.cash-WORKFORCE_HIRING_RULES.initialRecruitingCost,0,999);
   applyHiringPolicyToRecruiting();
   recordHistory(`Recruiting started for ${role}.`,"people",3);
   reinforceWorkforceLesson("hiringTiming",1,`Recruiting started for ${role}`,6);
@@ -1158,7 +1371,7 @@ function createRecruitingHireEmployee(item,candidate=null){
   replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`${backfill?"Backfilled":"Hired"} as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.communication={reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:-999,lastHelpRequestDay:-999,rumorsShared:0};replacement.knownMessages=[];replacement.actionOutcomeContext=null;replacement.activeCollaboration=null;replacement.activeMeeting=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:-999,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;normalizeEmployeeRoleProfile(replacement);ensureEmployeePersonality(replacement,{force:true,salt:`hire-${company.day}-${role}-${slot}-${item.id||"manual"}`});inheritInstitutionalLearning(replacement);
   employees.forEach(other=>{
     if(other&&other.id!==replacement.id){
-      recordSocialEncounter(replacement,other,{type:"onboarding_introduction",gain:1.2,sourceEventId:`onboarding-intro-${replacement.id}-${other.id}-${company.day}`,cooldownMinutes:1440});
+        recordSocialEncounter(replacement,other,{type:"onboarding_introduction",gain:1.2,sourceEventId:`onboarding-intro-${replacement.id}-${other.id}-${company.day}`,cooldownMinutes:WORKFORCE_TIME_RULES.minutesPerDay});
     }
   });
   employees[slot]=replacement;
@@ -1171,10 +1384,12 @@ function createRecruitingHireEmployee(item,candidate=null){
   return replacement;
 }
 function pruneRecruitingPipeline(){
-  const activeStatuses=new Set(["requisition","searching","interviewing","offer","exception","paused-policy"]);
   const active=[],history=[];
-  (company.recruitingPipeline||[]).forEach(item=>(activeStatuses.has(item.status)?active:history).push(item));
-  company.recruitingPipeline=[...active.slice(0,48),...history.slice(0,16)];
+  (company.recruitingPipeline||[]).forEach(item=>(WORKFORCE_ACTIVE_RECRUITING_STATUSES.has(item.status)?active:history).push(item));
+  company.recruitingPipeline=[
+    ...active.slice(0,WORKFORCE_HIRING_RULES.pipelineActiveLimit),
+    ...history.slice(0,WORKFORCE_HIRING_RULES.pipelineHistoryLimit)
+  ];
 }
 function completeRecruitingHire(item,candidate=null){
   ensureWorkforceEconomySystems();
@@ -1186,10 +1401,15 @@ function completeRecruitingHire(item,candidate=null){
     return;
   }
   if(hire){
-    const onboard=onboardingQualityForHire(candidate,item),duration=Math.round(clamp(34-onboard.quality*.18+roleRecruitingDifficulty(item.role)*.05,18,36));
+    const onboardingRules=WORKFORCE_HIRING_RULES.onboarding;
+    const onboard=onboardingQualityForHire(candidate,item),duration=Math.round(clamp(
+      onboardingRules.baseDurationDays-onboard.quality*.18+roleRecruitingDifficulty(item.role)*.05,
+      onboardingRules.minDurationDays,
+      onboardingRules.maxDurationDays
+    ));
     hire.performanceManagement={stage:"onboarding",coachingAttempts:0,pipAttempts:0,pipStartDay:null,pipDueDay:null,lastActionDay:company.day,documentedIssues:0,improvementScore:0,hrReviewed:false,terminationEligible:false};
-    hire.onboarding={startDay:company.day,duration,quality:Math.round(onboard.quality),mentorId:onboard.mentor?.id??null,productivity:20,projectId:item.project?.id||null};
-    if(onboard.mentor){onboard.mentor.onboardingMentorUntil=company.day+Math.min(duration,18);addMemory(onboard.mentor,"MENTORING",`I am helping onboard ${hire.name}.`,"neutral",8,hire.name);}
+    hire.onboarding={startDay:company.day,duration,quality:Math.round(onboard.quality),mentorId:onboard.mentor?.id??null,productivity:onboardingRules.startingProductivityPercent,projectId:item.project?.id||null};
+    if(onboard.mentor){onboard.mentor.onboardingMentorUntil=company.day+Math.min(duration,onboardingRules.mentorSupportMaxDays);addMemory(onboard.mentor,"MENTORING",`I am helping onboard ${hire.name}.`,"neutral",8,hire.name);}
     hire.focus=clamp((candidate?.skill??70)-8,42,92);applyEmployeeEmotionDelta(hire,{moraleDelta:clamp(66+(candidate?.cultureFit??60)*.18,55,88)-(hire.morale||60),reasonCode:"onboarding-start",sourceEventId:`onboarding-${hire.id}-${company.day}`,ignoreCooldown:true});
     hire.skills={...hire.skills};Object.keys(hire.skills).forEach(k=>hire.skills[k]=clamp((hire.skills[k]||50)+((candidate?.skill??65)-65)*.15,20,95));
     hire.careerHistory.unshift(`Selected by HR from a ${item.market} candidate market on day ${company.day}; onboarding quality ${Math.round(onboard.quality)}.`);
@@ -1201,7 +1421,7 @@ function completeRecruitingHire(item,candidate=null){
 }
 function processRecruitingPipeline(){
   ensureWorkforceEconomySystems();
-  for(const item of company.recruitingPipeline.filter(r=>["requisition","searching","interviewing","offer"].includes(r.status)&&company.day>=r.dueDay)){
+  for(const item of company.recruitingPipeline.filter(r=>WORKFORCE_ADVANCING_RECRUITING_STATUSES.has(r.status)&&company.day>=r.dueDay)){
     const elapsed=company.day-(item.searchStartedDay||item.day);
     if(item.status==="requisition"){
       advanceRecruitingStage(item,"searching");
@@ -1212,7 +1432,7 @@ function processRecruitingPipeline(){
       item.attempts=(item.attempts||0)+1;
       const candidate=generateRecruitingCandidate(item);
       if(candidate.mediocre&&((validationMode&&candidate.forceRetry)||simulationRandom()<.55)){
-        if(elapsed>=90||(item.attempts||0)>=5){company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"search-exception"});queueHiringExceptionEvent(item,"failed-search",candidate);}
+        if(elapsed>=WORKFORCE_HIRING_RULES.searchExceptionDays||(item.attempts||0)>=WORKFORCE_HIRING_RULES.searchExceptionAttempts){company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"search-exception"});queueHiringExceptionEvent(item,"failed-search",candidate);}
         else{item.dueDay=company.day+stageDaysForRecruiting(item,"searching");company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"search-continued"});recordHistory(`HR kept searching for ${item.role} after a weak candidate screen.`,"people",2);}
         continue;
       }
@@ -1228,7 +1448,7 @@ function processRecruitingPipeline(){
       const candidate=item.candidate||generateRecruitingCandidate(item);
       const acceptChance=clamp(.52+(recruitingHealthScore(item)-50)*.006+(candidate.skill-60)*.004+(candidate.cultureFit-55)*.003+((item.salaryCompetitiveness??65)-60)*.004-(company.unpaidPayrollDays||0)*.12-(item.competition||45)*.0015-(candidate.salaryPremium||0)*.006,0.16,.92);
       if(!candidate.mediocre&&simulationRandom()<acceptChance){completeRecruitingHire(item,candidate);}
-      else if(elapsed>=90||(item.attempts||0)>=5){item.declines=(item.declines||0)+1;company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"offer-failed"});queueHiringExceptionEvent(item,"failed-search",candidate);}
+      else if(elapsed>=WORKFORCE_HIRING_RULES.searchExceptionDays||(item.attempts||0)>=WORKFORCE_HIRING_RULES.searchExceptionAttempts){item.declines=(item.declines||0)+1;company.hiringRequestHistory.unshift({day:company.day,role:item.role,department:item.department,status:"offer-failed"});queueHiringExceptionEvent(item,"failed-search",candidate);}
       else{item.declines=(item.declines||0)+1;item.candidate=null;advanceRecruitingStage(item,"searching");recordHistory(`A ${item.role} candidate declined or stalled; HR restarted search.`,"people",3);}
     }
   }
@@ -1236,9 +1456,10 @@ function processRecruitingPipeline(){
 }
 function maybeQueueHiringFreezeException(){
   ensureWorkforceEconomySystems();
-  if(company.day<12||company.day%6!==0)return;
-  if((company.finance?.runwayDays||999)>62&&company.cash>6)return;
-  const item=(company.recruitingPipeline||[]).find(r=>r.status==="searching"&&!r.freezeReviewed&&company.day-(r.searchStartedDay||r.day)>4);
+  const rules=WORKFORCE_HIRING_RULES.freezeReview;
+  if(company.day<rules.startDay||company.day%rules.cadenceDays!==0)return;
+  if(runwayDaysOrUnknown(company.finance)>rules.runwayThresholdDays&&company.cash>rules.cashThreshold)return;
+  const item=(company.recruitingPipeline||[]).find(r=>r.status==="searching"&&!r.freezeReviewed&&company.day-(r.searchStartedDay||r.day)>rules.minimumSearchAgeDays);
   if(!item)return;
   item.freezeReviewed=true;
   queueHiringExceptionEvent(item,"freeze",item.candidate||null);
@@ -1266,12 +1487,12 @@ function applyHiringExceptionDecision(x){
     item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.salaryCompetitiveness=clamp((item.salaryCompetitiveness||60)+12,0,100);item.salaryInflation=clamp((item.salaryInflation||0)+8,0,35);item.dueDay=company.day+stageDaysForRecruiting(item,"searching");
     company.cash=clamp(company.cash-.12,0,999);recordHistory(`CEO increased the salary band for ${item.role}.`,"people",4);
   }else if(x.action==="contractor"){
-    item.contractorCoverageUntil=company.day+30;item.contractorCoverage=true;item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.dueDay=company.day+stageDaysForRecruiting(item,"searching");company.finance.contractorDaily=Number(company.finance.contractorDaily||0)+.018;
+    item.contractorCoverageUntil=company.day+WORKFORCE_HIRING_RULES.contractorCoverageDays;item.contractorCoverage=true;item.status="searching";item.stage="searching";item.stageStartedDay=company.day;item.dueDay=company.day+stageDaysForRecruiting(item,"searching");company.finance.contractorDaily=Number(company.finance.contractorDaily||0)+WORKFORCE_HIRING_RULES.contractorDailyCost;
     employees.filter(e=>e.active&&roleDepartment(e.role)===item.department).forEach(e=>applyEmployeeEmotionDelta(e,{stressDelta:-4,moraleDelta:1,reasonCode:"hiring-exception-approved",sourceEventId:item.id||`hire-${company.day}`,ignoreCooldown:true}));
     recordHistory(`Contractor coverage was approved while HR continued ${item.role} recruiting.`,"people",4);
   }else if(x.action==="cancel-role"){
     item.status="canceled";item.closedDay=company.day;
-    company.hiringRequests=(company.hiringRequests||[]).filter(r=>!(r.role===item.role&&r.department===item.department&&company.day-(r.day||0)<45));
+    company.hiringRequests=(company.hiringRequests||[]).filter(r=>!(r.role===item.role&&r.department===item.department&&company.day-(r.day||0)<WORKFORCE_HIRING_RULES.resolvedRequestCleanupDays));
     employees.filter(e=>e.active&&roleDepartment(e.role)===item.department).forEach(e=>applyEmployeeEmotionDelta(e,{stressDelta:3,moraleDelta:-2,reasonCode:"hiring-exception-denied",sourceEventId:item.id||`hire-${company.day}`,ignoreCooldown:true}));
     recordHistory(`CEO canceled the open ${item.role} search and asked the department to reprioritize.`,"people",4);
   }
@@ -1312,14 +1533,16 @@ function maybeQueueHiringPolicyReview(){
 function openRequestExists(kind,key){
   return (company.escalationQueue||[]).some(ev=>ev.id&&String(ev.id).includes(kind)&&String(ev.id).includes(key))||company.pendingEvent?.id&&String(company.pendingEvent.id).includes(kind)&&String(company.pendingEvent.id).includes(key);
 }
-function makeHiringRequestEvent(dept,st){
-  const role=roleForHiringNeed(dept),annualCost=defaultEmploymentForRole(role).annualSalary*1.34;
+function makeHiringRequestEvent(dept,st,requestedRole=null,requestId=null){
+  const role=canonicalRole(requestedRole||roleForHiringNeed(dept)),annualCost=defaultEmploymentForRole(role).annualSalary*1.34;
+  requestId=requestId||`hiring-request-${dept}-${company.day}`;
   const hist=company.hiringNeedHistory?.[dept]||{},confidence=Math.round(hist.confidence||62),needScore=Math.round(hist.lastScore||hiringNeedScore(dept,st));
   const narrative=hiringNeedNarrative(dept,st,role);
   const reasons=narrative.evidence;
-  const runwayImpact=Math.max(1,Math.round(annualCost/365/Math.max(.001,Math.abs(company.finance?.netCashFlowDaily||-.01))));
+  const runwayImpact=Math.max(1,Math.round(annualCost/WORKFORCE_TIME_RULES.daysPerYear/Math.max(.001,Math.abs(company.finance?.netCashFlowDaily||-.01))));
+  const runway=runwayDaysOrUnknown(company.finance);
   const confidenceLabel=qualitativeBand(confidence,{low:45,high:75,lowText:"early",midText:"credible",highText:"strong"});
-  return {id:`hiring-request-${dept}-${company.day}`,repeatable:false,category:"people",title:`Hiring request: ${role}`,copy:`${narrative.reason} Estimated annual employment cost is about $${annualCost.toFixed(2)}M.`,hiringRequest:{department:dept,role,requestedCount:1,confidence,reasons,financeAssessment:`Runway impact is about ${runwayImpact} ${runwayImpact===1?"day":"days"} under current cash flow`,operationalImpact:`Staffing pressure is ${qualitativeBand(needScore,{low:55,high:82,lowText:"manageable",midText:"material",highText:"critical"})}; ${reasons.slice(0,2).join("; ")}`,successionImpact:"Improves coverage if current staff leave or retire"},generatedCommunication:{type:"Hiring Request",priority:"Decision Needed",sender:{name:"People and Finance Review",role:"Operating Council"},subject:`Hiring Request - ${role}`,message:`${narrative.reason} People and Finance reviewed the request against workload, staffing range, project demand, succession risk, skills, and runway. The staffing case is ${confidenceLabel}. Evidence: ${reasons.slice(0,3).join("; ")}.`,recs:[[teamDisplayName(dept),`Approve the position because ${reasons[0]||"capacity risk is rising"}`,confidence],["Finance",(company.finance?.runwayDays||999)<75?"Delay until runway improves":"Fundable if growth remains controlled",Math.max(45,80-Math.max(0,90-(company.finance?.runwayDays||999)))],["People","Candidate market and retention pressure support action",72],["Board",needScore>88?"Approve if cash discipline remains visible":"Monitor payroll impact",64]],impacts:["Recruiting starts after approval","Payroll increases only after a candidate joins","Onboarding temporarily slows output","Capability and retention may improve"]},choices:[
+  return {id:requestId,repeatable:false,category:"people",title:`Hiring request: ${role}`,copy:`${narrative.reason} Estimated annual employment cost is about $${annualCost.toFixed(2)}M.`,hiringRequest:{requestId,department:dept,role,requestedCount:1,confidence,reasons,financeAssessment:`Runway impact is about ${runwayImpact} ${runwayImpact===1?"day":"days"} under current cash flow`,operationalImpact:`Staffing pressure is ${qualitativeBand(needScore,{low:55,high:82,lowText:"manageable",midText:"material",highText:"critical"})}; ${reasons.slice(0,2).join("; ")}`,successionImpact:"Improves coverage if current staff leave or retire"},generatedCommunication:{type:"Hiring Request",priority:"Decision Needed",sender:{name:"People and Finance Review",role:"Operating Council"},subject:`Hiring Request - ${role}`,message:`${narrative.reason} People and Finance reviewed the request against workload, staffing range, project demand, succession risk, skills, and runway. The staffing case is ${confidenceLabel}. Evidence: ${reasons.slice(0,3).join("; ")}.`,recs:[[teamDisplayName(dept),`Approve the position because ${reasons[0]||"capacity risk is rising"}`,confidence],["Finance",runway<75?"Delay until runway improves":"Fundable if growth remains controlled",Math.max(45,80-Math.max(0,90-runway))],["People","Candidate market and retention pressure support action",72],["Board",needScore>88?"Approve if cash discipline remains visible":"Monitor payroll impact",64]],impacts:["Recruiting starts after approval","Payroll increases only after a candidate joins","Onboarding temporarily slows output","Capability and retention may improve"]},choices:[
     {title:"Approve position",detail:"Authorize this role and let HR open recruiting.",effect:{board:1},directive:"people",days:8,people:{stress:-2,morale:2},hire:"specialist",hireRole:role,hireDept:dept,opinion:{support:2,trust:1},strategy:"people",benefits:["opens the role without CEO candidate review","may reduce workload pressure","improves succession depth"],risks:["raises payroll after joining","candidate may decline","runway shortens later"],uncertainty:"Material",estimatedConfidence:confidence},
     {title:"Delay position",detail:"Revisit the headcount request next quarter while the team manages workload.",effect:{board:1},directive:"quality",days:6,people:{stress:2,morale:-1},deferHiring:{dept,role},opinion:{fairness:-1},strategy:"finance",benefits:["protects runway","keeps flexibility"],risks:["backlog may grow","retention may worsen"],uncertainty:"Material",estimatedConfidence:54},
     {title:"Reject and reprioritize",detail:"Decline the position and ask the department to reduce scope instead.",effect:{cash:.05,board:2,quality:-1},directive:"cuts",days:8,people:{stress:4,morale:-3},rejectHiring:{dept,role},opinion:{support:-2,trust:-1},strategy:"cost-control",benefits:["protects cash","forces focus"],risks:["trust may decline","workload may rise","quality can suffer"],uncertainty:"High",estimatedConfidence:44}
@@ -1340,7 +1563,7 @@ function attemptInternalStaffingSolution(dept,st){
   company.internalTransfers=Array.isArray(company.internalTransfers)?company.internalTransfers:[];
   company.internalTransfers.unshift({day:company.day,employeeId:e.id,name:e.name,fromDepartment:from,toDepartment:dept,targetRole:role,type:candidate.fit>68?"temporary assignment":"cross-training",fit:Math.round(candidate.fit),status:"active"});
   e.temporaryAssignment={fromDepartment:from,toDepartment:dept,targetRole:role,startDay:company.day,duration:candidate.fit>68?18:32,productivity:clamp(candidate.fit/100,.35,.85)};
-  applyEmployeeEmotionDelta(e,{stressDelta:4,moraleDelta:candidate.fit>68?1:-1,reasonCode:"interview-load",sourceEventId:`interview-${item.id||company.day}`,ignoreCooldown:true});
+  applyEmployeeEmotionDelta(e,{stressDelta:4,moraleDelta:candidate.fit>68?1:-1,reasonCode:"internal-staffing-transfer",sourceEventId:`internal-transfer-${dept}-${e.id}-${company.day}`,ignoreCooldown:true});
   addMemory(e,"TRANSFER",`I was asked to help ${teamDisplayName(dept)} before the company opened a new role.`,"neutral",10,"People Operations");
   company.hiringRequestHistory.unshift({day:company.day,role,department:dept,status:"local-transfer",reason:`${e.name} temporarily assigned from ${teamDisplayName(from)}`,confidence:Math.round(candidate.fit)});
   recordHistory(`${teamDisplayName(dept)} tried a local staffing fix: ${e.name} was assigned from ${teamDisplayName(from)} before asking for external hiring.`,"people",3);
@@ -1368,24 +1591,29 @@ function processInternalTransfersDaily(){
 function maybeQueueHiringRequests(){
   ensureWorkforceEconomySystems();
   updateHiringNeedHistory();
-  if(company.day<6||company.day%5!==0)return;
-  const candidate=Object.entries(company.staffingModel||{}).filter(([dept,st])=>{
+  const hiringRules=OFFICE_AQUARIUM_CONSTANTS.hiring;
+  if(company.day<hiringRules.requestStartDay||company.day%hiringRules.requestCadenceDays!==0)return;
+  const candidates=Object.entries(company.staffingModel||{}).filter(([dept,st])=>{
     const h=company.hiringNeedHistory?.[dept]||{};
-    return h.lastScore>=85&&h.days>=3&&h.confidence>=62&&!st.overstaffed;
-  }).sort((a,b)=>(company.hiringNeedHistory?.[b[0]]?.lastScore||0)-(company.hiringNeedHistory?.[a[0]]?.lastScore||0))[0];
-  if(!candidate)return;
-  const [dept,st]=candidate;
-  const role=roleForHiringNeed(dept),hist=company.hiringNeedHistory?.[dept]||{};
-  const policy=hiringPolicyAllows(dept,st,role);
-  if(!policy.allowed){
-    recordSuppressedHiringNeed(dept,role,policy.reason,hist.lastScore||0,hist.confidence||0);
+    return h.lastScore>=hiringRules.requestScoreThreshold&&h.days>=hiringRules.requestSustainDays&&h.confidence>=hiringRules.requestConfidenceThreshold&&!st.overstaffed;
+  }).sort((a,b)=>(company.hiringNeedHistory?.[b[0]]?.lastScore||0)-(company.hiringNeedHistory?.[a[0]]?.lastScore||0));
+  for(const [dept,st] of candidates){
+    const role=roleForHiringNeed(dept),hist=company.hiringNeedHistory?.[dept]||{};
+    const policy=hiringPolicyAllows(dept,st,role);
+    if(!policy.allowed){
+      recordSuppressedHiringNeed(dept,role,policy.reason,hist.lastScore||0,hist.confidence||0);
+      continue;
+    }
+    if(openRequestExists("hiring-request",dept))continue;
+    if((company.hiringRequests||[]).some(r=>r.status!==hiringRequestStatus("orphaned")&&canonicalRole(r.role)===canonicalRole(role)&&company.day-(r.day||0)<hiringRules.duplicateRequestWindowDays))continue;
+    const organizationSignal=organizationRoleHiringSignalForDepartment(dept);
+    if(organizationSignal?.role!==role&&attemptInternalStaffingSolution(dept,st))return;
+    const requestId=`hiring-request-${dept}-${company.day}`;
+    const event=makeHiringRequestEvent(dept,st,role,requestId);
+    company.hiringRequests.unshift({id:requestId,day:company.day,department:dept,role,status:hiringRequestStatus("queued"),score:hist.lastScore||0,confidence:hist.confidence||0,critical:policy.critical});
+    company.escalationQueue.push(event);
     return;
   }
-  if(openRequestExists("hiring-request",dept))return;
-  if((company.hiringRequests||[]).some(r=>r.department===dept&&company.day-(r.day||0)<28))return;
-  if(attemptInternalStaffingSolution(dept,st))return;
-  company.hiringRequests.unshift({day:company.day,department:dept,role,status:"queued",score:hist.lastScore||0,confidence:hist.confidence||0,critical:policy.critical});
-  company.escalationQueue.push(makeHiringRequestEvent(dept,st));
 }
 function selectLayoffCandidates(targetCount=1){
   const active=employees.filter(e=>e.active);
@@ -1396,7 +1624,7 @@ function executeLayoffPlan(count=1,voluntary=false){
   const affected=selectLayoffCandidates(count);
   let severance=0;
   affected.forEach(e=>{
-    const weekly=(e.employment?.annualSalary||.15)/52,weeks=clamp(2+Math.max(0,((company.day-(e.joinedDay||0))/365))*1.5,2,26);
+    const weekly=(e.employment?.annualSalary||.15)/WORKFORCE_TIME_RULES.weeksPerYear,weeks=clamp(2+Math.max(0,((company.day-(e.joinedDay||0))/WORKFORCE_TIME_RULES.daysPerYear))*1.5,2,26);
     severance+=weekly*weeks+.018;
     e.active=false;e.offsite=true;e.action=voluntary?"voluntary separation":"laid off";
     e.careerHistory.push(`${voluntary?"Separated voluntarily":"Laid off"} on day ${company.day}`);
@@ -1424,7 +1652,7 @@ function makeRestructuringEvent(){
 function maybeQueueRestructuringRequest(){
   ensureWorkforceEconomySystems();
   if(company.day<20||company.day%7!==0)return;
-  const badRunway=(company.finance?.runwayDays||999)<35&&company.finance?.netCashFlowDaily<-.04;
+  const badRunway=runwayDaysOrUnknown(company.finance)<35&&company.finance?.netCashFlowDaily<-.04;
   const overstaffed=Object.values(company.staffingModel||{}).some(st=>st.overstaffed);
   if(!badRunway&&!overstaffed)return;
   if(openRequestExists("restructuring",String(company.day).slice(0,-1)))return;
@@ -1453,7 +1681,7 @@ function maybeIssueOrEvaluatePip(){
     else{g.pipActive=false;g.consecutivePoorQuarters=0;company.board=clamp(company.board+8,0,100);recordHistory("CEO PIP was completed successfully.","board",5);}
   }else if(!g.pipActive&&(g.strikes>=1||company.board<32)&&company.day-(g.lastPipOfferedDay||-999)>60){
     const snapshot=buildExecutiveIntelligenceSnapshot(),risk=snapshot.topRisks?.[0];
-    g.pipActive=true;g.pipStartDay=company.day;g.pipDeadlineDay=company.day+91;g.lastPipOfferedDay=company.day;
+    g.pipActive=true;g.pipStartDay=company.day;g.pipDeadlineDay=company.day+WORKFORCE_TIME_RULES.daysPerQuarter;g.lastPipOfferedDay=company.day;
     g.pipTargets={minimumCash:6,minimumBoard:36,minimumTrust:38,maximumNetDailyLoss:-.06};
     recordHistory(`The board issued a CEO performance improvement plan${risk?` after reviewing ${risk.title}`:""}.`,"board",6);
     company.escalationQueue.push({id:`board-pip-${company.day}`,repeatable:false,category:"board",title:"CEO Performance Improvement Plan",copy:"The board has issued a performance improvement plan for the next quarter.",generatedCommunication:{type:"Board Letter",priority:"Urgent",sender:{name:"Board of Directors",role:"Board"},subject:"CEO Performance Improvement Plan",message:`The board expects improved cash, confidence, trust, and net daily loss by the next quarterly review.${risk?` The Board is also concerned about ${risk.title}.`:""}`,recs:[["Board","Meet the PIP targets within one quarter",90],["Finance","Protect runway and reduce daily loss",78],["People","Avoid solving cash by destroying retention",70]],impacts:["Missing the PIP creates a board strike","Success restores board confidence","The CEO remains under review"].concat(risk?[risk.detail||risk.title]:[])},choices:[{title:"Accept the PIP",detail:"Commit to the board targets.",effect:{board:1},directive:"quality",days:8,strategy:"balanced"},{title:"Challenge the targets",detail:"Ask the board for flexibility and accept credibility risk.",effect:{board:-2,trust:1},directive:"people",days:6,strategy:"people"},{title:"Make a cost-first pledge",detail:"Prioritize runway even if morale suffers.",effect:{board:2},directive:"cuts",days:10,people:{stress:3,morale:-2},strategy:"cost-control"}]});
@@ -1560,7 +1788,7 @@ function removeEmployeeFromCompany(e,reason="resigned"){
   if(!company.openRoles.includes(e.role))company.openRoles.push(e.role);
   company.board=clamp(company.board-(reason==="retired"?1.5:3.5),0,100);
   if(reason==="retired"){
-    company.log.push(`${e.name}, the ${e.role}, retired after ${Math.max(0,Math.floor((company.day-(e.joinedDay||0))/365))} year(s) with the company.`);
+    company.log.push(`${e.name}, the ${e.role}, retired after ${Math.max(0,Math.floor((company.day-(e.joinedDay||0))/WORKFORCE_TIME_RULES.daysPerYear))} year(s) with the company.`);
     recordWeeklyEvent(`${e.name}, the ${e.role}, retired from the company.`,"people",5);
     recordHistory(`${e.name} retired as ${e.role}.`,"people",5);
   }else{
@@ -1571,7 +1799,8 @@ function removeEmployeeFromCompany(e,reason="resigned"){
   }
   company.organizationalMomentum.turnover=clamp(company.organizationalMomentum.turnover+12,-100,100);
   employees.filter(x=>x.active).forEach(x=>{
-    if(socialScore(x,e.id)>20){applyEmployeeEmotionDelta(x,{moraleDelta:-3,reasonCode:"coworker-departure",sourceEventId:`departure-${e.id}-${company.day}`,ignoreCooldown:true});x.stayScore=clamp((x.stayScore||70)-2,0,100);}
+    const view=getRelationshipView(x,e),confidence=Number(view.interpretation.confidence)||0;
+    if(confidence>=25&&relationshipPreferenceScore(x,e)>20){applyEmployeeEmotionDelta(x,{moraleDelta:-3,reasonCode:"coworker-departure",sourceEventId:`departure-${e.id}-${company.day}`,relatedEmployeeIds:[e.id],ignoreCooldown:true});x.stayScore=clamp((x.stayScore||70)-2,0,100);}
   });
 }
 function evaluateEmployeeRetentionDaily(){
@@ -1600,7 +1829,7 @@ function quarterlyEmployeeReview(e){
   const performance=clamp(45+output*4-mistakes*8+e.focus*.15+collaboration,0,100);
   const promotionPotential=clamp(performance*.48+growth*5+(e.goals?.promotion||.5)*25-(e.stress*.12),0,100);
   const review={
-    day:company.day,quarter:Math.floor(company.day/91),performance:Math.round(performance),
+    day:company.day,quarter:Math.floor(company.day/WORKFORCE_TIME_RULES.daysPerQuarter),performance:Math.round(performance),
     promotionPotential:Math.round(promotionPotential),retentionRisk:Math.round(e.retentionRisk||0),
     stressTrend:e.stress>68?"rising":e.stress<35?"low":"stable",
     recommendation:promotionPotential>75?"promotion candidate":e.retentionRisk>65?"retention intervention":performance<40?"coaching required":"continue development"
@@ -1612,13 +1841,13 @@ function quarterlyEmployeeReview(e){
 }
 function createQuarterlyBoardReport(){
   ensureLeadershipSystems();
-  const quarter=Math.floor(company.day/91);
+  const quarter=Math.floor(company.day/WORKFORCE_TIME_RULES.daysPerQuarter);
   const active=employees.filter(e=>e.active);
   const reviews=active.map(quarterlyEmployeeReview);
   const avgRetention=reviews.reduce((s,r)=>s+r.retentionRisk,0)/Math.max(1,reviews.length);
   const highRisk=reviews.filter(r=>r.retentionRisk>=60).length;
   const companyReview={
-    day:company.day,quarter,year:Math.floor(company.day/365)+1,cash:company.cash,board:company.board,
+    day:company.day,quarter,year:Math.floor(company.day/WORKFORCE_TIME_RULES.daysPerYear)+1,cash:company.cash,board:company.board,
     trust:company.trust,quality:company.quality,customers:company.customers,stress:avgStress(),
     retentionRisk:Math.round(avgRetention),highRiskEmployees:highRisk,
     leadership:{...company.leadership},momentum:{...company.organizationalMomentum}
@@ -1657,7 +1886,7 @@ function createQuarterlyBoardReport(){
 }
 function createAnnualReview(){
   ensureLeadershipSystems();
-  const year=Math.floor(company.day/365);
+  const year=Math.floor(company.day/WORKFORCE_TIME_RULES.daysPerYear);
   employees.filter(e=>e.active).forEach(e=>e.age=(e.age||30)+1);
   const review={day:company.day,year,cash:company.cash,revenue:company.dailyRevenue,customers:company.customers,board:company.board,trust:company.trust,activeEmployees:employees.filter(e=>e.active).length,resignations:company.simulationMetrics?.counters?.resignations||0,firings:company.simulationMetrics?.counters?.firings||0,leadership:{...company.leadership},momentum:{...company.organizationalMomentum}};
   company.annualReviews.unshift(review);company.annualReviews=company.annualReviews.slice(0,10);
@@ -1666,8 +1895,8 @@ function createAnnualReview(){
 }
 function processOrganizationalReviews(){
   ensureLeadershipSystems();
-  if(company.day>0&&company.day-company.lastQuarterlyReviewDay>=91){company.lastQuarterlyReviewDay=company.day;createQuarterlyBoardReport();}
-  if(company.day>0&&company.day-company.lastAnnualReviewDay>=365){company.lastAnnualReviewDay=company.day;createAnnualReview();}
+  if(company.day>0&&company.day-company.lastQuarterlyReviewDay>=WORKFORCE_TIME_RULES.daysPerQuarter){company.lastQuarterlyReviewDay=company.day;createQuarterlyBoardReport();}
+  if(company.day>0&&company.day-company.lastAnnualReviewDay>=WORKFORCE_TIME_RULES.daysPerYear){company.lastAnnualReviewDay=company.day;createAnnualReview();}
 }
 function crisisSignals(){
   ensureLeadershipSystems();
@@ -1843,7 +2072,7 @@ function staffingCrisisProgressDetail(snapshot=buildWorkforceAllocationSnapshot(
   const currentMissingAssignments=snapshot?.totals?.missingAssignments||0;
   const currentMissingFte=snapshot?.totals?.missingProjectFte||0;
   const onboarding=(employees||[]).filter(e=>e.active&&e.performanceManagement?.stage==="onboarding").reduce((sum,e)=>sum+clamp(onboardingProductivity(e),0,1),0);
-  const temporaryCoverage=(company.recruitingPipeline||[]).filter(r=>["requisition","searching","interviewing","offer"].includes(r.status)).length;
+  const temporaryCoverage=(company.recruitingPipeline||[]).filter(r=>WORKFORCE_ADVANCING_RECRUITING_STATUSES.has(r.status)).length;
   const initialMissingAssignments=crisis?.currentProgressDetail?.initialMissingAssignments??currentMissingAssignments;
   const initialMissingFte=crisis?.currentProgressDetail?.initialMissingFte??currentMissingFte;
   return {initialMissingAssignments,initialMissingFte,currentMissingAssignments,currentMissingFte,criticalRoleGapsRemaining:snapshot?.totals?.criticalRoleGaps||0,temporaryCoverage,onboardingCoverage:Number(onboarding.toFixed(2)),daysRemaining:company.crisis?.deadlineDay?Math.max(0,company.crisis.deadlineDay-(company.day||0)):0};
@@ -1855,7 +2084,7 @@ function staffingCrisisSeverity(snapshot=buildWorkforceAllocationSnapshot()){
   const missing=snapshot?.totals?.missingAssignments||0;
   const missingFte=snapshot?.totals?.missingProjectFte||0;
   const openRoles=(company.openRoles||[]).length;
-  const activeRecruiting=(company.recruitingPipeline||[]).filter(r=>["requisition","searching","interviewing","offer","exception","paused-policy"].includes(r.status)).length;
+  const activeRecruiting=(company.recruitingPipeline||[]).filter(r=>WORKFORCE_ACTIVE_RECRUITING_STATUSES.has(r.status)).length;
   const failedRecruiting=(company.hiringRequestHistory||[]).filter(r=>company.day-(r.day||0)<=45&&/failed|rejected|delayed|paused|suppressed/i.test(String(r.status||""))).length;
   const deliveryImpact=projects.reduce((score,p)=>score+Math.max(0,70-(p.coverage||100))*.08+(p.actualBlockers||0)*1.5,0);
   const concentration=affectedProjects<=1&&missing<=2?-14:0;
@@ -1948,7 +2177,7 @@ function renderOrganizationalDynamics(){
   ensureLeadershipSystems();
   const active=employees.filter(e=>e.active);
   const highRisk=active.filter(e=>(e.retentionRisk||0)>=60).length;
-  const nextQ=Math.max(0,91-(company.day-company.lastQuarterlyReviewDay));
+  const nextQ=Math.max(0,WORKFORCE_TIME_RULES.daysPerQuarter-(company.day-company.lastQuarterlyReviewDay));
   const momentum=company.organizationalMomentum;
   const stage=company.crisisStage?`${String(company.crisisType||"company").replace(/\b\w/g,c=>c.toUpperCase())} ${company.crisisStage}`:"No sustained crisis trajectory";
   el.innerHTML=`<strong>Organizational Dynamics</strong><br><small>
@@ -1960,7 +2189,7 @@ function renderOrganizationalDynamics(){
 function renderWorkforcePressure(){
   const el=document.getElementById("workforcePressure");if(!el)return;
   ensureWorkforceEconomySystems?.();
-  const hasSignals=(company.staffingNeeds||[]).length||(company.recruitingPipeline||[]).length||(company.hiringRequests||[]).length||employees.some(e=>e.active&&((e.retentionRisk||0)>=55||e.performanceManagement?.stage!=="none"))||Number(company.finance?.runwayDays||999)<180;
+  const hasSignals=(company.staffingNeeds||[]).length||(company.recruitingPipeline||[]).length||(company.hiringRequests||[]).length||employees.some(e=>e.active&&((e.retentionRisk||0)>=55||e.performanceManagement?.stage!=="none"))||runwayDaysOrUnknown(company.finance)<180;
   el.innerHTML=hasSignals?workforceFinancialPressureHtml():"";
   toggleSectionVisibility(el,!!hasSignals);
 }
@@ -2038,7 +2267,7 @@ if(company.shareholders?.pressure>78&&simulationRandom()<.16)recordMajorHistory(
 if(company.phase==="launched"&&company.manufacturing){const fulfillment=(company.manufacturing.readiness+company.manufacturing.yield+company.manufacturing.capacity)/300;if(fulfillment<.62){const penalty=company.dailyRevenue*(.62-fulfillment)*.45;company.cash=clamp(company.cash-penalty,0,999);company.trust=clamp(company.trust-(.62-fulfillment)*2.4,0,100);recordCustomerExperience?.("enterprise","delivery-delay",Math.round(58+(1-fulfillment)*24),"Manufacturing fulfillment delays affected customer delivery.","manufacturing",true);Object.values(company.customerSegments||{}).forEach(seg=>{seg.sentiment=clamp((seg.sentiment||50)-(0.62-fulfillment)*3,0,100);seg.trust=clamp((seg.trust||50)-(0.62-fulfillment)*2,0,100);});syncCustomerSummaryFromSegments?.();const owner=employees.filter(e=>e.active).find(e=>canonicalRole(e.role)==="Software QA Engineer")||employees.find(e=>e.active);if(owner)recordQualityMistake(owner,"launched-product fulfillment defects",.6);recordHistory(`Manufacturing fulfillment dragged revenue by $${penalty.toFixed(2)}M.`,"manufacturing",3);}}
 pruneLongRunCollections();
 runDailyStage("save",()=>{if(!validationMode)saveGame();});}
-function maybeEmergentEvent(){if(simulationRandom()>.025)return;const active=employees.filter(e=>e.active);if(!active.length)return;const e=active[Math.floor(simulationRandom()*active.length)];if(e.stress>78){e.morale-=8;company.board-=2;company.log.push(`${e.name} warned that the workload is unsustainable.`);}else if(e.taskProgress>18){e.taskProgress=0;e.achievements++;company.trust+=2;company.valuation+=.8;company.log.push(`${e.name} completed a difficult ${e.role.toLowerCase()} milestone.`);recordWeeklyEvent(`${e.name} completed a major ${e.role.toLowerCase()} milestone.`,"people",3);}else{const other=socialTarget(e);if(other){recordSharedExperience(e,other,{type:"direct_help",sourceEventId:`emergent-help-${e.id}-${other.id}-${company.day}-${company.minute}`,emotionalWeight:1,outcome:"positive",importance:3,evidence:`${e.name} and ${other.name} handled difficult work together.`});addMemory(e,"SOCIAL_HELP",`${other.name} helped me with difficult work.`,"positive",9,other.name);addMemory(other,"SOCIAL_HELP",`I helped ${e.name} with difficult work.`,"positive",7,e.name);company.log.push(`${e.name} helped ${other.name}, strengthening cooperation.`);recordWeeklyEvent(`${e.name} helped ${other.name}, strengthening cooperation.`,"people",2);}}}
+function maybeEmergentEvent(){if(simulationRandom()>.025)return;const active=employees.filter(e=>e.active);if(!active.length)return;const e=active[Math.floor(simulationRandom()*active.length)];if(e.stress>78){applyEmployeeEmotionDelta(e,{moraleDelta:-8,stressDelta:1,reasonCode:"workload-warning",sourceEventId:`workload-warning-${e.id}-${company.day}-${company.minute}`,exceptional:true});company.board-=2;company.log.push(`${e.name} warned that the workload is unsustainable.`);}else if(e.taskProgress>18){e.taskProgress=0;e.achievements++;company.trust+=2;company.valuation+=.8;company.log.push(`${e.name} completed a difficult ${e.role.toLowerCase()} milestone.`);recordWeeklyEvent(`${e.name} completed a major ${e.role.toLowerCase()} milestone.`,"people",3);}else{const other=socialTarget(e);if(other){recordSharedExperience(e,other,{type:"direct_help",sourceEventId:`emergent-help-${e.id}-${other.id}-${company.day}-${company.minute}`,tone:"positive",intensity:2});addMemory(e,"SOCIAL_HELP",`${other.name} helped me with difficult work.`,"positive",9,other.name);addMemory(other,"SOCIAL_HELP",`I helped ${e.name} with difficult work.`,"positive",7,e.name);company.log.push(`${e.name} helped ${other.name}, strengthening cooperation.`);recordWeeklyEvent(`${e.name} helped ${other.name}, strengthening cooperation.`,"people",2);}}}
 function endGame(message,type="ceo-fired",failureCode=null){
   company.gameOver=true;company.paused=true;company.failureType=type;company.failureOwner=type;company.failureCode=failureCode||(type==="company-failure"?"COMPANY_FAILURE":"CEO_REMOVED");
   if(company.crisis&&company.crisisLearningEpisodes?.[0]?.crisisId===company.crisis.id){
@@ -2074,6 +2303,7 @@ function startCrisis(r){
   company.crisis={...candidate,id:`crisis-${company.nextCrisisId++}`,failureOwner:candidate.failureOwner||def.owner,failureCode:candidate.failureCode||def.code,status:"active",escalationStage:"crisis",currentProgress:crisisRecoveryProgress(candidate.type)};
   company.crisisType=company.crisis.type;company.crisisStage="crisis";company.crisisDays=Math.max(0,company.crisis.deadlineDay-company.day);
   company.crisisLearningEpisodes.unshift({
+    ownerSystem:AI_SYSTEM_OWNERS.institutional,
     id:`crisis-learning-${company.nextCrisisLearningEpisodeId++}`,
     crisisId:company.crisis.id,
     type:company.crisis.type,

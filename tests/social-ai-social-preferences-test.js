@@ -71,7 +71,6 @@ async function main() {
     recordSharedExperience(a, b, { type: "direct_help", sourceEventId: "stage4-help", tone: "positive", intensity: 5 });
     recordSharedExperience(a, b, { type: "shared_break", sourceEventId: "stage4-break", tone: "positive", intensity: 4 });
     recordSharedExperience(a, c, { type: "conflict_observed", sourceEventId: "stage4-conflict", tone: "negative", intensity: 5 });
-    evaluateEmployeeRelationshipInterpretations(a);
 
     const beforeChoice = boundarySnapshot();
     const decision = chooseSocialPreference(a, { type: "break", roomId: "break-area", allowAlone: true }, { record: false });

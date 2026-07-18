@@ -70,6 +70,10 @@ async function main() {
       company.boardGovernance = { ...(company.boardGovernance || {}), strikes: 0, lastStrikeDay: -999, pipActive: false };
       company.organizationalMomentum = { ...(company.organizationalMomentum || {}), execution: 0, burnout: 0 };
       company.workItems = [];
+      company.projectArchive = [
+        ...(company.projectArchive || []),
+        ...(company.projects || []).map(project => ({ ...project, status: "completed", completedDay: company.day, closedDay: company.day }))
+      ];
       company.projects = [];
     };
 
@@ -161,9 +165,11 @@ async function main() {
       company.openRoles = [];
       company.workItems = [];
       employees.forEach((e, i) => { e.active = true; e.stress = 35; e.daysAtRisk = 0; e.role = i < 4 ? ["Chip Architect", "Firmware Engineer", "Verification Engineer", "Software Lead"][i] : e.role; });
+      const recoveryProgress = crisisRecoveryProgress(type);
+      const recoverySnapshot = type === "staffing" ? buildWorkforceAllocationSnapshot() : null;
       evaluateFailure();
       assert(!company.gameOver, `${type}: recovery should not end game`);
-      assert(!company.crisis, `${type}: expected crisis to clear on recovery`);
+      assert(!company.crisis, `${type}: expected crisis to clear on recovery; progress ${recoveryProgress}; staffing ${JSON.stringify(recoverySnapshot?.totals || {})}`);
     }
 
     validationMode = false;

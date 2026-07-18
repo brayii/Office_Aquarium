@@ -39,6 +39,21 @@ async function main() {
     function stableSnapshotHash() {
       return typeof hashAuthoritativeState === "function" ? hashAuthoritativeState(company, employees) : stateHash();
     }
+    function authoritativeDifferencePaths(left, right, path = "", output = []) {
+      if (output.length >= 30 || Object.is(left, right)) return output;
+      if (left === null || right === null || typeof left !== "object" || typeof right !== "object") {
+        output.push({ path, left, right });
+        return output;
+      }
+      const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+      [...keys].sort().forEach(key => {
+        if (output.length >= 30) return;
+        const nextPath = path ? `${path}.${key}` : key;
+        if (!(key in left) || !(key in right)) output.push({ path: nextPath, left: key in left ? left[key] : "<missing>", right: key in right ? right[key] : "<missing>" });
+        else authoritativeDifferencePaths(left[key], right[key], nextPath, output);
+      });
+      return output;
+    }
     function advanceToDay(targetDay, maxTicks = 30000) {
       const oldValidationMode = typeof validationMode !== "undefined" ? validationMode : false;
       validationMode = true;
@@ -131,17 +146,31 @@ async function main() {
     const reachedDay100A = reachedDay50 && advanceToDay(100, 14000);
     const endDayA = company.day;
     const failureA = company.failureCode || company.failureType || null;
+    const employeesA = employees.filter(e => e.active).length;
+    const rolesA = [...new Set(employees.filter(e => e.active).map(e => canonicalRole(e.role)))].sort();
     const hashA = stableSnapshotHash();
+    const authoritativeA = {
+      company: canonicalAuthoritativeState(company, "company"),
+      employees: canonicalAuthoritativeState(employees, "employees")
+    };
     if (savedDay50) localStorage.setItem(saveKey, savedDay50);
     const reloadDay50Ok = typeof loadGame === "function" ? loadGame() : false;
     const day50ReloadHash = stableSnapshotHash();
     const reachedDay100B = reloadDay50Ok && day50ReloadHash === day50Hash && advanceToDay(100, 14000);
     const endDayB = company.day;
     const failureB = company.failureCode || company.failureType || null;
+    const employeesB = employees.filter(e => e.active).length;
+    const rolesB = [...new Set(employees.filter(e => e.active).map(e => canonicalRole(e.role)))].sort();
     const hashB = stableSnapshotHash();
-    const deterministicContinuation = reachedDay100A === reachedDay100B && endDayA === endDayB && failureA === failureB && hashA === hashB;
+    const authoritativeB = {
+      company: canonicalAuthoritativeState(company, "company"),
+      employees: canonicalAuthoritativeState(employees, "employees")
+    };
+    const continuationDifferences = hashA === hashB ? [] : authoritativeDifferencePaths(authoritativeA, authoritativeB);
+    const deterministicContinuation = reachedDay100A === reachedDay100B && endDayA === endDayB && failureA === failureB && employeesA === employeesB && JSON.stringify(rolesA) === JSON.stringify(rolesB) && hashA === hashB;
+    const workforceGrowthObserved = employeesA > 8 && rolesA.length > 8;
     return {
-      ok: reachedDay50 && decisionApplied && !beforeSave.lastSimulationError && loadOk && beforeSave.day === afterLoad.day && beforeSave.employees === afterLoad.employees && hashEqualAfterLoad && deterministicContinuation,
+      ok: reachedDay50 && decisionApplied && !beforeSave.lastSimulationError && loadOk && beforeSave.day === afterLoad.day && beforeSave.employees === afterLoad.employees && hashEqualAfterLoad && deterministicContinuation && workforceGrowthObserved,
       beforeSave,
       afterLoad,
       loadOk,
@@ -157,8 +186,14 @@ async function main() {
         endDayB,
         failureA,
         failureB,
+        employeesA,
+        employeesB,
+        rolesA,
+        rolesB,
+        workforceGrowthObserved,
         hashA,
         hashB,
+        continuationDifferences,
         deterministicContinuation
       }
     };

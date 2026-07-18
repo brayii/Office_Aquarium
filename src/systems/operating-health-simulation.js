@@ -120,13 +120,14 @@ function weightedProjectMetric(projects,metric){
 }
 function relevantProjects(category,{includePaused=false}={}){
   ensureProjectPortfolio();
-  const statuses=includePaused?["approved","planning","prototype","execution","verification","pilot","scaling","at risk","blocked","paused"]:["approved","planning","prototype","execution","verification","pilot","scaling","at risk","blocked"];
+  const lifecycle=OFFICE_AQUARIUM_CONSTANTS.projectLifecycle;
+  const statuses=includePaused?lifecycle.activeIncludingPausedStatuses:lifecycle.activeStatuses;
   const active=(company.projects||[]).filter(p=>statuses.includes(p.status)&&projectMatchesCategory(p,category));
   const completed=(company.projectArchive||[]).filter(p=>p.status==="completed"&&projectMatchesCategory(p,category)).slice(0,6);
   return [...active,...completed];
 }
 function derivedFinanceHealth(){
-  const f=company.finance||{},runway=f.runwayDays>=999?100:clamp((f.runwayDays||0)/180*100,0,100),flow=clamp(50+(Number(f.netCashFlowDaily||0)*420),0,100),cash=clamp(company.cash/20*100,0,100);
+  const f=company.finance||{},runwayDays=runwayDaysOrUnknown(f),runway=runwayDays>=OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay?100:clamp(runwayDays/180*100,0,100),flow=clamp(50+(Number(f.netCashFlowDaily||0)*420),0,100),cash=clamp(company.cash/20*100,0,100);
   return Math.round(runway*.45+flow*.35+cash*.20);
 }
 function weightedEmployeeMorale(){
@@ -191,8 +192,8 @@ function derivedInvestorConfidence(portfolioHealth){
 }
 function boardConfidenceTarget(morale=null,stress=null){
   const finance=company.finance||{},portfolio=company.portfolioHealth||{},risk=company.companyRiskComponents||{};
-  const runway=Number(finance.runwayDays??999),net=Number(finance.netCashFlowDaily||0),avgMorale=morale??weightedEmployeeMorale?.()??60,avgStressValue=stress??avgStress();
-  const runwayScore=runway>=999?82:clamp(runway*.62,0,92);
+  const runway=runwayDaysOrUnknown(finance),net=Number(finance.netCashFlowDaily||0),avgMorale=morale??weightedEmployeeMorale?.()??60,avgStressValue=stress??avgStress();
+  const runwayScore=runway>=OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay?82:clamp(runway*.62,0,92);
   const cashScore=clamp((company.cash||0)*5.2,0,92);
   const executionScore=clamp(72-(portfolio.atRiskProjects||0)*8-Math.max(0,portfolio.averageScheduleVariance||0)*.55-Math.max(0,portfolio.averageBudgetVariance||0)*.35+(portfolio.activeProjects?6:0),0,96);
   const peopleScore=clamp(avgMorale*.55+(100-avgStressValue)*.35+(employees.filter(e=>e.active).length>=6?8:0),0,96);
@@ -210,8 +211,8 @@ function updateBoardConfidenceDaily(morale,stress){
 }
 function applyDailyOrganizationalPressure(morale,stress){
   const finance=company.finance||{},portfolio=company.portfolioHealth||{},risk=company.companyRiskComponents||{};
-  const runway=Number(finance.runwayDays??999),net=Number(finance.netCashFlowDaily||0);
-  const runwayPressure=runway>=999?0:clamp((140-runway)/140,0,1);
+  const runway=runwayDaysOrUnknown(finance),net=Number(finance.netCashFlowDaily||0);
+  const runwayPressure=runway>=OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay?0:clamp((140-runway)/140,0,1);
   const burnPressure=clamp(Math.abs(Math.min(0,net))/.18,0,1);
   const capacityPressure=clamp((company.projectCapacity?.totalOverload||0)/Math.max(1,company.projectCapacity?.totalCapacity||1),0,1);
   const projectPressure=clamp((portfolio.atRiskProjects||0)*.18+Math.max(0,portfolio.averageScheduleVariance||0)*.012+Math.max(0,portfolio.projectDrivenOpenRoles||0)*.08+capacityPressure*.32,0,1);
@@ -519,13 +520,22 @@ function workSkillFit(e,work){
   const skill=e.skills||{},req=work.requiredSkills||{};
   return Object.entries(req).reduce((s,[k,v])=>s+Math.min(1.25,(skill[k]??35)/Math.max(1,v)),0)/Math.max(1,Object.keys(req).length);
 }
-function assertNoSocialFieldsInWorkResolutionInputs(inputs={}){
-  const forbidden=/social|relationship|friendship|rivalry|trust|respect|comfort|friction/i;
-  const bad=Object.keys(inputs||{}).filter(key=>forbidden.test(key));
+function assertWorkAIInputsDoNotContainSocialState(inputs={}){
+  const forbidden=SOCIAL_RULES.workInputForbiddenKeys.map(key=>String(key).toLowerCase());
+  const bad=[];
+  const inspect=(value,path="inputs")=>{
+    if(!value||typeof value!=="object")return;
+    Object.entries(value).forEach(([key,nested])=>{
+      const normalized=String(key).toLowerCase();
+      if(forbidden.some(token=>normalized.includes(token)))bad.push(`${path}.${key}`);
+      if(nested&&typeof nested==="object")inspect(nested,`${path}.${key}`);
+    });
+  };
+  inspect(inputs);
   if(bad.length){
     const error=new Error(`Work AI resolution received Social AI field(s): ${bad.join(", ")}`);
     recordSimulationError?.(error,"work-ai-boundary");
-    if(validationMode)throw error;
+    throw error;
   }
   return true;
 }
@@ -721,6 +731,21 @@ function finishAction(e){
   e.activeCollaboration=null;
   e.activeMeeting=null;
 }
+function qualityMistakeSocialPartner(e,workItem){
+  if(!e||!workItem)return null;
+  const candidates=new Map();
+  const add=(employeeId,weight)=>{
+    const id=Number(employeeId);
+    if(!Number.isFinite(id)||id===e.id)return;
+    const employee=employees.find(candidate=>candidate.active&&candidate.id===id);
+    if(employee)candidates.set(id,{employee,weight:Math.max(weight,candidates.get(id)?.weight||0)});
+  };
+  add(workItem.ownerId,100);
+  (workItem.collaborators||[]).forEach(employeeId=>add(employeeId,80));
+  const project=(company.projects||[]).find(candidate=>candidate.id===workItem.projectId);
+  Object.entries(project?.staffAllocations||{}).forEach(([employeeId,fte])=>add(employeeId,(Number(fte)||0)*60));
+  return [...candidates.values()].sort((a,b)=>b.weight-a.weight||a.employee.id-b.employee.id)[0]?.employee||null;
+}
 function recordQualityMistake(e,reason,severity=1){
   e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
   e.performance.qualityMistakes=clamp((e.performance.qualityMistakes||0)+severity,0,10);
@@ -731,6 +756,13 @@ function recordQualityMistake(e,reason,severity=1){
   if(company.phase==="pilot"||company.phase==="launched")company.trust=clamp(company.trust-.08*severity,0,100);
   if(simulationRandom()<.18)recordWeeklyEvent(`${e.name} created rework from ${reason}.`,"quality",3);
   if(severity>=1)recordLearningEvidence({domain:"quality",eventType:"verification-need",action:"quality-mistake",outcome:"negative",magnitude:severity,confidence:60,department:employeeTeam(e),employeeIds:[e.id],projectId:activeWorkForEmployee(e)?.projectId||null,evidence:`Verification evidence from ${reason}`,contributors:[{type:"employee",id:e.id,weight:.55},{type:"workItem",id:activeWorkForEmployee(e)?.id||null,weight:.30},{type:"global",id:"company",weight:.10}]});
+  const affectedWork=activeWorkForEmployee(e),partner=qualityMistakeSocialPartner(e,affectedWork);
+  const affectedProject=(company.projects||[]).find(project=>project.id===affectedWork?.projectId);
+  const qualityRules=OFFICE_AQUARIUM_CONSTANTS.social.projectExperience;
+  if(partner&&affectedProject&&reason==="a failed verification pass"&&company.day-affectedProject.lastQualitySocialExperienceDay>=qualityRules.cooldownDays){
+    recordSharedExperience(e,partner,{type:"milestone_failure_together",sourceEventId:`quality-rework-${affectedProject.id}-${company.day}`,projectId:affectedProject.id,participants:[e.id,partner.id],tone:"negative",intensity:qualityRules.qualityFailureIntensity,requireSource:true});
+    affectedProject.lastQualitySocialExperienceDay=company.day;
+  }
 }
 function startCollaborationSession(e,target,ctx){
   const work=ctx.work||activeWorkForEmployee(e);
@@ -740,7 +772,7 @@ function startCollaborationSession(e,target,ctx){
   target.activeCollaboration={...session,partnerId:e.id};
   if(!work.collaborators.includes(e.id))work.collaborators.push(e.id);
   if(!work.collaborators.includes(target.id))work.collaborators.push(target.id);
-  recordSocialEncounter?.(e,target,{type:(work.blockedBy||[]).length?"direct_help":"shared_work_event",gain:(work.blockedBy||[]).length?3:2,sourceEventId:`collab-${work.id}-${company.day}-${company.minute}`,roomId:e.currentRoom||roomForZone?.(e.zone)||null,cooldownMinutes:240});
+  recordSocialEncounter?.(e,target,{type:(work.blockedBy||[]).length?"direct_help":"shared_work_activity",gain:(work.blockedBy||[]).length?3:2,sourceEventId:`collab-${work.id}-${company.day}-${company.minute}`,roomId:e.currentRoom||roomForZone?.(e.zone)||null,cooldownMinutes:240});
   return session;
 }
 function applyCollaborationOutcome(e){
@@ -752,7 +784,7 @@ function applyCollaborationOutcome(e){
   if(!partner||!item)return;
   const fit=(workSkillFit(e,item)+workSkillFit(partner,item))/2;
   const workInputs={skillFit:fit,employeeFocus:e.focus||50,partnerFocus:partner.focus||50,employeeMorale:e.morale||50,partnerMorale:partner.morale||50,employeeStress:e.stress||0,partnerStress:partner.stress||0,communicationCulture:company.culture?.communication??50};
-  assertNoSocialFieldsInWorkResolutionInputs(workInputs);
+  assertWorkAIInputsDoNotContainSocialState(workInputs);
   const stateModifier=((workInputs.employeeFocus+workInputs.partnerFocus)/200)*.65+((workInputs.employeeMorale+workInputs.partnerMorale)/200)*.25-Math.max(0,(workInputs.employeeStress+workInputs.partnerStress)/2-65)*.006;
   const gain=clamp(1.2+fit*3.0+stateModifier+(company.culture?.communication??50)/90,1,7);
   const before=item.progress||0;
@@ -763,6 +795,13 @@ function applyCollaborationOutcome(e){
   partner.taskProgress=(partner.taskProgress||0)+gain*.008;
   company.integration=clamp(company.integration+gain*.035,0,100);
   company.quality=clamp(company.quality+gain*.018,0,100);
+  const socialRules=OFFICE_AQUARIUM_CONSTANTS.social.projectExperience;
+  const teamPressure=Number(company.teams?.[item.assignedTeam]?.pressure)||0;
+  const deadlinePressure=company.day>=Number(item.deadlineDay||company.day+socialRules.collaborationDeadlineLeadDays)-socialRules.collaborationDeadlineLeadDays;
+  if(deadlinePressure||teamPressure>=socialRules.collaborationTeamPressure||(item.blockedBy||[]).length){
+    const episode=Math.floor(company.day/socialRules.cooldownDays);
+    recordSharedExperience?.(e,partner,{type:"deadline_pressure_together",sourceEventId:`collaboration-pressure-${item.id}-${episode}`,projectId:item.projectId||null,participants:[e.id,partner.id],tone:"mixed",intensity:clamp(2+Math.round(teamPressure/35),2,4),requireSource:true});
+  }
   if(item.blockedBy?.length){
     const chance=clamp(.12+fit*.25+stateModifier*.08,0,.55);
     if(simulationRandom()<chance){
@@ -844,7 +883,20 @@ function chooseAction(e){
   if((a==="break"||a==="socialize"||a==="meeting")&&typeof applySocialPreferenceOpportunity==="function"){
     const opportunityType=a==="break"?"break":a==="meeting"?"meeting_before_after":"conversation";
     const preference=applySocialPreferenceOpportunity(e,{type:opportunityType,roomId:chosenRoom,allowAlone:true});
-    if(a==="socialize"&&preference?.selectedEmployeeId!=null){
+    if(a==="break"&&preference?.selectedEmployeeId!=null){
+      target=employees.find(x=>x.id===preference.selectedEmployeeId)||null;
+      if(target){
+        const pair=[e.id,target.id].sort((left,right)=>left-right);
+        recordSharedExperience(e,target,{
+          type:"shared_break",
+          roomId:chosenRoom,
+          sourceEventId:`shared-break-${pair[0]}-${pair[1]}-${company.day}-${Math.floor(company.minute/30)}`,
+          tone:null,
+          intensity:1,
+          requireSource:true
+        });
+      }
+    }else if(a==="socialize"&&preference?.selectedEmployeeId!=null){
       target=employees.find(x=>x.id===preference.selectedEmployeeId)||null;
       if(target){
         e.action=`talking with ${target.name}`;
@@ -916,17 +968,23 @@ function simulateMinuteCore(renderNow=true){if(company.gameOver)return;company.m
 function clampCompany(){["chip","software","quality","integration","board","trust"].forEach(k=>company[k]=clamp(company[k],0,100));company.customers=Math.max(0,company.customers);company.valuation=Math.max(0,company.valuation);}
 function maybePhaseAdvance(){let next=company.phase;if(company.phase==="prototype"&&company.chip>=45&&company.software>=45)next="integration";if(company.phase==="integration"&&company.integration>=48&&company.quality>=50)next="customer trial";if(next!==company.phase){company.phase=next;company.log.push(`Product phase advanced to ${next}.`);recordWeeklyEvent(`Product phase advanced to ${next}.`,"product",4);}}
 
-function defaultEmploymentForRole(role){
-  const band=salaryBandForRole(role),annualSalary=rand(band[0],band[1]);
+function employmentBaselineForRole(role,annualSalary=null){
+  const rules=OFFICE_AQUARIUM_CONSTANTS.employment,band=salaryBandForRole(role);
+  const normalizedSalary=Number.isFinite(Number(annualSalary))?Number(annualSalary):(band[0]+band[1])/2;
   return {
-    annualSalary:Number(annualSalary.toFixed(3)),benefitsRate:.24,payrollTaxRate:.08,
-    equipmentAnnual:.018,trainingAnnual:.012,officeAnnual:.016,insuranceAnnual:.009,
-    severanceWeeks:clamp(2+simulationRandom()*3,2,8),salarySatisfaction:65
+    annualSalary:Number(normalizedSalary.toFixed(3)),benefitsRate:rules.benefitsRate,payrollTaxRate:rules.payrollTaxRate,
+    equipmentAnnual:rules.equipmentAnnual,trainingAnnual:rules.trainingAnnual,officeAnnual:rules.officeAnnual,insuranceAnnual:rules.insuranceAnnual,
+    severanceWeeks:rules.severanceWeeksMin,salarySatisfaction:rules.salarySatisfaction
   };
 }
+function defaultEmploymentForRole(role){
+  const rules=OFFICE_AQUARIUM_CONSTANTS.employment,band=salaryBandForRole(role),annualSalary=rand(band[0],band[1]);
+  return {...employmentBaselineForRole(role,annualSalary),severanceWeeks:rand(rules.severanceWeeksMin,rules.severanceWeeksMax)};
+}
 function dailyEmploymentCost(e){
-  const emp=e.employment||defaultEmploymentForRole(e.role),salary=Number(emp.annualSalary)||.15;
-  return salary/365+salary*(emp.benefitsRate??.24)/365+salary*(emp.payrollTaxRate??.08)/365+(emp.equipmentAnnual??.018)/365+(emp.trainingAnnual??.012)/365+(emp.officeAnnual??.016)/365+(emp.insuranceAnnual??.009)/365;
+  const emp=e.employment||employmentBaselineForRole(e.role),salary=Number(emp.annualSalary)||.15;
+  const daysPerYear=OFFICE_AQUARIUM_CONSTANTS.time.daysPerYear;
+  return salary/daysPerYear+salary*(emp.benefitsRate??.24)/daysPerYear+salary*(emp.payrollTaxRate??.08)/daysPerYear+(emp.equipmentAnnual??.018)/daysPerYear+(emp.trainingAnnual??.012)/daysPerYear+(emp.officeAnnual??.016)/daysPerYear+(emp.insuranceAnnual??.009)/daysPerYear;
 }
 function activeTechnicalEmployees(){
   return employees.filter(e=>e.active&&["hardware","software","quality"].includes(roleDepartment(e.role))).length;

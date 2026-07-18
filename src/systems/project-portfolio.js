@@ -1,5 +1,7 @@
 const DEPARTMENTS=["hardware","software","quality","product","finance","people","company"];
 const PROJECT_LESSON_KEYS=["estimateAccuracy","scopeControl","pilotValue","earlyQA","staffingTiming","cancellationTiming","sunkCostDiscipline","marketTiming","supplierRisk","projectSize","crossDepartmentCoordination","customerValidation","knowledgeValue"];
+const PROJECT_SOCIAL_EXPERIENCE_RULES=OFFICE_AQUARIUM_CONSTANTS.social.projectExperience;
+const PORTFOLIO_DEMAND_RULES=OFFICE_AQUARIUM_CONSTANTS.portfolioDemand;
 const LEARNING_COVERAGE={
   testing:{producers:["quality mistakes","project QA","CEO quality decisions"],consumers:["employee lab utility","project early QA"],ui:["Lessons Learned"]},
   collaboration:{producers:["successful collaboration","project coordination"],consumers:["employee collaborate utility","project coordination"],ui:["Lessons Learned"]},
@@ -34,7 +36,7 @@ const LEARNING_COVERAGE={
   customerValidation:{producers:["validation decisions"],consumers:["portfolio recommendations"],ui:["Project Portfolio"]},
   knowledgeValue:{producers:["completed research/projects"],consumers:["proposal benefit estimates"],ui:["Project Portfolio"]}
 };
-function emptyProjectLessons(){return Object.fromEntries(PROJECT_LESSON_KEYS.map(k=>[k,{score:0,confidence:0,successEvidence:0,failureEvidence:0,sampleCount:0,lastObservedDay:-999,effectEstimate:0,variance:1,evidence:[]}]));}
+function emptyProjectLessons(){return Object.fromEntries(PROJECT_LESSON_KEYS.map(k=>[k,{score:0,confidence:0,successEvidence:0,failureEvidence:0,sampleCount:0,lastObservedDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,effectEstimate:0,variance:1,evidence:[]}]));}
 function normalizeProjectLessons(){
   const defaults=emptyProjectLessons(), current=company.projectLessons&&typeof company.projectLessons==="object"?company.projectLessons:{};
   for(const key of PROJECT_LESSON_KEYS){
@@ -87,6 +89,53 @@ function projectPaceProfile(project){
   const scope=Number(project?.scope||1);
   const complexity=clamp((difficulty-45)*.006+(scope-1)*.10+(major ? .16 : 0)-(internal ? .10 : 0),-.12,.34);
   return {major,internal,complexity,progressMultiplier:clamp(1-complexity,.62,1.08),closeoutDays:major?5:internal?3:4};
+}
+function projectDemandScale(project){
+  if(project?.originType==="regression")return 1;
+  const rules=PORTFOLIO_DEMAND_RULES;
+  const cash=Number(company?.cash)||0,valuation=Number(company?.valuation)||0,customers=Number(company?.customers)||0,revenue=Number(company?.dailyRevenue)||0;
+  const profile=projectPaceProfile(project),scope=Number(project?.scope)||1,activeCount=(company?.projects||[]).filter(p=>p&&!terminalProjectStatus(p.status)).length;
+  const cashSignal=Math.max(0,cash-rules.scaleCashThreshold)*.012;
+  const valuationSignal=Math.max(0,valuation-rules.scaleValuationThreshold)*.006;
+  const customerSignal=Math.max(0,customers-rules.scaleCustomerThreshold)*.004;
+  const revenueSignal=Math.max(0,revenue-rules.scaleRevenueThreshold)*1.15;
+  const scopeSignal=Math.max(0,scope-1)*.18;
+  const phaseSignal=(company?.phase==="launched"||company?.phase==="pilot")?rules.launchedDemandBonus:0;
+  const majorSignal=profile.major?rules.majorProjectDemandBonus:0;
+  const portfolioSignal=Math.max(0,activeCount-1)*.08;
+  return clamp(1+cashSignal+valuationSignal+customerSignal+revenueSignal+scopeSignal+phaseSignal+majorSignal+portfolioSignal,.9,2.15);
+}
+function roundProjectFte(value){
+  return Number((Math.ceil(Math.max(0,Number(value)||0)*2)/2).toFixed(1));
+}
+function desiredProjectHeadcount(project){
+  const primary=project.proposingDepartment||projectDepartmentForFamily(project.family||"");
+  const profile=projectPaceProfile(project),scale=projectDemandScale(project),scope=Number(project.scope)||1;
+  const fixedRegressionProject=project.originType==="regression";
+  const current=project.baseRequiredHeadcount&&typeof project.baseRequiredHeadcount==="object"?project.baseRequiredHeadcount:(project.requiredHeadcount&&typeof project.requiredHeadcount==="object"?project.requiredHeadcount:{});
+  const required=new Set([...(project.requiredDepartments||[]),primary]);
+  if(["hardware","software"].includes(primary))required.add("quality");
+  if(!fixedRegressionProject&&(profile.major||company.phase==="launched"||(project.customerInterest||0)>68))required.add("product");
+  if(!fixedRegressionProject&&((project.estimatedCost||0)>2.2||(project.budgetApproved||0)>1.5||profile.major))required.add("finance");
+  const base={...current};
+  base[primary]=Math.max(Number(base[primary])||0,profile.major?2:scope>1?1.5:1);
+  if(required.has("quality"))base.quality=Math.max(Number(base.quality)||0,profile.major?1.5:1);
+  if(required.has("product"))base.product=Math.max(Number(base.product)||0,(company.phase==="launched"||profile.major)?.75:.5);
+  if(required.has("finance"))base.finance=Math.max(Number(base.finance)||0,profile.major?.75:.5);
+  (project.requiredDepartments||[]).forEach(dept=>{base[dept]=Math.max(Number(base[dept])||0,dept===primary?base[dept]||1:.5);});
+  const desired={};
+  Object.entries(base).forEach(([dept,need])=>{
+    if(!need)return;
+    const multiplier=dept===primary?scale:clamp(.82+scale*.30,.95,1.55);
+    desired[dept]=roundProjectFte(need*multiplier);
+  });
+  const maxTotal=PORTFOLIO_DEMAND_RULES.maxProjectHeadcount;
+  const total=Object.values(desired).reduce((s,v)=>s+(Number(v)||0),0);
+  if(total>maxTotal){
+    const trim=maxTotal/total;
+    Object.keys(desired).forEach(dept=>desired[dept]=Math.max(dept===primary?1:.5,roundProjectFte(desired[dept]*trim)));
+  }
+  return desired;
 }
 function projectLateStageDrag(project,progress=null){
   const p=Number(progress??project?.progress??0);
@@ -179,10 +228,21 @@ function reauditProjectRequirements(project){
   project.learningDomains=Array.isArray(project.learningDomains)&&project.learningDomains.length?project.learningDomains:["estimateAccuracy","scopeControl","crossDepartmentCoordination","staffingTiming"];
   project.requiredDepartments=Array.isArray(project.requiredDepartments)&&project.requiredDepartments.length?project.requiredDepartments:projectRequiredDepartments(project.family||"",primary);
   project.requiredHeadcount=project.requiredHeadcount&&typeof project.requiredHeadcount==="object"?project.requiredHeadcount:{[primary]:1,quality:["hardware","software"].includes(primary)?1:0};
+  project.baseRequiredHeadcount=project.baseRequiredHeadcount&&typeof project.baseRequiredHeadcount==="object"?project.baseRequiredHeadcount:{...project.requiredHeadcount};
+  if(!terminalProjectStatus(project.status)){
+    const desired=desiredProjectHeadcount(project);
+    project.requiredHeadcount=Object.fromEntries([...new Set([...Object.keys(project.requiredHeadcount||{}),...Object.keys(desired||{})])].map(dept=>[
+      dept,
+      Math.max(Number(project.requiredHeadcount?.[dept])||0,Number(desired?.[dept])||0)
+    ]).filter(([,need])=>need>0));
+    const activeDemand=Object.values(project.requiredHeadcount).reduce((s,v)=>s+(Number(v)||0),0);
+    project.requirementScale={day:company.day,demandScale:Number(projectDemandScale(project).toFixed(2)),requiredFte:Number(activeDemand.toFixed(1)),reason:"project staffing demand scales with company size, portfolio load, scope, and commercial expectations"};
+  }
   if(project.originType==="legacy"||/Legacy Flagship/i.test(project.title||"")){
     const total=Object.values(project.requiredHeadcount).reduce((s,v)=>s+(Number(v)||0),0);
-    if(total>8){
-      const scale=8/total;
+    const legacyMax=PORTFOLIO_DEMAND_RULES.maxLegacyProjectHeadcount;
+    if(total>legacyMax){
+      const scale=legacyMax/total;
       Object.keys(project.requiredHeadcount).forEach(k=>project.requiredHeadcount[k]=Math.max(0,Number((project.requiredHeadcount[k]*scale).toFixed(1))));
     }
     project.requiredRoles=(project.requiredRoles||[]).filter(role=>!["Manager","Director","Vice President","Manufacturing Engineer"].includes(role));
@@ -263,6 +323,10 @@ function ensureProjectPortfolio(){
     p.staffAllocations=p.staffAllocations&&typeof p.staffAllocations==="object"?p.staffAllocations:{};
     p.causalLedger=Array.isArray(p.causalLedger)?p.causalLedger:[];
     p.closeoutReadyDays=Number(p.closeoutReadyDays)||0;
+    p.lastSocialPressureExperienceDay=Number.isFinite(Number(p.lastSocialPressureExperienceDay))?Number(p.lastSocialPressureExperienceDay):-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay;
+    p.lastSocialFailureExperienceDay=Number.isFinite(Number(p.lastSocialFailureExperienceDay))?Number(p.lastSocialFailureExperienceDay):-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay;
+    p.lastQualitySocialExperienceDay=Number.isFinite(Number(p.lastQualitySocialExperienceDay))?Number(p.lastQualitySocialExperienceDay):-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay;
+    p.socialCompletionExperienceRecorded=!!p.socialCompletionExperienceRecorded;
     p.commercialStatus=p.commercialStatus||((p.status==="completed"&&(p.customerInterest||0)>=65)?"ready":p.status==="completed"?"completed":"not ready");
     p.convertedCustomers=Number(p.convertedCustomers)||0;
     p.projectedDailyRevenue=Number(p.projectedDailyRevenue)||0;
@@ -271,7 +335,7 @@ function ensureProjectPortfolio(){
   });
   employees?.forEach(e=>{e.projectAffinity=e.projectAffinity&&typeof e.projectAffinity==="object"?e.projectAffinity:{};e.projectHistory=Array.isArray(e.projectHistory)?e.projectHistory:[];e.proposalHistory=Array.isArray(e.proposalHistory)?e.proposalHistory:[];e.projectSkills=e.projectSkills&&typeof e.projectSkills==="object"?e.projectSkills:{estimateAccuracy:45,scopeControl:45,coordination:45};});
 }
-function terminalProjectStatus(status){return ["completed","canceled","rejected","merged"].includes(status);}
+function terminalProjectStatus(status){return OFFICE_AQUARIUM_CONSTANTS.projectLifecycle.terminalStatuses.includes(status);}
 function archiveProjectOnce(project,status=null){
   if(!project||!company)return null;
   company.projects=Array.isArray(company.projects)?company.projects:[];
@@ -331,7 +395,7 @@ function repairProjectPortfolioIntegrity(){
     delete company._repairingProjectPortfolio;
   }
 }
-function activeProjects(){ensureProjectPortfolio();return company.projects.filter(p=>["approved","planning","prototype","execution","verification","pilot","scaling","at risk","blocked"].includes(p.status));}
+function activeProjects(){ensureProjectPortfolio();return company.projects.filter(p=>OFFICE_AQUARIUM_CONSTANTS.projectLifecycle.activeStatuses.includes(p.status));}
 function setProjectArchiveOpen(open){if(company)company.projectArchiveOpen=!!open;}
 function employeeProjectCapacity(e){
   const onboarding=clamp(onboardingProductivity(e),.15,1);
@@ -563,6 +627,72 @@ function applyProjectDevelopmentFriction(project,allItems,items,metrics){
   const blockers=items.reduce((s,w)=>s+(w.blockedBy?.length||0),0);
   return {items,blockers,backlog:items.length};
 }
+function projectSocialExperienceParticipants(project,items=[]){
+  const involvement=new Map();
+  Object.entries(project?.staffAllocations||{}).forEach(([employeeId,fte])=>{
+    const id=Number(employeeId);
+    if(Number.isFinite(id)&&(Number(fte)||0)>.01)involvement.set(id,(involvement.get(id)||0)+(Number(fte)||0)*100);
+  });
+  (project?.assignedEmployees||[]).forEach(employeeId=>{
+    const id=Number(employeeId);
+    if(Number.isFinite(id))involvement.set(id,(involvement.get(id)||0)+20);
+  });
+  (items||[]).forEach(item=>{
+    const ownerId=Number(item?.ownerId);
+    if(Number.isFinite(ownerId))involvement.set(ownerId,(involvement.get(ownerId)||0)+16);
+    (item?.collaborators||[]).forEach(employeeId=>{
+      const id=Number(employeeId);
+      if(Number.isFinite(id))involvement.set(id,(involvement.get(id)||0)+8);
+    });
+  });
+  const candidates=[...involvement.entries()]
+    .map(([id,score])=>({employee:employees.find(e=>e.active&&e.id===id),score}))
+    .filter(entry=>entry.employee)
+    .sort((a,b)=>b.score-a.score||a.employee.id-b.employee.id);
+  if(candidates.length<2)return candidates.map(entry=>entry.employee);
+  const pairScores=[];
+  for(let left=0;left<candidates.length-1;left++){
+    for(let right=left+1;right<candidates.length;right++){
+      const a=candidates[left],b=candidates[right];
+      const jointWork=(items||[]).filter(item=>{
+        const participants=new Set([Number(item?.ownerId),...(item?.collaborators||[]).map(Number)]);
+        return participants.has(a.employee.id)&&participants.has(b.employee.id);
+      }).length;
+      pairScores.push({a:a.employee,b:b.employee,score:a.score+b.score+jointWork*80});
+    }
+  }
+  const selected=pairScores.sort((a,b)=>b.score-a.score||a.a.id-b.a.id||a.b.id-b.b.id)[0];
+  return selected?[selected.a,selected.b]:candidates.slice(0,2).map(entry=>entry.employee);
+}
+function recordProjectSocialExperience(project,items,{blockers=0,scheduleVariance=0,riskTrend=0,coverage=100,overload=0,completed=false}={}){
+  if(typeof recordSharedExperience!=="function"||!project)return null;
+  const participants=projectSocialExperienceParticipants(project,items);
+  if(participants.length<2)return null;
+  const [a,b]=participants,rules=PROJECT_SOCIAL_EXPERIENCE_RULES;
+  if(completed){
+    if(project.socialCompletionExperienceRecorded)return null;
+    const result=recordSharedExperience(a,b,{type:"milestone_success_together",sourceEventId:`project-completed-${project.id}`,projectId:project.id,participants:[a.id,b.id],tone:"positive",intensity:4,requireSource:true});
+    if(result)project.socialCompletionExperienceRecorded=true;
+    return result;
+  }
+  const late=company.day>(project.deadlineDay||OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay)&&Number(project.progress||0)<96;
+  const overdueItems=(items||[]).filter(item=>item?.status==="open"&&Number(item.progress||0)<96&&company.day>Number(item.deadlineDay??OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay));
+  const longestWorkItemDelay=overdueItems.reduce((max,item)=>Math.max(max,company.day-Number(item.deadlineDay||company.day)),0);
+  const blockedOverdue=overdueItems.some(item=>(item.blockedBy||[]).length>0);
+  const severe=(late&&blockers>0)||blockedOverdue||longestWorkItemDelay>=rules.severeWorkItemOverdueDays||(scheduleVariance>=rules.severeScheduleVariance&&riskTrend>=rules.severeRisk)||(coverage<rules.severeCoverage&&blockers>0&&overload>rules.pressureOverload);
+  const pressured=late||overdueItems.length>0||blockers>0||scheduleVariance>=rules.pressureScheduleVariance||riskTrend>=rules.pressureRisk||(coverage<rules.pressureCoverage&&overload>rules.pressureOverload);
+  if(severe&&company.day-project.lastSocialFailureExperienceDay>=rules.cooldownDays){
+    const result=recordSharedExperience(a,b,{type:"milestone_failure_together",sourceEventId:`project-delivery-failure-${project.id}-${company.day}`,projectId:project.id,participants:[a.id,b.id],tone:"negative",intensity:clamp(2+Math.round((riskTrend-rules.pressureRisk)/12),2,5),requireSource:true});
+    if(result)project.lastSocialFailureExperienceDay=company.day;
+    return result;
+  }
+  if(pressured&&company.day-project.lastSocialPressureExperienceDay>=rules.cooldownDays){
+    const result=recordSharedExperience(a,b,{type:"deadline_pressure_together",sourceEventId:`project-delivery-pressure-${project.id}-${company.day}`,projectId:project.id,participants:[a.id,b.id],tone:"mixed",intensity:clamp(2+Math.round(Math.max(0,scheduleVariance)/24),2,5),requireSource:true});
+    if(result)project.lastSocialPressureExperienceDay=company.day;
+    return result;
+  }
+  return null;
+}
 function projectPerformanceUpdate(){
   ensureProjectPortfolio();
   rebuildRuntimeIndexes();
@@ -608,6 +738,7 @@ function projectPerformanceUpdate(){
     const fallbackProjectHealth=typeof projectVisibleHealth==="function"?projectVisibleHealth(p):50;
     const executionHealth=typeof projectExecutionHealthBreakdown==="function"?projectExecutionHealthBreakdown(p):{current:fallbackProjectHealth,base:50,companyCondition:condition.score,companyModifier:0,staffingModifier:0,riskModifier:0,profile:condition.profile};
     p.performance={progress:Math.round(p.progress),scheduleVariance,budgetVariance,quality:Math.round(p.quality),integration:Math.round(p.integration),teamHealth:Math.round(clamp(100-avgStress()+coverage*.2-overload*.25+conditionDelta*.05,0,100)),staffingCoverage:Math.round(coverage),workloadOverload:Math.round(overload),blockerCount:blockers,backlogCount:friction.backlog,customerInterest:Math.round(p.customerInterest),strategicConfidence:Math.round(clamp((p.visibleConfidence||55)+(p.quality-55)*.08+(p.customerInterest-50)*.1-overload*.04+conditionDelta*.08,0,100)),riskTrend:Math.round(riskTrend),benefitRealization:Math.round(clamp((p.progress||0)*p.hiddenReality.trueStrategicValue/100,0,100)),forecastAtCompletion:Math.round(clamp(100-riskTrend*.45+(p.customerInterest||50)*.25,0,100)),executionHealth:executionHealth.current,baseHealth:executionHealth.base,companyCondition:executionHealth.companyCondition,companyModifier:executionHealth.companyModifier,staffingModifier:executionHealth.staffingModifier,riskModifier:executionHealth.riskModifier,dependencyProfile:executionHealth.profile};
+    recordProjectSocialExperience(p,allItems,{blockers,scheduleVariance,riskTrend,coverage,overload});
     if(Math.abs(conditionDelta)>18&&company.day%7===0)recordProjectLedger(p.id,"company-conditions","executionHealth",conditionDelta*.08,`Relevant company conditions ${conditionDelta>0?"supported":"weighed on"} execution`);
     if(overload>20&&items.length&&simulationRandom()<clamp((overload-15)*.0015,0,.08)){
       const target=items.slice().sort((a,b)=>(b.qualityRisk||0)-(a.qualityRisk||0))[0];
@@ -619,7 +750,7 @@ function projectPerformanceUpdate(){
     p.closeoutReadyDays=closeoutReady?Math.min(closeoutNeeded+1,(p.closeoutReadyDays||0)+1):0;
     if(p.closeoutReadyDays>=closeoutNeeded&&p.progress<100){p.progress=100;p.performance.progress=100;recordProjectLedger(p.id,"project-closeout","progress",100-beforeProgress,`Near-complete project accepted after ${closeoutNeeded} readiness checks`);}
     if(riskTrend>72&&p.status!=="blocked")p.status="at risk";
-    if(p.progress>=100){p.status="completed";p.completedDay=company.day;archiveProjectOnce(p,"completed");updateProjectCommercialStats(p);recordWeeklyEvent(`${p.title} completed.`,"project",6);recordMajorHistory(`${p.title} completed and shaped the company portfolio.`,"project",6);if(p.commercialStatus==="ready")recordHistory(`${p.title} is ready for commercial review after completion.`,"product",4);reinforceProjectLesson("estimateAccuracy",budgetVariance<20?.8:-.5,p.title,8,budgetVariance<20?"positive":"contradiction");reinforceProjectLesson("crossDepartmentCoordination",blockers<2?.7:-.4,p.title,7,blockers<2?"positive":"mixed");reinforceProjectLesson("knowledgeValue",(p.hiddenReality?.trueKnowledgeValue||50)>60?.6:.2,p.title,5,"positive");createOrReinforceLesson({key:"project-completion-learning",title:"Completed projects improve future project estimation and coordination.",department:p.proposingDepartment,vector:{planning:.8,documentation:.5,collaboration:.5,estimateAccuracy:.5,crossDepartmentCoordination:.6},outcome:"positive",confidence:70,evidence:p.title,importance:5});}
+    if(p.progress>=100){p.status="completed";p.completedDay=company.day;recordProjectSocialExperience(p,allItems,{completed:true});archiveProjectOnce(p,"completed");updateProjectCommercialStats(p);recordWeeklyEvent(`${p.title} completed.`,"project",6);recordMajorHistory(`${p.title} completed and shaped the company portfolio.`,"project",6);if(p.commercialStatus==="ready")recordHistory(`${p.title} is ready for commercial review after completion.`,"product",4);reinforceProjectLesson("estimateAccuracy",budgetVariance<20?.8:-.5,p.title,8,budgetVariance<20?"positive":"contradiction");reinforceProjectLesson("crossDepartmentCoordination",blockers<2?.7:-.4,p.title,7,blockers<2?"positive":"mixed");reinforceProjectLesson("knowledgeValue",(p.hiddenReality?.trueKnowledgeValue||50)>60?.6:.2,p.title,5,"positive");createOrReinforceLesson({key:"project-completion-learning",title:"Completed projects improve future project estimation and coordination.",department:p.proposingDepartment,vector:{planning:.8,documentation:.5,collaboration:.5,estimateAccuracy:.5,crossDepartmentCoordination:.6},outcome:"positive",confidence:70,evidence:p.title,importance:5});}
   });
   if(typeof buildWorkforceAllocationSnapshot==="function")buildWorkforceAllocationSnapshot({updateAwareness:true});
   deriveLegacyProgressFromProjects();
