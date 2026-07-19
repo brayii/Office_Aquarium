@@ -91,7 +91,11 @@ Shows what employees are doing right now. Employees may work, meet, test, collab
 
 Click an employee in the office to open their detail page. A faded employee is temporarily offsite or unavailable. Employees who resign or are terminated are removed from the live office rather than left as transparent copies.
 
-Short speech bubbles may appear when a real conversation occurs. They show a few grounded exchanges about current work, help, blockers, meetings, mentoring, recognition, conflict, repair, company news, or celebrations. Select a bubble to read the exchange more comfortably. Not every conversation is visible, and confidential conversations never appear.
+Short speech bubbles may appear when a real event gives coworkers a reason to talk. Employees approach, greet, exchange a few grounded replies, say goodbye, and then return to their current activity. Personality and real shared memories can change the wording, while recent pair history reduces repetition.
+
+Conversations may cover current work, help, blockers, meetings, mentoring, recognition, conflict, repair, company news, or celebrations. Select a bubble to read the exchange more comfortably. Critical work is protected from irrelevant interruptions. Not every conversation is visible, and confidential conversations never appear.
+
+New hires may speak with their mentor once they meet in the office. Employees with an unresolved disagreement may later attempt an apology or clarification, but only when their personalities, relationship, and working environment make that response believable.
 
 ## Employees
 

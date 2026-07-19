@@ -44,7 +44,7 @@ async function main() {
       hiring: JSON.stringify(company.hiringRequests || []),
       recruiting: JSON.stringify(company.recruitingPipeline || []),
       projects: projectSnapshot(),
-      positions: JSON.stringify(employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action })))
+      assignments: JSON.stringify(employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration })))
     });
     const unchanged = (before, label) => {
       assert(company.chip === before.chip && company.software === before.software && company.integration === before.integration, `${label} must not change product progress`);
@@ -52,7 +52,7 @@ async function main() {
       assert(JSON.stringify(company.lessons || []) === before.lessons && JSON.stringify(company.learningEpisodes || []) === before.learningEpisodes, `${label} must not change Institutional Learning`);
       assert(JSON.stringify(company.hiringRequests || []) === before.hiring && JSON.stringify(company.recruitingPipeline || []) === before.recruiting, `${label} must not change hiring or recruiting`);
       assert(projectSnapshot() === before.projects, `${label} must not change project state`);
-      assert(JSON.stringify(employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action }))) === before.positions, `${label} must not change movement or task selection`);
+      assert(JSON.stringify(employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration }))) === before.assignments, `${label} may stage physical presence but must not change work selection or progress`);
     };
 
     validationMode = true;

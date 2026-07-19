@@ -68,7 +68,7 @@ function checkSharedConstants() {
   const constants = read(path.join("src", "core", "constants.js"));
   const required = [
     [/Codex\/reviewer rule/, "reviewer instruction"],
-    [/saveVersion\s*:\s*39/, "save version constant"],
+    [/saveVersion\s*:\s*40/, "save version constant"],
     [/transientCompanyKeys\s*:/, "transient save-state exclusions"],
     [/workdayStartMinute\s*:\s*480/, "workday start constant"],
     [/workdayEndMinute\s*:\s*1200/, "workday end constant"],

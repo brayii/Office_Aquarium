@@ -45,7 +45,7 @@ async function main() {
       hiring: JSON.stringify(company.hiringRequests || []),
       recruiting: JSON.stringify(company.recruitingPipeline || []),
       projects: projectSnapshot(),
-      positions: JSON.stringify(employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action })))
+      assignments: JSON.stringify(employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration })))
     });
 
     validationMode = true;
@@ -57,7 +57,8 @@ async function main() {
     assert(company.randomState === rngBeforeMigration, "Shared-experience migration should not consume RNG");
     const [a, b, c] = employees.filter(e => e.active);
     const keyAB = makeRelationshipKey(a.id, b.id);
-    assert(normalizeSocialExperienceType("not-a-real-type") === "shared_work_activity", "Unknown experience types should normalize to a controlled type");
+    assert(normalizeSocialExperienceType("not-a-real-type") === null, "Unknown experience types should be rejected instead of masquerading as real work");
+    assert(recordSharedExperience(a, b, { type: "not-a-real-type", sourceEventId: "unknown-event" }) === null, "Rejected experience types should not create relationship or conversation evidence");
 
     const before = boundarySnapshot();
     const directWithoutSource = recordSharedExperience(a, b, { type: "direct_help", intensity: 2, requireSource: true });
@@ -79,7 +80,7 @@ async function main() {
     assert(JSON.stringify(company.lessons || []) === before.lessons && JSON.stringify(company.learningEpisodes || []) === before.learningEpisodes, "Shared experience must not change Institutional Learning");
     assert(JSON.stringify(company.hiringRequests || []) === before.hiring && JSON.stringify(company.recruitingPipeline || []) === before.recruiting, "Shared experience must not change hiring or recruiting");
     assert(projectSnapshot() === before.projects, "Shared experience must not change project state");
-    assert(JSON.stringify(employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action }))) === before.positions, "Shared experience must not change movement or task selection");
+    assert(JSON.stringify(employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration }))) === before.assignments, "Shared experience may stage physical presence but must not change work selection or progress");
 
     recordSharedExperience(a, b, { type: "shared_work_activity", sourceEventId: "work-event-1", projectId: "project-test", participants: [a.id, b.id], tone: "positive", intensity: 2 });
     assert(company.socialRelationships[keyAB].recentExperiences.length === 1, "Duplicate source event should be ignored");

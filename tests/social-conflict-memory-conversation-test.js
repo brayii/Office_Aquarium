@@ -121,7 +121,7 @@ async function main() {
     const conflictConversation = company.socialConversationState.history.find(item => item.sourceEventId === conflictSource);
     assert(Boolean(conflictConversation), "The meaningful conflict event should create the visible conversation, not a synthetic first-meeting greeting");
     assert(conflictConversation?.category === "conflict", "A professional disagreement should use the conflict conversation category");
-    assert(conflictConversation?.exchanges.length >= 2 && conflictConversation?.exchanges.length <= 4, "Visible conversations should contain two to four exchanges");
+    assert(conflictConversation?.exchanges.length >= 4 && conflictConversation?.exchanges.length <= 5, "Visible conversations should contain a greeting, topic, reply, optional follow-up, and goodbye");
     assert(conflictConversation?.exchanges.every(exchange => !/\{\w+\}/.test(exchange.text)), "Visible conversation text must not contain unresolved template placeholders");
     assert(conflictConversation?.contexts?.[a.id]?.relationship && conflictConversation?.contexts?.[a.id]?.recentMemoryIds, "Conversation context should include relationship, memory, emotion, location, and time data");
     const selectionSignals = socialDialogueSelectionSignals(a, "conflict", conflictConversation.contexts[a.id]);
@@ -134,6 +134,8 @@ async function main() {
     assert((company.socialConversationState.knowledge[observer.id] || []).some(item => item.sourceEventId === conflictSource), "A nearby attentive employee should be able to overhear an ordinary conversation");
     assert(!(company.socialConversationState.knowledge[confidentialObserver.id] || []).some(item => item.sourceEventId === "stage8-confidential"), "Confidential information should never be overheard");
 
+    company.minute += SOCIAL_CONVERSATION_RULES.approachDurationMinutes;
+    processVisibleConversationsMinute();
     buildOffice(true);
     render();
     renderVisibleConversations();
@@ -224,7 +226,7 @@ async function main() {
 
     const templateCounts = Object.fromEntries(Object.entries(SOCIAL_DIALOGUE_TEMPLATES).map(([category, templates]) => [category, templates.length]));
     assert(SOCIAL_CONVERSATION_RULES.categories.length === 15, "The visible conversation system should expose all 15 required categories");
-    assert(Object.values(templateCounts).every(count => count >= 20 && count <= 50), "Every conversation category should contain 20 to 50 deterministic templates");
+    assert(Object.values(templateCounts).every(count => count >= 40 && count <= 60), "Every conversation category should contain 40 to 60 deterministic templates");
 
     for (let index = 0; index < 42; index++) {
       recordSharedExperience(a, b, {

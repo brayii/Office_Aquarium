@@ -44,7 +44,7 @@ async function main() {
       recruiting: JSON.stringify(company.recruitingPipeline || []),
       projects: JSON.stringify((company.projects || []).map(p => ({ id: p.id, progress: p.progress, quality: p.quality, risk: p.risk, status: p.status }))),
       work: JSON.stringify((company.workItems || []).map(w => ({ id: w.id, progress: w.progress, status: w.status, blockedBy: w.blockedBy }))),
-      movement: JSON.stringify(employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action, currentRoom: e.currentRoom })))
+      assignments: JSON.stringify(employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration })))
     });
     const unchanged = (before, label) => {
       assert(company.chip === before.chip && company.software === before.software && company.integration === before.integration, `${label} must not change product progress`);
@@ -53,7 +53,7 @@ async function main() {
       assert(JSON.stringify(company.hiringRequests || []) === before.hiring && JSON.stringify(company.recruitingPipeline || []) === before.recruiting, `${label} must not change hiring or recruiting`);
       assert(JSON.stringify((company.projects || []).map(p => ({ id: p.id, progress: p.progress, quality: p.quality, risk: p.risk, status: p.status }))) === before.projects, `${label} must not change project state`);
       assert(JSON.stringify((company.workItems || []).map(w => ({ id: w.id, progress: w.progress, status: w.status, blockedBy: w.blockedBy }))) === before.work, `${label} must not change work items`);
-      assert(JSON.stringify(employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action, currentRoom: e.currentRoom }))) === before.movement, `${label} must not change movement or selected tasks`);
+      assert(JSON.stringify(employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration }))) === before.assignments, `${label} may stage physical presence but must not change work selection or progress`);
     };
 
     validationMode = true;

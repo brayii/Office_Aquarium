@@ -174,7 +174,9 @@ async function main() {
     }
     company.day += SOCIAL_GROUP_RULES.updateIntervalDays;
     deriveInformalGroups();
-    assert(company.informalGroups.some(item => item.memberIds.includes(leader.id) && item.memberIds.includes(groupB1.id) && item.memberIds.includes(groupB2.id)), "Independent groups should merge deterministically when repeated meaningful interaction connects them");
+    const mergedGroupExists=company.informalGroups.some(item => item.memberIds.includes(leader.id) && item.memberIds.includes(groupB1.id) && item.memberIds.includes(groupB2.id));
+    const mergeEdges=buildSocialRelationshipGraph().edges.filter(edge=>[leader.id,groupB1.id,groupB2.id].some(id=>edge.aId===id||edge.bId===id));
+    assert(mergedGroupExists, `Independent groups should merge deterministically when repeated meaningful interaction connects them (groups ${JSON.stringify(company.informalGroups.map(item=>item.memberIds))}; edges ${JSON.stringify(mergeEdges)})`);
 
     for (let index = 0; index < 10; index++) {
       [groupB1, groupB2].forEach(member => recordSharedExperience(leader, member, {

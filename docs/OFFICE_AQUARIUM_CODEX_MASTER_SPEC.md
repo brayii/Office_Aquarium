@@ -1,7 +1,7 @@
 ﻿# Office Aquarium — Master Product, Design, and Engineering Specification
 
 **Current source of truth:** `Office_Aquarium.html` and the `src/` JavaScript source tree  
-**Current save version:** `39`
+**Current save version:** `40`
 **Target environment:** Standalone browser application, desktop and Android/mobile  
 **Architecture:** Standalone offline HTML page with external local JavaScript  
 **Player role:** CEO  
@@ -44,7 +44,7 @@ The HTML file and ordered JavaScript source files are the runtime source of trut
 
 # Current Build Notes
 
-- Save version is `39`.
+- Save version is `40`.
 - The player-facing runtime is `Office_Aquarium.html` plus ordered source files under `src/`.
 - Browser/mobile release packages are generated under `dist/`.
 - Desktop release packages are generated under `src-tauri/target/`.
@@ -65,6 +65,7 @@ Current simulation integrity rules:
 - Valuation and investor reaction update at most once per simulated day unless an explicit validation force flag is used. Reading Board or market views must not consume RNG or create duplicate forecasts.
 - Company-wide, project, and workforce lessons require an attributable reviewed episode and independent evidence group. Unreviewed events may record evidence but cannot change department, employee, project-estimation, recruiting, or onboarding behavior.
 - Social AI model 4 owns source-backed conflict/repair, bounded directional memory, grounded visible conversations, slow evidence-backed culture, derived informal groups and team chemistry, and evidence-backed formal/informal leadership.
+- Conversation Presence uses the shared rules in `src/core/constants.js` for grounded triggers, 4-5 turn structure, wording volume, timing, movement, spacing, critical-work protection, anti-repetition, and persistence bounds.
 - Social organizational state may influence only social preference, reporting interpretation, and bounded emotional recommendations. It must never become a direct project, work, hiring, customer, or Institutional Learning modifier.
 
 ---
@@ -498,6 +499,22 @@ Save version 39 completes Social Personality AI Stages 6-8 and adds an evidence-
 * The Reports workspace includes People & Culture views for culture, groups, network, and leadership. Raw pair weights, hidden memory scores, and repair calculations remain Debug-only.
 * Shared rules live in `src/core/constants.js`; dedicated deterministic 90-, 180-, and 365-day social-system tests enforce bounds, source retention, save/load, UI read safety, and Work AI isolation.
 * Production saves omit transient social diagnostics, compact repeated field names through a versioned backward-compatible envelope, and bound detailed relationship evidence, cooldowns, memories, conversations, reputation observations, and Institutional Learning records. Older plain JSON saves remain readable, and regression tests enforce the release storage budget against a mature 29-employee complete relationship graph.
+
+## Implemented in save version 40
+
+Save version 40 deepens the existing visible-conversation system into a grounded conversation-and-presence pipeline.
+
+* Conversations begin only from an approved real trigger and retain the source event and evidence identifier.
+* The normal sequence is approach, greeting, topic, reply, optional follow-up, goodbye, and activity resumption, producing four or five timed exchanges.
+* All 15 categories provide 40 deterministic templates. Intent selection is separate from reserved, professional, extroverted, and humorous wording.
+* Pair history tracks recent templates, topics, categories, and partners so unused dialogue is preferred before repetition.
+* Real shared memories can shape later wording; unresolved placeholders, stale evidence, unknown triggers, and unsupported future claims are rejected.
+* Employees approach with acceleration/deceleration, maintain personal space, face one another, use small speaking/listening gestures, and return to their latest destination after the goodbye.
+* Sentence length controls display time, short pauses separate replies, and irrelevant conversations cannot interrupt critical work.
+* Help requests and blocker resolution remain distinct grounded events: direct assistance uses help dialogue, while a real resolved blocker uses the blocker category.
+* Onboarding can produce a mentoring exchange after the new hire and mentor are actually co-present. A cooled, unresolved conflict can produce an autonomous apology or clarification only when the employees, relationship, culture, and source-backed conflict support it.
+* Conversation opportunities created only for presentation, such as a completed shared task or return from another department, do not fabricate relationship, emotional, work, or learning outcomes.
+* Conversation timing, presence, movement, anti-repeat state, and source links are migration-safe, compact, deterministic, and covered by `tests/conversation-presence-regression-test.js`.
 
 ## Implemented in save version 38
 

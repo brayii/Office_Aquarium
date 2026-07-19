@@ -830,6 +830,44 @@ function desiredWorkPressure(team){
   if(team==="product")return Math.max(30,100-company.customerSentiment,company.phase==="prototype"?45:60-company.customers*.25);
   return Math.max(30,100-company.shareholders?.confidence||45,company.cash<10?78:35);
 }
+function recordCompletedWorkConversationOpportunity(work){
+  if(typeof createGroundedConversationOpportunity!=="function"||!work||work.completionConversationRecorded)return null;
+  const owner=employees.find(employee=>employee.active&&employee.id===Number(work.ownerId));
+  if(!owner)return null;
+  const ownerRoom=owner.currentRoom||roomForZone(owner.zone);
+  const participantIds=(work.collaborators||[]).map(Number);
+  const partner=[...new Set(participantIds)]
+    .map(employeeId=>employees.find(employee=>employee.active&&!employee.offsite&&employee.id===employeeId&&employee.id!==owner.id))
+    .filter(Boolean)
+    .sort((a,b)=>{
+      const aSame=(a.currentRoom||roomForZone(a.zone))===ownerRoom?1:0;
+      const bSame=(b.currentRoom||roomForZone(b.zone))===ownerRoom?1:0;
+      return bSame-aSame||relationshipPreferenceScore(owner,b)-relationshipPreferenceScore(owner,a)||a.id-b.id;
+    })[0];
+  if(!partner)return null;
+  const partnerRoom=partner.currentRoom||roomForZone(partner.zone);
+  const result=createGroundedConversationOpportunity({
+    id:`work-completed-${work.id}`,
+    type:"task_completed",
+    actorId:owner.id,
+    subjectId:partner.id,
+    roomId:ownerRoom&&ownerRoom===partnerRoom?ownerRoom:null,
+    projectId:work.projectId||null,
+    workItemId:work.id,
+    tone:"positive",
+    intensity:clamp(Math.round((Number(work.priority)||50)/25),1,4),
+    category:"celebration",
+    confidence:100,
+    context:{
+      workItemId:work.id,
+      workTitle:work.title,
+      projectId:work.projectId||null,
+      outcome:`${work.title} was completed`
+    }
+  });
+  if(result)work.completionConversationRecorded=true;
+  return result;
+}
 function maintainWorkItems(){
   ensureBibleSystems();
   company.workItems=Array.isArray(company.workItems)?company.workItems:[];
@@ -847,7 +885,7 @@ function maintainWorkItems(){
     let attempts=0;
     while(open.length<target&&company.workItems.length<52&&attempts<target+2){attempts++;const pressure=desiredWorkPressure(team);const type=company.teams?.[team]?.currentPriority||workItemTypeForTeam(team);const item=createWorkItem(team,type,pressure);company.workItems.push(item);open.push(item);}
   }
-  company.workItems.forEach(w=>{if(w.status!=="open")return;w.blockedBy=Array.isArray(w.blockedBy)?w.blockedBy:[];w.collaborators=Array.isArray(w.collaborators)?w.collaborators:[];assignWorkOwner(w);const deadlineSoon=w.deadlineDay-company.day<4;w.qualityRisk=clamp(w.qualityRisk+(deadlineSoon?1.5:.2)+(w.progress<35 ? .25 : 0)-(company.culture.qualityDiscipline-50)*.01,0,100);const stalled=company.day-(w.createdDay??company.day)>2&&w.progress<18;const blockerChance=(w.qualityRisk>72 ? .07 : 0)+(deadlineSoon ? .025 : 0)+(stalled ? .025 : 0);if(!w.blockedBy.length&&simulationRandom()<blockerChance){const blocker=contentPick(v23Content.blockers,w.priority);w.blockedBy.push(blocker);addStoryBeat(w.storyId,`${w.title} became blocked by ${blocker}.`,"blocker");recordWeeklyEvent(`${w.assignedTeam} work blocked: ${w.title}.`,"work",2);}w.stage=workStage(w);if(w.progress>=100){w.status="closed";w.closedDay=company.day;w.stage="Complete";addStoryBeat(w.storyId,`${w.title} was completed by the ${w.assignedTeam} team.`,"completed");recordWeeklyEvent(`${w.title} closed by the ${w.assignedTeam} team.`,"work",2);}});
+  company.workItems.forEach(w=>{if(w.status!=="open")return;w.blockedBy=Array.isArray(w.blockedBy)?w.blockedBy:[];w.collaborators=Array.isArray(w.collaborators)?w.collaborators:[];assignWorkOwner(w);const deadlineSoon=w.deadlineDay-company.day<4;w.qualityRisk=clamp(w.qualityRisk+(deadlineSoon?1.5:.2)+(w.progress<35 ? .25 : 0)-(company.culture.qualityDiscipline-50)*.01,0,100);const stalled=company.day-(w.createdDay??company.day)>2&&w.progress<18;const blockerChance=(w.qualityRisk>72 ? .07 : 0)+(deadlineSoon ? .025 : 0)+(stalled ? .025 : 0);if(!w.blockedBy.length&&simulationRandom()<blockerChance){const blocker=contentPick(v23Content.blockers,w.priority);w.blockedBy.push(blocker);addStoryBeat(w.storyId,`${w.title} became blocked by ${blocker}.`,"blocker");recordWeeklyEvent(`${w.assignedTeam} work blocked: ${w.title}.`,"work",2);}w.stage=workStage(w);if(w.progress>=100){w.status="closed";w.closedDay=company.day;w.stage="Complete";addStoryBeat(w.storyId,`${w.title} was completed by the ${w.assignedTeam} team.`,"completed");recordWeeklyEvent(`${w.title} closed by the ${w.assignedTeam} team.`,"work",2);recordCompletedWorkConversationOpportunity(w);}});
 }
 function updateEmployeeWorkContribution(e,output){
   if(!company?.workItems)return;
@@ -865,6 +903,7 @@ function updateEmployeeWorkContribution(e,output){
   const lateItemDrag=item.progress>=75?clamp(1-(item.progress-75)/25*.25,.70,1):1;
   item.progress=clamp(item.progress+output*(7+skillFit*8.5)*blockerPenalty*projectPace*lateItemDrag,0,100);
   if(item.projectId&&item.progress!==beforeProgress)recordProjectLedger(item.projectId,"employee-work","work-progress",item.progress-beforeProgress,`${e.name} worked on ${item.title}`);
+  if(beforeProgress<100&&item.progress>=100)recordCompletedWorkConversationOpportunity(item);
   if(blockers.length){
     const resolveChance=clamp(output*(skillFit+.4)*.55+(e.activeCollaboration?.workItemId===item.id ? .08 : 0),.01,.32);
     if(simulationRandom()<resolveChance){
@@ -874,6 +913,20 @@ function updateEmployeeWorkContribution(e,output){
       addStoryBeat(item.storyId,`${e.name} helped resolve ${blocker} on ${item.title}.`,"unblocked");
       recordWeeklyEvent(`${item.title} was unblocked by ${e.name}.`,"work",1);
       if(item.projectId)recordProjectLedger(item.projectId,"employee-work","blocker",-1,`${e.name} resolved ${blocker}`);
+      const collaborationPartner=employees.find(employee=>employee.active&&!employee.offsite&&employee.id===Number(e.activeCollaboration?.partnerId));
+      if(collaborationPartner)recordSharedExperience(e,collaborationPartner,{
+        type:"blocker_resolved_together",
+        sourceEventId:`work-unblocked-${item.id}-${company.day}-${company.minute}`,
+        roomId:(e.currentRoom||roomForZone(e.zone))===(collaborationPartner.currentRoom||roomForZone(collaborationPartner.zone))?(e.currentRoom||roomForZone(e.zone)):null,
+        projectId:item.projectId||null,
+        tone:"positive",
+        intensity:3,
+        actorId:e.id,
+        subjectId:collaborationPartner.id,
+        category:"blockers",
+        confidence:100,
+        context:{workItemId:item.id,workTitle:item.title,projectId:item.projectId||null,blocker,outcome:`${blocker} was resolved`}
+      });
     }
   }
   item.qualityRisk=clamp(item.qualityRisk-output*(skillFit>.8?3:1.2)+(e.stress>75 ? .05 : 0),0,100);

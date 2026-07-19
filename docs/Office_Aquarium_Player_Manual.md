@@ -1,9 +1,9 @@
 # Office Aquarium
-## Player Manual - Save Version 39
+## Player Manual - Save Version 40
 
 Office Aquarium is an autonomous technology-company simulation. You are the CEO of a company building hardware and software. Employees control themselves; your job is to watch the organization, understand what is happening, respond to important communications, and keep the company healthy enough to survive and grow.
 
-This manual describes the current save version 39 build. The game remains a standalone offline application and does not require an API key or online service.
+This manual describes the current save version 40 build. The game remains a standalone offline application and does not require an API key or online service.
 
 The current build uses a main `Office_Aquarium.html` file plus ordered JavaScript files under `src/`. Keep the folder structure together, including `assets/audio` for optional sound, when moving the game to another PC or mobile device.
 
@@ -256,7 +256,9 @@ The Office screen shows employees moving through:
 
 Employee labels show what they are currently doing. Busy employees display activity animation and thought text appears in the office. Select an employee to open the detailed profile.
 
-Short speech bubbles appear when a source-backed conversation is suitable for the live office. They may cover current work, help, blockers, meetings, deadlines, mentoring, recognition, conflict, repair, news, or celebration. A bubble contains a few exchanges and can be selected for a larger reading view. It fades naturally, pauses while hovered, and does not mean the CEO can direct the conversation. Private conversations are difficult to overhear; confidential conversations are never displayed.
+Short speech bubbles appear when a real event creates a suitable conversation opportunity. Employees approach one another, greet, discuss the grounded topic, reply, sometimes follow up, say goodbye, and return to what they were doing. The wording varies with personality and may refer to a real shared memory, so coworkers can sound different and later conversations can acknowledge earlier events.
+
+Conversations may cover current work, help, blockers, meetings, deadlines, mentoring, recognition, conflict, repair, news, or celebration. Select a bubble for a larger reading view. Longer lines remain visible longer, and critical work is protected from irrelevant interruptions. The CEO watches these interactions but does not direct them. Private conversations are difficult to overhear; confidential conversations are never displayed.
 
 Roles have a primary workplace, although meetings, collaboration, breaks, and project needs can move employees elsewhere:
 
@@ -709,6 +711,8 @@ These hidden values affect how stressful or encouraging future interactions feel
 Employees choose collaborators mainly from project need, role usefulness, skill fit, availability, focus, stress, and social compatibility. A coworker can be trusted but still difficult to work with, or comfortable to talk to but not the most useful collaborator for a technical problem.
 
 Conflict does not appear from nowhere. It can develop from a real disagreement, ignored request, interruption, credit dispute, deadline blame, failed collaboration, or dismissive exchange. A later apology, clarification, constructive follow-up, recognition, or successful joint effort may repair it, but employees do not accept every attempt.
+
+Onboarding mentorship and conflict-repair conversations require the relevant employees to meet in the office. The visible exchange reports a real mentoring assignment or unresolved conflict; it does not create one merely because a speech bubble appeared.
 
 Culture and informal groups emerge slowly from repeated evidence. Sharing a room does not create a friendship, clique, conflict, or leadership reputation by itself. A manager has formal authority, but credibility must still be earned; a non-manager can become an informal leader through consistent mentoring, communication, and conflict handling.
 

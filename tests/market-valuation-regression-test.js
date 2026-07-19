@@ -56,6 +56,7 @@ async function main() {
       company.investorAppetite = strong ? 78 : 22;
       company.crisis = strong ? null : { category: "financial", stage: "critical" };
       company.companyRiskComponents = { total: strong ? 14 : 88, label: strong ? "Healthy" : "Critical" };
+      company.valuationRiskScore = strong ? 14 : 88;
       company.finance = {
         ...(company.finance || {}),
         netCashFlowDaily: strong ? 0.12 : -0.35,

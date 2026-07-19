@@ -193,6 +193,9 @@ function ensureWorkforceEconomySystems(){
   company.workforceLessons=company.workforceLessons&&typeof company.workforceLessons==="object"?company.workforceLessons:{};
   Object.entries(workforceDefaults).forEach(([k,v])=>{company.workforceLessons[k]={...v,...(company.workforceLessons[k]||{})};});
   company.companyRiskComponents={financial:0,people:0,product:0,customer:0,operational:0,leadership:0,staffing:0,total:0,label:"Stable",...(company.companyRiskComponents||{})};
+  company.valuationRiskScore=Number.isFinite(Number(company.valuationRiskScore))
+    ?clamp(Number(company.valuationRiskScore),0,100)
+    :clamp(Number(company.companyRiskComponents.total)||RISK_PILLAR_RULES.valuationSnapshotDefault,0,100);
   employees.forEach(e=>{
     const existingEmployment=e.employment&&typeof e.employment==="object"?e.employment:null;
     e.employment=existingEmployment?{...employmentBaselineForRole(e.role,existingEmployment.annualSalary),...existingEmployment}:defaultEmploymentForRole(e.role);
@@ -645,7 +648,7 @@ function riskOverallLabel(pillars,total){
   if(total>=25||elevated>=1)return "Watch";
   return "Low";
 }
-function updateCompanyRiskComponents(){
+function updateCompanyRiskComponents({recordForValuation=false}={}){
   ensureWorkforceEconomySystems();
   company.riskPillars=company.riskPillars&&typeof company.riskPillars==="object"?company.riskPillars:{};
   company.departmentFriction=normalizeDepartmentFriction(company.departmentFriction);
@@ -668,6 +671,7 @@ function updateCompanyRiskComponents(){
   const topContributors=Object.entries(pillars).map(([key,value])=>({key,label:riskPillarName(key),value:Math.round(value),band:value>=85?"Critical":value>=70?"High":value>=45?"Elevated":value>=25?"Watch":"Low"})).sort((a,b)=>b.value-a.value).slice(0,3);
   company.riskPillars=pillars;
   company.companyRiskComponents={financial,people:workforce,product:productDelivery,customer:customerMarket,operational:operations,leadership:governance,staffing:clamp(below*18+above*8+(8-active.length)*5,0,100),productDelivery,customerMarket,workforce,operations,governance,strategic,total,label,topContributors,narrative:`${topContributors[0]?.label||"Company"} is the main contributor to ${label.toLowerCase()} company risk.`};
+  if(recordForValuation)company.valuationRiskScore=clamp(total,0,100);
   if(Array.isArray(company.executiveObservations)){
     company.executiveObservations=company.executiveObservations.map(o=>o?.type==="risk"&&o.day===company.day?{...o,severity:topContributors.find(t=>t.key===o.pillar)?.value??o.severity}:o);
   }
@@ -969,7 +973,7 @@ function staffingShortageSummary(){
   return `Department coverage and project allocation are tracked separately. ${critical.length?`Critical shortages: ${critical.join(", ")}`:"Critical shortages: none"} | ${moderate.length?`Moderate shortages: ${moderate.join(", ")}`:"Moderate shortages: none"}${monitoring.length?` | Monitoring capacity: ${monitoring.join(", ")}`:""}`;
 }
 function workforceFinancialPressureHtml(){
-  ensureWorkforceEconomySystems();updateCompanyRiskComponents();
+  ensureWorkforceEconomySystems();
   const allocation=buildWorkforceAllocationSnapshot();
   const maturity=organizationalRoleCoverage();
   const f=company.finance,s=company.staffingModel||{},below=Object.entries(s).filter(([,v])=>v.understaffed).map(([k])=>k),above=Object.entries(s).filter(([,v])=>v.overstaffed).map(([k])=>k),activeEmployees=employees.filter(e=>e.active).length,inOffice=employees.filter(e=>e.active&&!e.offsite).length;
@@ -1315,6 +1319,40 @@ function onboardingProductivity(e){
   e.onboarding.productivity=clamp(Math.round(ramp*100),onboardingRules.startingProductivityPercent,100);
   return clamp(ramp,minimum,1);
 }
+function maybeRecordOnboardingMentorInteraction(a,b,roomId){
+  if(!a?.active||!b?.active||a.offsite||b.offsite||!roomId)return null;
+  const hire=a.onboarding?.mentorId===b.id?a:b.onboarding?.mentorId===a.id?b:null;
+  const mentor=hire?.id===a.id?b:hire?.id===b.id?a:null;
+  if(!hire||!mentor||hire.performanceManagement?.stage!=="onboarding"||hire.onboarding.mentorConversationRecorded)return null;
+  if(hire.currentRoom!==roomId||mentor.currentRoom!==roomId)return null;
+  if(hire.conversationPresence||mentor.conversationPresence)return null;
+  if(typeof employeeHasCriticalConversationConflict==="function"&&(
+    employeeHasCriticalConversationConflict(hire,"mentoring")||
+    employeeHasCriticalConversationConflict(mentor,"mentoring")
+  ))return null;
+  const sourceEventId=`onboarding-mentor-${hire.id}-${hire.onboarding.startDay??hire.joinedDay??company.day}`;
+  const record=recordSocialEncounter(mentor,hire,{
+    type:"mentoring_interaction",
+    gain:WORKFORCE_HIRING_RULES.onboarding.mentorInteractionGain,
+    sourceEventId,
+    roomId,
+    projectId:hire.onboarding.projectId||null,
+    cooldownMinutes:WORKFORCE_TIME_RULES.minutesPerDay,
+    actorId:mentor.id,
+    subjectId:hire.id,
+    category:"mentoring",
+    confidence:90,
+    context:{
+      workTitle:`${hire.role} onboarding`,
+      purpose:`help ${hire.name} learn the role and the team`,
+      projectId:hire.onboarding.projectId||null
+    }
+  });
+  if(record&&(company.socialConversationState?.history||[]).some(conversation=>conversation.sourceEventId===sourceEventId)){
+    hire.onboarding.mentorConversationRecorded=true;
+  }
+  return record;
+}
 function completeDueOnboarding(){
   employees.filter(e=>e.active&&e.performanceManagement?.stage==="onboarding"&&e.onboarding&&company.day-(e.onboarding.startDay??e.joinedDay)>=e.onboarding.duration).forEach(e=>{
     const startDay=e.onboarding.startDay??e.joinedDay??company.day;
@@ -1452,11 +1490,6 @@ function createRecruitingHireEmployee(item,candidate=null){
   replacement.focus=68+simulationRandom()*12;
   replacement.stress=18+simulationRandom()*10;
   replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`${backfill?"Backfilled":"Hired"} as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.communication={reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:-999,lastHelpRequestDay:-999,rumorsShared:0};replacement.knownMessages=[];replacement.actionOutcomeContext=null;replacement.activeCollaboration=null;replacement.activeMeeting=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:-999,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;normalizeEmployeeRoleProfile(replacement);ensureEmployeePersonality(replacement,{force:true,salt:`hire-${company.day}-${role}-${slot}-${item.id||"manual"}`});inheritInstitutionalLearning(replacement);
-  employees.forEach(other=>{
-    if(other&&other.id!==replacement.id){
-        recordSocialEncounter(replacement,other,{type:"onboarding_introduction",gain:1.2,sourceEventId:`onboarding-intro-${replacement.id}-${other.id}-${company.day}`,cooldownMinutes:WORKFORCE_TIME_RULES.minutesPerDay});
-    }
-  });
   employees[slot]=replacement;
   if(typeof ensureEmployeeSocialOrganizationState==="function")ensureEmployeeSocialOrganizationState(replacement);
   if(backfill){
@@ -1492,8 +1525,18 @@ function completeRecruitingHire(item,candidate=null){
       onboardingRules.maxDurationDays
     ));
     hire.performanceManagement={stage:"onboarding",coachingAttempts:0,pipAttempts:0,pipStartDay:null,pipDueDay:null,lastActionDay:company.day,documentedIssues:0,improvementScore:0,hrReviewed:false,terminationEligible:false};
-    hire.onboarding={startDay:company.day,duration,quality:Math.round(onboard.quality),mentorId:onboard.mentor?.id??null,productivity:onboardingRules.startingProductivityPercent,projectId:item.project?.id||null};
+    hire.onboarding={startDay:company.day,duration,quality:Math.round(onboard.quality),mentorId:onboard.mentor?.id??null,mentorConversationRecorded:false,productivity:onboardingRules.startingProductivityPercent,projectId:item.project?.id||null};
     if(onboard.mentor){onboard.mentor.onboardingMentorUntil=company.day+Math.min(duration,onboardingRules.mentorSupportMaxDays);addMemory(onboard.mentor,"MENTORING",`I am helping onboard ${hire.name}.`,"neutral",8,hire.name);}
+    employees.filter(other=>other.active&&!other.offsite&&other.id!==hire.id&&other.id!==onboard.mentor?.id).forEach(other=>{
+      recordSocialEncounter(hire,other,{
+        type:"onboarding_introduction",
+        gain:onboardingRules.socialIntroductionGain,
+        sourceEventId:`onboarding-intro-${hire.id}-${other.id}-${company.day}`,
+        roomId:hire.currentRoom&&hire.currentRoom===other.currentRoom?hire.currentRoom:null,
+        cooldownMinutes:WORKFORCE_TIME_RULES.minutesPerDay
+      });
+    });
+    if(onboard.mentor&&hire.currentRoom===onboard.mentor.currentRoom)maybeRecordOnboardingMentorInteraction(hire,onboard.mentor,hire.currentRoom);
     hire.focus=clamp((candidate?.skill??70)-8,42,92);applyEmployeeEmotionDelta(hire,{moraleDelta:clamp(66+(candidate?.cultureFit??60)*.18,55,88)-(hire.morale||60),reasonCode:"onboarding-start",sourceEventId:`onboarding-${hire.id}-${company.day}`,ignoreCooldown:true});
     hire.skills={...hire.skills};Object.keys(hire.skills).forEach(k=>hire.skills[k]=clamp((hire.skills[k]||50)+((candidate?.skill??65)-65)*.15,20,95));
     hire.careerHistory.unshift(`Selected by HR from a ${item.market} candidate market on day ${company.day}; onboarding quality ${Math.round(onboard.quality)}.`);

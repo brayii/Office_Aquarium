@@ -1,6 +1,6 @@
 # Social Systems: Culture, Groups, Chemistry, and Leadership
 
-Save version 39 / Social AI model 4 completes the evidence-backed organizational layer built above Stages 1-8.
+Save version 39 / Social AI model 4 completed the evidence-backed organizational layer built above Stages 1-8. Save version 40 deepens Stage 8 presentation with grounded multi-turn conversations and physical presence while preserving the same Social AI ownership boundary.
 
 ## Culture
 
@@ -38,8 +38,12 @@ Shared thresholds and limits live in `src/core/constants.js`. `src/systems/socia
 
 `tests/social-organizational-long-run-test.js` runs deterministic 90-, 180-, and 365-day scenarios and verifies bounds, repair, diversity, source retention, save safety, and no direct work coupling.
 
+`tests/conversation-presence-regression-test.js` verifies the 15-category, 40-template dialogue library; 4-5 turn flow; personality wording; shared-memory grounding; pair-level anti-repetition; smooth approach/resume movement; personal space; gestures; critical-work protection; save/load; and deterministic replay.
+
 ## Persistence Bounds
 
 Social source events, directional memories, visible-conversation history, overheard knowledge, conflict records, leadership evidence, culture evidence, and short-term relationship windows all have shared caps. Mature organizations retain aggregate relationship history while detailed short-term evidence is reserved for the most relevant current pairs and unresolved conflicts.
+
+Presentation-only conversation opportunities do not create relationship, emotional, work, project, customer, hiring, or Institutional Learning outcomes merely because dialogue was displayed.
 
 The save repository writes an offline compact envelope using the append-only key dictionary in `OFFICE_AQUARIUM_CONSTANTS.storage`. It reads both compact saves and older plain JSON saves. Transient developer diagnostics are rebuilt after load instead of consuming browser storage.

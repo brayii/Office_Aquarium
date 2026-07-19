@@ -39,7 +39,7 @@ async function main() {
       customers: company.customers,
       projects: (company.projects || []).map(p => ({ id: p.id, status: p.status, progress: p.progress, performance: p.performance, allocations: p.staffAllocations })),
       workItems: (company.workItems || []).map(w => ({ id: w.id, progress: w.progress, blockedBy: w.blockedBy, qualityRisk: w.qualityRisk, ownerId: w.ownerId, status: w.status })),
-      assignments: employees.map(e => ({ id: e.id, action: e.action, zone: e.zone, x: e.x, y: e.y, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration }))
+      assignments: employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration }))
     });
 
     validationMode = true;

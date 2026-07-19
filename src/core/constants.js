@@ -17,7 +17,7 @@ function deepFreezeConstants(value){
 globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
   storage:{
     saveKey:"office-aquarium-living-office-v3",
-    saveVersion:39,
+    saveVersion:40,
     transientCompanyKeys:[
       "runtime",
       "socialMemoryDebug",
@@ -52,7 +52,17 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       "description","recommendation","risks","benefits","choices","decision","read","deleted",
       "eventId","priority","from","date","message","structuredMessage","laterOutcome","progress",
       "quality","risk","cash","board","trust","morale","stress","customers","dailyRevenue",
-      "valuation","phase","randomState","nextRuntimeId"
+      "valuation","phase","randomState","nextRuntimeId",
+      "pairHistory","recentTopics","recentTemplateIds","recentPartnersByEmployee",
+      "triggerType","triggerEvidenceId","phaseStartedAt","exchangeSchedule",
+      "startOffsetMinutes","durationMinutes","pauseAfterMinutes","endAtAbsoluteMinute",
+      "conversationStartAt","resumeAt","completedAt","presence","previousPositions",
+      "motion","fromX","fromY","targetX","targetY","flowCue","gesture","intent","voiceStyle",
+      "durationMs","easing","pendingPosition","cue","partnerId","facing","currentExchangeIndex",
+      "topicKey","memoryReferences","targets","presentationOnly","exchangeIndex",
+      "schemaVersion","lastConversationAt","recentCategories","zone","currentRoom","homeRoom",
+      "homeZone","x","y","actionMinutes","thought","valuationRiskScore",
+      "lastAutomaticRepairCheckAt","mentorConversationRecorded"
     ]
   },
   determinism:{
@@ -131,7 +141,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       "help_request","blocker_resolved_together","deadline_pressure_together",
       "milestone_success_together","milestone_failure_together","recognition_shared",
       "interruption_shared","conflict_observed","crisis_response_together",
-      "onboarding_support","mentoring_interaction",
+      "onboarding_support","mentoring_interaction","task_completed","department_return",
       "shared_success","successful_collaboration","constructive_feedback","recognition",
       "successful_repair","apology","apology_accepted","clarification","constructive_follow_up","same_meeting","same_break",
       "casual_conversation","routine_collaboration","professional_disagreement",
@@ -144,20 +154,22 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       onboarding_introduction:"onboarding_support",
       successful_help:"direct_help",
       shared_milestone:"shared_success",
-      repaired_conflict:"successful_repair"
+      repaired_conflict:"successful_repair",
+      task_finished:"task_completed",
+      returned_from_department:"department_return"
     },
     passiveLegacyExperienceTypes:["same_room_presence","room_presence","co_presence"],
     positiveExperienceTypes:[
       "direct_help","shared_success","successful_collaboration","constructive_feedback",
       "recognition","recognition_shared","successful_repair","apology_accepted",
       "blocker_resolved_together","milestone_success_together","onboarding_support",
-      "mentoring_interaction"
+      "mentoring_interaction","task_completed"
     ],
     neutralExperienceTypes:[
       "shared_work_activity","shared_meeting","shared_break","conversation","same_meeting",
       "same_break","casual_conversation","routine_collaboration","help_request",
       "deadline_pressure_together","crisis_response_together","apology",
-      "clarification","constructive_follow_up"
+      "clarification","constructive_follow_up","department_return"
     ],
     negativeExperienceTypes:[
       "professional_disagreement","interrupted","ignored_request","credit_dispute",
@@ -219,7 +231,20 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       duplicateCooldownMinutes:60,
       ignoredRequestCooldownMinutes:1440,
       minimumRepairAgeMinutes:60,
-      automaticRepairAgeMinutes:240,
+      automaticRepair:{
+        ageMinutes:240,
+        checkMinutes:120,
+        initialThreshold:68,
+        thresholdDecayPerWindow:4,
+        minimumThreshold:38,
+        baseReadiness:52,
+        forgivenessWeight:18,
+        empathyWeight:14,
+        trustWeight:.1,
+        psychologicalSafetyWeight:.08,
+        intensityPenalty:3,
+        previousAttemptPenalty:7
+      },
       repairAcceptanceThreshold:48,
       frustrationHomeostasisRate:.018,
       conflictFatigueHomeostasisRate:.012
@@ -241,6 +266,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
         help_request:"supportive_conversation",
         shared_success:"shared_success",
         milestone_success_together:"shared_success",
+        task_completed:"shared_success",
         successful_collaboration:"reliable_collaboration",
         routine_collaboration:"routine_collaboration",
         shared_work_activity:"routine_collaboration",
@@ -271,6 +297,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
         shared_break:"casual_conversation",
         same_break:"casual_conversation",
         casual_conversation:"casual_conversation",
+        department_return:"casual_conversation",
         deadline_pressure_together:"mixed_outcome",
         crisis_response_together:"mixed_outcome"
       },
@@ -279,7 +306,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       globalCap:720,
       maxSummaries:360,
       maxDebugRecords:160,
-      maxSourceEvents:900,
+      maxSourceEvents:720,
       maxSourceEventAgeDays:730,
       significanceThreshold:1,
       unresolvedPreserveIntensity:3,
@@ -294,25 +321,52 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       emotionalRecallMoraleMaximum:1.2
     },
     conversations:{
-      schemaVersion:1,
+      schemaVersion:2,
       categories:[
         "greeting","current_work","help_request","giving_help","blockers",
         "meetings","deadlines","appreciation","mentoring","recognition",
         "conflict","repair","casual","company_news","celebration"
       ],
-      templatesPerCategory:20,
-      maxStored:32,
+      templatesPerCategory:40,
+      maxTemplatesPerCategory:60,
+      maxStored:18,
       maxRecentTemplateIds:72,
       maxRecentCategories:16,
+      maxRecentPairTemplates:72,
+      maxRecentPairTopics:10,
+      maxRecentPartnersPerEmployee:10,
       maxKnowledgePerEmployee:24,
-      minimumExchanges:2,
-      maximumExchanges:4,
+      minimumExchanges:4,
+      maximumExchanges:5,
       maxVisibleBubbles:4,
-      bubbleDurationMs:7200,
-      exchangeDurationMs:1800,
-      visibleDurationMinutes:90,
-      exchangeIntervalMinutes:5,
-      fadeStartMinutes:70,
+      approachDurationMinutes:10,
+      minimumLineDurationMinutes:10,
+      maximumLineDurationMinutes:25,
+      baseLineDurationMinutes:5,
+      wordsPerDurationMinute:.65,
+      lineDurationStepMinutes:5,
+      pauseBetweenExchangesMinutes:5,
+      goodbyeDurationMinutes:10,
+      resumeDurationMinutes:10,
+      movementBaseDurationMs:620,
+      movementPerDistanceMs:23,
+      movementMaxDurationMs:1800,
+      personalSpacePercent:3.2,
+      naturalOffsetPercent:.8,
+      criticalDeadlineWindowDays:3,
+      criticalStressThreshold:84,
+      criticalPriorityThreshold:82,
+      groundedTriggerTypes:[
+        "passing-coworker","meeting-transition","help-request","task-finished",
+        "blocker-resolved","milestone","conflict","repair","mentoring",
+        "break","department-return","work-coordination","deadline","company-news",
+        "first-meeting"
+      ],
+      explicitRepairTriggerTypes:[
+        "apology","apology_accepted","successful_repair","clarification","constructive_follow_up"
+      ],
+      gestures:["nod","glance","shift-weight","fold-arms","sip-coffee","hand-gesture"],
+      humorSafeCategories:["greeting","current_work","casual","appreciation","recognition","celebration"],
       conversationCooldownMinutes:90,
       sourceEventMaxAgeMinutes:180,
       overhearingRange:28,
@@ -393,6 +447,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     decisionCooldownMinutes:720
   },
   rooms:{
+    departmentWorkRooms:["software-studio","hardware-lab","executive-suite"],
     capacities:{
       "software-studio":8,
       "hardware-lab":6,
@@ -459,7 +514,9 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       maxDurationDays:36,
       mentorSupportMaxDays:18,
       startingProductivityPercent:20,
-      minProductivity:.2
+      minProductivity:.2,
+      socialIntroductionGain:1.2,
+      mentorInteractionGain:2.2
     },
     freezeReview:{
       startDay:12,
@@ -627,6 +684,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     maxIndependenceGroupsPerLesson:12
   },
   riskPillars:{
+    valuationSnapshotDefault:35,
     weights:{
       financial:.20,
       productDelivery:.20,

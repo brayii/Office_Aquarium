@@ -224,7 +224,7 @@ function dailyPipelineHandlers(context){
     workforce:()=>processDailyWorkforce(context),
     "social-organization":()=>processSocialOrganizationDaily(),
     "organizational-friction":()=>updateDepartmentFrictionDaily(),
-    "risk-pillars":()=>updateCompanyRiskComponents(),
+    "risk-pillars":()=>updateCompanyRiskComponents({recordForValuation:true}),
     "crisis-lifecycle":()=>{updateCrisisRiskSystem();evaluateFailure();if(!company.gameOver)advanceCrisisDay();},
     "learning-reviews":()=>{reviewLearningEpisodes();reviewInstitutionalPatterns();},
     "executive-communication":()=>processDailyExecutiveCommunication(),

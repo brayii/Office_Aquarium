@@ -86,6 +86,12 @@ Social Personality AI must not directly modify:
 - role requirements
 - project requirements
 
+Conversation Presence is a presentation layer above a real Social AI source event. It may temporarily stage avatar movement, facing, gestures, speech timing, and a pending visual destination. It must not block or replace the authoritative Work AI action. If work changes during a conversation, the employee resumes toward the latest work destination after the goodbye.
+
+Task-completion, passing, and department-return opportunities may be presentation-only. Showing those events in the office does not create a relationship outcome, emotional event, project result, or Institutional Learning lesson unless another authoritative system records real evidence for that outcome.
+
+Onboarding mentoring is emitted only after the assigned mentor and new hire are co-present. Autonomous conflict repair requires a source-backed unresolved conflict, a completed cooldown, real co-presence, and sufficient personality, relationship, culture, and safety support. The repair attempt remains attributable whether it succeeds or fails.
+
 ## Required Flow
 
 ```text
@@ -186,10 +192,12 @@ Any future change touching employee AI should verify:
 - Every active meaningful memory retains its source event.
 - Conflict repair links to a real unresolved conflict and preserves the attempt.
 - Visible dialogue is grounded in current state or source-backed history.
+- Visible dialogue follows a source-backed trigger, uses bounded pair-level anti-repetition, and resumes the latest activity after goodbye.
+- Presentation-only dialogue does not fabricate social, emotional, work, or learning outcomes.
 - Confidential conversations cannot be overheard.
 - Culture, group, chemistry, and leadership reads do not mutate authoritative state.
 - Group and leadership derivation is deterministic and idempotent for unchanged state.
 
-Dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`, `tests/ai-ownership-remediation-test.js`, `tests/social-ai-familiarity-test.js`, `tests/social-ai-shared-experiences-test.js`, `tests/social-ai-relationship-interpretation-test.js`, `tests/social-ai-social-preferences-test.js`, `tests/social-ai-workplace-reputation-test.js`, `tests/social-ai-emotional-integration-test.js`, `tests/social-conflict-memory-conversation-test.js`, `tests/social-organizational-systems-test.js`, and `tests/emotional-homeostasis-test.js`.
+Dedicated regression coverage for this boundary lives in `tests/personality-foundation-test.js`, `tests/ai-ownership-remediation-test.js`, `tests/social-ai-familiarity-test.js`, `tests/social-ai-shared-experiences-test.js`, `tests/social-ai-relationship-interpretation-test.js`, `tests/social-ai-social-preferences-test.js`, `tests/social-ai-workplace-reputation-test.js`, `tests/social-ai-emotional-integration-test.js`, `tests/social-conflict-memory-conversation-test.js`, `tests/conversation-presence-regression-test.js`, `tests/social-organizational-systems-test.js`, and `tests/emotional-homeostasis-test.js`.
 
 Additional boundary coverage lives in `tests/social-ai-boundary-regression-test.js`, `tests/social-emotional-long-run-test.js`, `tests/social-organizational-long-run-test.js`, and `tests/institutional-learning-causality-test.js`.

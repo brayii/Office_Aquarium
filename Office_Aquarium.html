@@ -85,7 +85,8 @@
     .z-break{left:36%;bottom:5%;width:27%;height:38%;background:rgba(240,251,249,.78)}
     .z-exec{right:3%;bottom:5%;width:31%;height:38%;background:rgba(241,243,249,.78)}
     .agent{
-      position:absolute;width:52px;transform:translate(-50%,-50%);transition:left 1.05s linear,top 1.05s linear;
+      position:absolute;width:52px;transform:translate(-50%,-50%);
+      transition:left var(--agent-move-duration,1050ms) cubic-bezier(.42,0,.2,1),top var(--agent-move-duration,1050ms) cubic-bezier(.42,0,.2,1);
       z-index:10;text-align:center;pointer-events:auto
     }
     .avatar{
@@ -211,6 +212,28 @@
     .agent.busy .avatar{animation:workBob .8s ease-in-out infinite alternate}
     @keyframes pulseWork{from{transform:scale(.65)}to{transform:scale(1.05)}}
     @keyframes workBob{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+    .agent.facing-left{--face-shift:-1px;--face-shift-wide:-2px}
+    .agent.facing-right{--face-shift:1px;--face-shift-wide:2px}
+    .agent.facing-left .avatar{border-left-color:var(--aqua)}
+    .agent.facing-right .avatar{border-right-color:var(--aqua)}
+    .agent.conversation-approaching .avatar{animation:conversationApproach .95s ease-in-out infinite alternate}
+    .agent.conversation-paused .avatar{animation:conversationPause 1.7s ease-in-out infinite alternate}
+    .agent.conversation-resuming .avatar{animation:conversationResume .9s ease-in-out infinite alternate}
+    .agent.conversation-speaking.gesture-nod .avatar,.agent.conversation-listening.gesture-nod .avatar{animation:conversationNod 1.25s ease-in-out infinite}
+    .agent.conversation-speaking.gesture-glance .avatar,.agent.conversation-listening.gesture-glance .avatar{animation:conversationGlance 1.6s ease-in-out infinite}
+    .agent.conversation-speaking.gesture-shift-weight .avatar,.agent.conversation-listening.gesture-shift-weight .avatar{animation:conversationShift 1.8s ease-in-out infinite alternate}
+    .agent.conversation-speaking.gesture-fold-arms .avatar{animation:conversationFoldArms 1.9s ease-in-out infinite alternate}
+    .agent.conversation-speaking.gesture-sip-coffee .avatar{animation:conversationSip 1.55s ease-in-out infinite}
+    .agent.conversation-speaking.gesture-hand-gesture .avatar{animation:conversationGesture 1.15s ease-in-out infinite alternate}
+    @keyframes conversationApproach{from{transform:translate(var(--face-shift,0),1px)}to{transform:translate(var(--face-shift,0),-1px)}}
+    @keyframes conversationPause{from{transform:translateX(var(--face-shift,0)) rotate(-1deg)}to{transform:translateX(var(--face-shift,0)) rotate(1deg)}}
+    @keyframes conversationResume{from{transform:translateX(0)}to{transform:translateX(var(--face-shift-wide,0))}}
+    @keyframes conversationNod{0%,100%{transform:translate(var(--face-shift,0),0)}45%{transform:translate(var(--face-shift,0),2px)}}
+    @keyframes conversationGlance{0%,100%{transform:translateX(var(--face-shift,0))}50%{transform:translateX(var(--face-shift-wide,0))}}
+    @keyframes conversationShift{from{transform:translateX(var(--face-shift,0)) rotate(-2deg)}to{transform:translateX(var(--face-shift,0)) rotate(2deg)}}
+    @keyframes conversationFoldArms{from{transform:translateX(var(--face-shift,0)) scale(.98)}to{transform:translateX(var(--face-shift,0)) scale(1.02)}}
+    @keyframes conversationSip{0%,100%{transform:translate(var(--face-shift,0),0) rotate(0)}45%{transform:translate(var(--face-shift,0),-2px) rotate(-3deg)}}
+    @keyframes conversationGesture{from{transform:translateX(var(--face-shift,0)) rotate(-3deg)}to{transform:translateX(var(--face-shift,0)) rotate(3deg)}}
     .save-note{font-size:.75rem;color:var(--muted);margin-top:6px}
 
     .startup-overlay,.confirm-overlay{

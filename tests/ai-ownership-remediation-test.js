@@ -57,14 +57,20 @@ async function main() {
       })),
       learningEpisodes: company.learningEpisodes || [],
       lessons: company.lessons || [],
-      positions: employees.map(employee => ({
+      employeeActions: employees.map(employee => ({
         id: employee.id,
-        action: employee.action,
-        zone: employee.zone,
-        x: employee.x,
-        y: employee.y
+        action: employee.action
       }))
     });
+    const presentationSnapshot = () => JSON.stringify(employees.map(employee => ({
+        id: employee.id,
+        zone: employee.zone,
+        x: employee.x,
+        y: employee.y,
+        motion: employee.motion,
+        conversationPresence: employee.conversationPresence,
+        officeFlow: employee.officeFlow
+      })));
 
     validationMode = true;
     reset(true, false, 617284);
@@ -188,6 +194,7 @@ async function main() {
     passiveA.currentRoom = "break-area";
     passiveB.currentRoom = "break-area";
     const passiveWorkBefore = workSnapshot();
+    const passivePresentationBefore = presentationSnapshot();
     const passiveEmotionBefore = (company.socialEmotionTraces || []).length;
     for (let index = 0; index < 4; index++) observeRoomFamiliarity(5);
     const passiveRecord = company.socialRelationships[makeRelationshipKey(passiveA.id, passiveB.id)];
@@ -197,8 +204,10 @@ async function main() {
     assert((passiveRecord?.recentExperiences || []).length === 0 && (passiveRecord?.reputationObservations || []).length === 0, "Passive co-presence should not create evidence or reputation observations");
     assert((company.socialEmotionTraces || []).length === passiveEmotionBefore, "Passive co-presence should not create emotional reactions");
     assert(workSnapshot() === passiveWorkBefore, "Passive Social AI observation should not change work or Institutional Learning");
+    assert(presentationSnapshot() === passivePresentationBefore, "Passive observation should not stage a visible conversation");
 
     const concreteWorkBefore = workSnapshot();
+    const concretePresentationBefore = presentationSnapshot();
     const concreteEmotionBefore = (company.socialEmotionTraces || []).length;
     recordSharedExperience(passiveA, passiveB, { type: "direct_help", sourceEventId: "concrete-help", tone: "positive", intensity: 3 });
     const concreteRecord = company.socialRelationships[makeRelationshipKey(passiveA.id, passiveB.id)];
@@ -214,6 +223,7 @@ async function main() {
     assert(company.emotionalTraces[0]?.ownerSystem === AI_SYSTEM_OWNERS.emotional, "Final stress and morale writes should identify the Emotional System as owner");
     assert(company.socialEmotionTraces[0] !== company.emotionalTraces[0], "Social recommendations and emotional state writes should use separate trace records");
     assert(workSnapshot() === concreteWorkBefore, "Concrete Social AI events should not directly change work or Institutional Learning");
+    assert(presentationSnapshot() !== concretePresentationBefore && passiveA.conversationPresence && passiveB.conversationPresence, "A grounded social event may stage presentation-only conversation presence");
 
     let guardRejected = false;
     try {

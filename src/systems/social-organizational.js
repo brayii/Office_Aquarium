@@ -16,6 +16,9 @@ function socialClone(value){
 function socialHasFiniteNumber(value){
   return value!==null&&value!==undefined&&value!==""&&Number.isFinite(Number(value));
 }
+function socialNumberOr(value,fallback=0){
+  return socialHasFiniteNumber(value)?Number(value):fallback;
+}
 function socialEmployee(employeeOrId){
   const id=Number(employeeOrId?.id??employeeOrId);
   return (employees||[]).find(employee=>employee.id===id)||null;
@@ -67,6 +70,9 @@ function defaultSocialCultureDimension(name){
 function ensureEmployeeSocialOrganizationState(employee){
   if(!employee)return employee;
   ensureEmployeePersonality(employee);
+  employee.motion=employee.motion&&typeof employee.motion==="object"?employee.motion:null;
+  employee.conversationPresence=employee.conversationPresence&&typeof employee.conversationPresence==="object"?employee.conversationPresence:null;
+  employee.officeFlow=employee.officeFlow&&typeof employee.officeFlow==="object"?employee.officeFlow:null;
   const hadCultureAdaptation=employee.cultureAdaptation&&typeof employee.cultureAdaptation==="object";
   employee.cultureAdaptation=hadCultureAdaptation?employee.cultureAdaptation:{};
   SOCIAL_CULTURE_RULES.dimensions.forEach(name=>{
@@ -95,10 +101,15 @@ function ensureSocialOrganizationContainers(){
   company.socialTemporaryStates=company.socialTemporaryStates&&typeof company.socialTemporaryStates==="object"?company.socialTemporaryStates:{};
   company.socialConversationState=company.socialConversationState&&typeof company.socialConversationState==="object"
     ?company.socialConversationState
-    :{schemaVersion:SOCIAL_CONVERSATION_RULES.schemaVersion,history:[],templateUsage:{},recentCategoryHistory:{},knowledge:{},lastConversationByPair:{}};
+    :{schemaVersion:SOCIAL_CONVERSATION_RULES.schemaVersion,history:[],templateUsage:{},recentCategoryHistory:{},knowledge:{},lastConversationByPair:{},pairHistory:{},recentPartnersByEmployee:{}};
   company.socialConversationState.schemaVersion=SOCIAL_CONVERSATION_RULES.schemaVersion;
   company.socialConversationState.history=Array.isArray(company.socialConversationState.history)
-    ?company.socialConversationState.history.slice(0,SOCIAL_CONVERSATION_RULES.maxStored)
+    ?company.socialConversationState.history.map(conversation=>{
+      const normalized=normalizeStoredConversation(conversation);
+      if(!normalized)return null;
+      Object.assign(conversation,normalized);
+      return conversation;
+    }).filter(Boolean).slice(0,SOCIAL_CONVERSATION_RULES.maxStored)
     :[];
   company.socialConversationState.templateUsage=company.socialConversationState.templateUsage&&typeof company.socialConversationState.templateUsage==="object"?company.socialConversationState.templateUsage:{};
   company.socialConversationState.recentCategoryHistory=company.socialConversationState.recentCategoryHistory&&typeof company.socialConversationState.recentCategoryHistory==="object"?company.socialConversationState.recentCategoryHistory:{};
@@ -110,6 +121,23 @@ function ensureSocialOrganizationContainers(){
       :[];
   });
   company.socialConversationState.lastConversationByPair=company.socialConversationState.lastConversationByPair&&typeof company.socialConversationState.lastConversationByPair==="object"?company.socialConversationState.lastConversationByPair:{};
+  company.socialConversationState.pairHistory=company.socialConversationState.pairHistory&&typeof company.socialConversationState.pairHistory==="object"?company.socialConversationState.pairHistory:{};
+  Object.entries(company.socialConversationState.pairHistory).forEach(([key,value])=>{
+    const history=value&&typeof value==="object"?value:{};
+    company.socialConversationState.pairHistory[key]={
+      recentTemplateIds:Array.isArray(history.recentTemplateIds)?history.recentTemplateIds.slice(0,SOCIAL_CONVERSATION_RULES.maxRecentPairTemplates):[],
+      recentTopics:Array.isArray(history.recentTopics)?history.recentTopics.slice(0,SOCIAL_CONVERSATION_RULES.maxRecentPairTopics):[],
+      recentCategories:Array.isArray(history.recentCategories)?history.recentCategories.slice(0,SOCIAL_CONVERSATION_RULES.maxRecentCategories):[],
+      lastConversationAt:socialHasFiniteNumber(history.lastConversationAt)?Number(history.lastConversationAt):null
+    };
+  });
+  company.socialConversationState.recentPartnersByEmployee=company.socialConversationState.recentPartnersByEmployee&&typeof company.socialConversationState.recentPartnersByEmployee==="object"?company.socialConversationState.recentPartnersByEmployee:{};
+  Object.keys(company.socialConversationState.recentPartnersByEmployee).forEach(employeeId=>{
+    const partners=company.socialConversationState.recentPartnersByEmployee[employeeId];
+    company.socialConversationState.recentPartnersByEmployee[employeeId]=Array.isArray(partners)
+      ?partners.map(Number).filter(Number.isFinite).slice(0,SOCIAL_CONVERSATION_RULES.maxRecentPartnersPerEmployee)
+      :[];
+  });
   company.socialCulture=company.socialCulture&&typeof company.socialCulture==="object"
     ?company.socialCulture
     :{schemaVersion:SOCIAL_CULTURE_RULES.schemaVersion,dimensions:{},evidence:[],lastUpdatedDay:null};
@@ -118,7 +146,7 @@ function ensureSocialOrganizationContainers(){
   SOCIAL_CULTURE_RULES.dimensions.forEach(name=>{
     const existing=company.socialCulture.dimensions[name]||{};
     company.socialCulture.dimensions[name]={...defaultSocialCultureDimension(name),...existing};
-    company.socialCulture.dimensions[name].value=clamp(Number(company.socialCulture.dimensions[name].value)||50,0,100);
+    company.socialCulture.dimensions[name].value=clamp(socialNumberOr(company.socialCulture.dimensions[name].value,50),0,100);
     company.socialCulture.dimensions[name].confidence=clamp(Number(company.socialCulture.dimensions[name].confidence)||0,0,100);
     company.socialCulture.dimensions[name].evidenceTypes=Array.isArray(company.socialCulture.dimensions[name].evidenceTypes)?company.socialCulture.dimensions[name].evidenceTypes.slice(0,12):[];
   });
@@ -167,7 +195,7 @@ function normalizeSocialSourceEvent(event){
     workItemId:event.workItemId||event.context?.workItemId||null,
     privacy:socialPrivacy(event.privacy),
     volume:socialHasFiniteNumber(event.volume)?clamp(Number(event.volume),0,1):null,
-    confidence:clamp(Number(event.confidence)||80,0,100),
+    confidence:clamp(socialNumberOr(event.confidence,80),0,100),
     intensity:clamp(Number(event.intensity)||1,1,5),
     tone:["positive","negative","neutral","mixed"].includes(event.tone)?event.tone:"neutral",
     timestamp,
@@ -201,6 +229,62 @@ function registerSocialSourceEvent(event){
   company.socialSourceEvents.unshift(normalized);
   pruneSocialSourceEvents();
   return normalized;
+}
+function createGroundedConversationOpportunity({
+  id,
+  type,
+  category,
+  actorId,
+  subjectId,
+  roomId=null,
+  projectId=null,
+  workItemId=null,
+  confidence=80,
+  intensity=1,
+  tone="neutral",
+  privacy="ordinary",
+  context={}
+}={}){
+  if(!id||!type||!socialHasFiniteNumber(actorId)||!socialHasFiniteNumber(subjectId)||Number(actorId)===Number(subjectId))return null;
+  const event=registerSocialSourceEvent({
+    id,
+    type,
+    category,
+    actorId:Number(actorId),
+    subjectId:Number(subjectId),
+    participantIds:[Number(actorId),Number(subjectId)],
+    roomId,
+    projectId,
+    workItemId,
+    confidence,
+    intensity,
+    tone,
+    privacy,
+    context:{...context,presentationOnly:true}
+  });
+  if(!event)return null;
+  const experience={
+    type:event.type,
+    category:event.category,
+    sourceEventId:event.id,
+    timestamp:event.timestamp,
+    roomId:event.roomId,
+    projectId:event.projectId,
+    participants:event.participantIds,
+    actorId:event.actorId,
+    subjectId:event.subjectId,
+    privacy:event.privacy,
+    confidence:event.confidence,
+    intensity:event.intensity,
+    emotionalTone:event.tone,
+    context:socialClone(event.context)
+  };
+  const conversation=createGroundedConversationFromExperience(experience,event);
+  if(!conversation){
+    company.socialSourceEvents=company.socialSourceEvents.filter(item=>item.id!==event.id);
+    return null;
+  }
+  return conversation;
 }
 function socialSourceEventById(sourceEventId){
   return (company?.socialSourceEvents||[]).find(event=>event.id===sourceEventId)||null;
@@ -425,7 +509,7 @@ function normalizeSocialMemoryRecord(memory){
     timestamp:memory.timestamp&&typeof memory.timestamp==="object"?memory.timestamp:simulationTimestamp(memory.day??0,memory.minute??0),
     tags:Array.isArray(memory.tags)?[...new Set(memory.tags.map(String))].slice(0,12):[],
     context:memory.context&&typeof memory.context==="object"?socialClone(memory.context):{},
-    confidence:clamp(Number(memory.confidence)||50,0,100),
+    confidence:clamp(socialNumberOr(memory.confidence,50),0,100),
     resolved:memory.resolved!==false,
     relatedMemoryIds:Array.isArray(memory.relatedMemoryIds)?[...new Set(memory.relatedMemoryIds.map(String))].slice(0,12):[],
     lastAgedDay:Number.isFinite(Number(memory.lastAgedDay))?Number(memory.lastAgedDay):(memory.timestamp?.day??0),
@@ -664,6 +748,62 @@ function latestUnresolvedConflictBetween(aId,bId){
   return (company.socialConflicts||[]).filter(conflict=>conflict.status!=="resolved"&&makeRelationshipKey(conflict.actorId,conflict.subjectId)===key)
     .sort((a,b)=>socialTimestampValue(b.createdAt)-socialTimestampValue(a.createdAt))[0]||null;
 }
+function maybeCreateAutomaticConflictRepair(a,b,roomId){
+  if(!a?.active||!b?.active||a.offsite||b.offsite||a.id===b.id||!roomId)return null;
+  const conflict=latestUnresolvedConflictBetween(a.id,b.id);
+  if(!conflict)return null;
+  const rules=SOCIAL_ORGANIZATION_RULES.conflict.automaticRepair;
+  const now=simulationTimestamp().absoluteMinute;
+  const age=now-socialTimestampValue(conflict.createdAt);
+  if(age<rules.ageMinutes||now-(Number(conflict.lastAutomaticRepairCheckAt)||-999999)<rules.checkMinutes)return null;
+  conflict.lastAutomaticRepairCheckAt=now;
+  const actor=socialEmployee(conflict.actorId),subject=socialEmployee(conflict.subjectId);
+  if(!actor?.active||!subject?.active||actor.offsite||subject.offsite)return null;
+  if(conversationParticipantRoom(actor)!==roomId||conversationParticipantRoom(subject)!==roomId)return null;
+  refreshEmployeeConversationPresence(actor);
+  refreshEmployeeConversationPresence(subject);
+  if(actor.conversationPresence||subject.conversationPresence)return null;
+  if(employeeHasCriticalConversationConflict(actor,"repair")||employeeHasCriticalConversationConflict(subject,"repair"))return null;
+  const forgiveness=((actor.personality?.forgivenessRate||0)+(subject.personality?.forgivenessRate||0))/2;
+  const empathy=((actor.personality?.empathy||0)+(subject.personality?.empathy||0))/2;
+  const relationship=getRelationshipView(actor,subject).interpretation;
+  const safety=(company.socialCulture?.dimensions?.psychologicalSafety?.value??50)-50;
+  const attempts=(conflict.repairAttempts||[]).length;
+  const readiness=
+    rules.baseReadiness+
+    forgiveness*rules.forgivenessWeight+
+    empathy*rules.empathyWeight+
+    ((relationship.trust??50)-50)*rules.trustWeight+
+    safety*rules.psychologicalSafetyWeight-
+    (conflict.intensity||1)*rules.intensityPenalty-
+    attempts*rules.previousAttemptPenalty;
+  const windows=Math.floor(Math.max(0,age-rules.ageMinutes)/rules.checkMinutes);
+  const threshold=Math.max(rules.minimumThreshold,rules.initialThreshold-windows*rules.thresholdDecayPerWindow);
+  if(readiness<threshold)return null;
+  const source=typeof socialSourceEventById==="function"?socialSourceEventById(conflict.sourceEventId):null;
+  const projectTitle=socialProjectTitle(conflict.projectId);
+  const repairType=(actor.personality?.empathy||0)+(actor.personality?.forgivenessRate||0)>=0?"apology":"clarification";
+  const sourceEventId=`conflict-repair-${conflict.id}-${now}`;
+  recordSharedExperience(actor,subject,{
+    type:repairType,
+    sourceEventId,
+    roomId,
+    projectId:conflict.projectId||null,
+    tone:"positive",
+    intensity:readiness>=threshold+10?3:2,
+    actorId:actor.id,
+    subjectId:subject.id,
+    category:"repair",
+    confidence:clamp(Math.round(55+readiness*.35),55,90),
+    context:{
+      workItemId:source?.context?.workItemId||null,
+      workTitle:source?.context?.workTitle||projectTitle||null,
+      purpose:"repair the earlier disagreement",
+      outcome:"The coworkers chose to address an unresolved conflict after taking time to cool down."
+    }
+  });
+  return conflict.repairAttempts?.at(-1)||null;
+}
 function linkConflictAndRepairMemories(conflict,repairMemoryIds){
   const records=company.socialMemoryStore.records||[];
   const allIds=[...(conflict.memoryIds||[]),...(repairMemoryIds||[])];
@@ -842,7 +982,7 @@ function updateSocialCulture(){
     const directExposure=recent.filter(evidence=>(evidence.participantIds||[]).includes(employee.id)).length;
     const exposureScale=directExposure?1:.35;
     SOCIAL_CULTURE_RULES.dimensions.forEach(name=>{
-      const target=company.socialCulture.dimensions[name].value,current=Number(employee.cultureAdaptation[name])||50;
+      const target=company.socialCulture.dimensions[name].value,current=socialNumberOr(employee.cultureAdaptation[name],50);
       employee.cultureAdaptation[name]=Number(clamp(current+(target-current)*SOCIAL_CULTURE_RULES.adaptationRate*adaptability*exposureScale,0,100).toFixed(3));
     });
     employee.cultureAdaptationUpdatedDay=company.day;
@@ -876,10 +1016,10 @@ function socialCultureExperienceRecommendation(employee,type,tone){
 function socialCulturePreferenceModifier(employee,coworker,opportunity={}){
   if(!company?.socialCulture)return 0;
   const dimensions=company.socialCulture.dimensions||{},adapt=employee?.cultureAdaptation||{};
-  const collaboration=(Number(dimensions.collaboration?.value)||50)-50;
-  const warmth=(Number(dimensions.socialWarmth?.value)||50)-50;
-  const safety=(Number(dimensions.psychologicalSafety?.value)||50)-50;
-  const employeeFit=((Number(adapt.collaboration)||50)-50)*.04+((Number(adapt.socialWarmth)||50)-50)*.03;
+  const collaboration=socialNumberOr(dimensions.collaboration?.value,50)-50;
+  const warmth=socialNumberOr(dimensions.socialWarmth?.value,50)-50;
+  const safety=socialNumberOr(dimensions.psychologicalSafety?.value,50)-50;
+  const employeeFit=(socialNumberOr(adapt.collaboration,50)-50)*.04+(socialNumberOr(adapt.socialWarmth,50)-50)*.03;
   const modifier=collaboration*.08+warmth*.06+safety*.04+employeeFit;
   return Number(clamp(modifier,-12,12).toFixed(3));
 }
@@ -919,7 +1059,11 @@ function processSocialExperience({experience,sourceEvent,a,b}={}){
   if(SOCIAL_ORGANIZATION_RULES.repairExperienceTypes.includes(experience.type))socialRepairFromExperience(experience,memories.map(memory=>memory.id));
   recordSocialCultureEvidence(experience);
   if(typeof recordLeadershipEvidenceFromSocialExperience==="function")recordLeadershipEvidenceFromSocialExperience(experience);
-  if(typeof createGroundedConversationFromExperience==="function")createGroundedConversationFromExperience(experience,event);
+  const conversation=typeof createGroundedConversationFromExperience==="function"?createGroundedConversationFromExperience(experience,event):null;
+  if(!conversation){
+    applySocialMemoryRecallRecommendation(a,b,event,experience.category||conversationCategoryForEvent(event));
+    applySocialMemoryRecallRecommendation(b,a,event,experience.category||conversationCategoryForEvent(event));
+  }
   return {event,memories};
 }
 
@@ -1058,15 +1202,23 @@ function socialGroupType(memberIds,graph){
 function deriveInformalGroups(){
   ensureSocialOrganizationalSystems();
   const graph=buildSocialRelationshipGraph(),eligibleEdges=graph.edges.filter(edge=>edge.score>=SOCIAL_GROUP_RULES.edgeThreshold);
+  const joinEdges=eligibleEdges.filter(edge=>edge.score>=SOCIAL_GROUP_RULES.memberJoinThreshold);
   const previousGroups=(company.informalGroups||[]).map(socialClone),unassigned=new Set(graph.nodes.map(node=>node.id)),groups=[];
   for(const seed of graph.nodes){
     if(!unassigned.has(seed.id))continue;
-    const connected=eligibleEdges.filter(edge=>edge.aId===seed.id||edge.bId===seed.id)
-      .map(edge=>({id:edge.aId===seed.id?edge.bId:edge.aId,score:edge.score}))
-      .filter(candidate=>unassigned.has(candidate.id))
-      .sort((a,b)=>b.score-a.score||a.id-b.id);
-    if(!connected.length)continue;
-    const memberIds=[seed.id,...connected.filter(candidate=>candidate.score>=SOCIAL_GROUP_RULES.memberJoinThreshold).slice(0,SOCIAL_GROUP_RULES.maxGroupSize-1).map(candidate=>candidate.id)];
+    const memberIds=[seed.id],queued=new Set(memberIds);
+    for(let cursor=0;cursor<memberIds.length&&memberIds.length<SOCIAL_GROUP_RULES.maxGroupSize;cursor++){
+      const currentId=memberIds[cursor];
+      const connected=joinEdges.filter(edge=>edge.aId===currentId||edge.bId===currentId)
+        .map(edge=>({id:edge.aId===currentId?edge.bId:edge.aId,score:edge.score}))
+        .filter(candidate=>unassigned.has(candidate.id)&&!queued.has(candidate.id))
+        .sort((a,b)=>b.score-a.score||a.id-b.id);
+      connected.forEach(candidate=>{
+        if(memberIds.length>=SOCIAL_GROUP_RULES.maxGroupSize)return;
+        memberIds.push(candidate.id);
+        queued.add(candidate.id);
+      });
+    }
     if(memberIds.length<2)continue;
     memberIds.forEach(id=>unassigned.delete(id));
     memberIds.sort((a,b)=>a-b);
@@ -1357,133 +1509,235 @@ function recordLeadershipCompanyEvent({sourceEventId,type="ceo-decision",outcome
 }
 
 const SOCIAL_DIALOGUE_WRAPPERS=[
-  "{statement}",
-  "Quick note: {statement}",
-  "For context, {statement}",
-  "I wanted to mention this: {statement}"
+  {id:"reserved",voiceStyle:"reserved"},
+  {id:"professional",voiceStyle:"professional"},
+  {id:"extrovert",voiceStyle:"extrovert"},
+  {id:"humorous",voiceStyle:"humorous"}
 ];
 const SOCIAL_DIALOGUE_STATEMENTS={
   greeting:[
-    "{timeGreeting}, {subjectName}.",
-    "Hi, {subjectName}.",
-    "How is your day going, {subjectName}?",
-    "It is good to see you, {subjectName}.",
-    "Hello. Let us catch up when there is a quiet minute."
+    {intent:"acknowledge",text:"{timeGreeting}, {subjectName}."},
+    {intent:"acknowledge",text:"Hi, {subjectName}."},
+    {intent:"check-in",text:"How is your day going, {subjectName}?"},
+    {intent:"acknowledge",text:"It is good to see you, {subjectName}."},
+    {intent:"request-attention",text:"Do you have a minute, {subjectName}?"},
+    {intent:"request-attention",text:"I was hoping to catch you, {subjectName}."},
+    {intent:"acknowledge",text:"Nice timing, {subjectName}."},
+    {intent:"acknowledge",text:"I am glad we crossed paths, {subjectName}."},
+    {intent:"check-in",text:"How are things on your side, {subjectName}?"},
+    {intent:"acknowledge",text:"Before we get back to work, hello, {subjectName}."}
   ],
   current_work:[
-    "I am working through {workTitle}.",
-    "{workTitle} is my main focus right now.",
-    "I am still making progress on {workTitle}.",
-    "The next step for me is on {workTitle}.",
-    "I am keeping my attention on {workTitle}.",
-    "{groupStatement}"
+    {intent:"share-status",text:"I am working through {workTitle}."},
+    {intent:"share-status",text:"{workTitle} is my main focus right now."},
+    {intent:"share-status",text:"I am still making progress on {workTitle}."},
+    {intent:"share-next-step",text:"The next step for me is on {workTitle}."},
+    {intent:"share-focus",text:"I am keeping my attention on {workTitle}."},
+    {intent:"share-status",text:"The work is moving, but I am checking the details before I call it done."},
+    {intent:"share-focus",text:"I am trying to keep the current task from creating rework later."},
+    {intent:"share-next-step",text:"I have a clear next step and I am working through it now."},
+    {intent:"shared-history",text:"{memoryReference}"},
+    {intent:"group-identity",text:"{groupStatement}"}
   ],
   help_request:[
-    "Could you help me with {workTitle}?",
-    "I could use another set of eyes on {workTitle}.",
-    "Can we review {workTitle} together?",
-    "I need your perspective on {workTitle}.",
-    "Would you have time to help with {workTitle}?"
+    {intent:"request-help",text:"Could you help me with {workTitle}?"},
+    {intent:"request-review",text:"I could use another set of eyes on {workTitle}."},
+    {intent:"request-review",text:"Can we review {workTitle} together?"},
+    {intent:"request-perspective",text:"I need your perspective on {workTitle}."},
+    {intent:"request-help",text:"Would you have time to help with {workTitle}?"},
+    {intent:"request-help",text:"I have reached the point where another perspective would help."},
+    {intent:"request-review",text:"Could you sanity-check the approach before I go further?"},
+    {intent:"request-perspective",text:"I am not fully confident in the next step and would value your view."},
+    {intent:"request-help",text:"Can we spend a few minutes working through this together?"},
+    {intent:"shared-history",text:"{memoryReference}"}
   ],
   giving_help:[
-    "I can help you with {workTitle}.",
-    "Let us work through {workTitle} together.",
-    "I have time to review {workTitle}.",
-    "I can take a closer look at {workTitle}.",
-    "Let me help clear the next step on {workTitle}.",
-    "{cultureStatement}"
+    {intent:"offer-help",text:"I can help you with {workTitle}."},
+    {intent:"offer-collaboration",text:"Let us work through {workTitle} together."},
+    {intent:"offer-review",text:"I have time to review {workTitle}."},
+    {intent:"offer-review",text:"I can take a closer look at {workTitle}."},
+    {intent:"offer-help",text:"Let me help clear the next step on {workTitle}."},
+    {intent:"offer-help",text:"Show me where you are stuck and we can work from there."},
+    {intent:"offer-review",text:"I can give you a quick second opinion before you commit to the approach."},
+    {intent:"offer-collaboration",text:"We can divide the problem and compare what we find."},
+    {intent:"shared-history",text:"{memoryReference}"},
+    {intent:"culture",text:"{cultureStatement}"}
   ],
   blockers:[
-    "{workTitle} is blocked by {blocker}.",
-    "The main issue on {workTitle} is {blocker}.",
-    "We cannot move {workTitle} forward until we address {blocker}.",
-    "{blocker} is holding up {workTitle}.",
-    "I need help clearing {blocker} from {workTitle}."
+    {intent:"identify-blocker",text:"{workTitle} is blocked by {blocker}."},
+    {intent:"identify-blocker",text:"The main issue on {workTitle} is {blocker}."},
+    {intent:"explain-dependency",text:"We cannot move {workTitle} forward until we address {blocker}."},
+    {intent:"identify-blocker",text:"{blocker} is holding up {workTitle}."},
+    {intent:"request-resolution",text:"I need help clearing {blocker} from {workTitle}."},
+    {intent:"confirm-resolution",text:"We cleared {blocker} from {workTitle}."},
+    {intent:"confirm-resolution",text:"{blockerResolution}."},
+    {intent:"recognize-resolution",text:"Clearing {blocker} lets {workTitle} move again."},
+    {intent:"confirm-resolution",text:"The work can continue now that {blocker} is resolved."},
+    {intent:"reflect-on-resolution",text:"We should remember how we cleared {blocker} if this dependency returns."}
   ],
   meetings:[
-    "The meeting is about {purpose}.",
-    "We need a clear decision on {purpose}.",
-    "I want the meeting to settle {purpose}.",
-    "The team needs alignment on {purpose}.",
-    "Let us keep the discussion focused on {purpose}."
+    {intent:"state-purpose",text:"The meeting is about {purpose}."},
+    {intent:"seek-decision",text:"We need a clear decision on {purpose}."},
+    {intent:"seek-decision",text:"I want the meeting to settle {purpose}."},
+    {intent:"seek-alignment",text:"The team needs alignment on {purpose}."},
+    {intent:"focus-discussion",text:"Let us keep the discussion focused on {purpose}."},
+    {intent:"seek-alignment",text:"I think the meeting helped us understand where the teams disagree."},
+    {intent:"focus-discussion",text:"We should leave the room with an owner and a next step."},
+    {intent:"seek-decision",text:"The discussion is useful, but the team still needs a decision."},
+    {intent:"state-purpose",text:"I want to make sure the right people hear the same version of the plan."},
+    {intent:"shared-history",text:"{memoryReference}"}
   ],
   deadlines:[
-    "{workTitle} is due on day {deadlineDay}.",
-    "The deadline on {workTitle} is getting close.",
-    "We need to protect the schedule for {workTitle}.",
-    "I am concerned about the timing on {workTitle}.",
-    "The remaining work on {workTitle} needs a realistic plan."
+    {intent:"state-deadline",text:"{workTitle} is due on day {deadlineDay}."},
+    {intent:"flag-pressure",text:"The deadline on {workTitle} is getting close."},
+    {intent:"protect-schedule",text:"We need to protect the schedule for {workTitle}."},
+    {intent:"flag-pressure",text:"I am concerned about the timing on {workTitle}."},
+    {intent:"request-plan",text:"The remaining work on {workTitle} needs a realistic plan."},
+    {intent:"flag-pressure",text:"The schedule has less room for error than it did earlier."},
+    {intent:"request-plan",text:"We should be honest about what can still fit before the deadline."},
+    {intent:"protect-schedule",text:"A clear trade-off now would be better than a surprise later."},
+    {intent:"request-plan",text:"I need to know which work is essential and which work can wait."},
+    {intent:"shared-history",text:"{memoryReference}"}
   ],
   appreciation:[
-    "Thank you for helping with {workTitle}.",
-    "Your help on {workTitle} made a difference.",
-    "I appreciate the time you gave to {workTitle}.",
-    "That support on {workTitle} was useful.",
-    "Thanks for stepping in on {workTitle}."
+    {intent:"thank-help",text:"Thank you for helping with {workTitle}."},
+    {intent:"recognize-impact",text:"Your help on {workTitle} made a difference."},
+    {intent:"thank-time",text:"I appreciate the time you gave to {workTitle}."},
+    {intent:"recognize-impact",text:"That support on {workTitle} was useful."},
+    {intent:"thank-help",text:"Thanks for stepping in on {workTitle}."},
+    {intent:"thank-help",text:"I noticed that you made time to help when the team needed it."},
+    {intent:"recognize-impact",text:"The work moved more cleanly because you were involved."},
+    {intent:"thank-time",text:"I appreciate you following through instead of leaving the problem half-solved."},
+    {intent:"recognize-impact",text:"Your support reduced the pressure on the rest of the team."},
+    {intent:"shared-history",text:"{memoryReference}"}
   ],
   mentoring:[
-    "I can walk you through {workTitle}.",
-    "Let us review what we learned from {workTitle}.",
-    "I can share how I would approach {workTitle}.",
-    "We can use {workTitle} as a learning opportunity.",
-    "I will help you build confidence with {workTitle}.",
-    "{leadershipStatement}"
+    {intent:"offer-guidance",text:"I can walk you through {workTitle}."},
+    {intent:"reflect",text:"Let us review what we learned from {workTitle}."},
+    {intent:"share-approach",text:"I can share how I would approach {workTitle}."},
+    {intent:"teach",text:"We can use {workTitle} as a learning opportunity."},
+    {intent:"build-confidence",text:"I will help you build confidence with {workTitle}."},
+    {intent:"offer-guidance",text:"I can explain the reasoning, then you can decide how to apply it."},
+    {intent:"teach",text:"The important part is understanding why the approach works."},
+    {intent:"build-confidence",text:"Try the next step yourself and I will stay close if you need a review."},
+    {intent:"shared-history",text:"{memoryReference}"},
+    {intent:"leadership",text:"{leadershipStatement}"}
   ],
   recognition:[
-    "Your contribution to {workTitle} deserves recognition.",
-    "You handled {workTitle} well.",
-    "The team noticed your work on {workTitle}.",
-    "You made an important contribution to {workTitle}.",
-    "Your follow-through on {workTitle} helped the team."
+    {intent:"recognize-contribution",text:"Your contribution to {workTitle} deserves recognition."},
+    {intent:"recognize-execution",text:"You handled {workTitle} well."},
+    {intent:"share-team-recognition",text:"The team noticed your work on {workTitle}."},
+    {intent:"recognize-contribution",text:"You made an important contribution to {workTitle}."},
+    {intent:"recognize-follow-through",text:"Your follow-through on {workTitle} helped the team."},
+    {intent:"recognize-judgment",text:"You made a good call when the work became uncertain."},
+    {intent:"share-team-recognition",text:"People noticed that you stayed with the problem until it was resolved."},
+    {intent:"recognize-follow-through",text:"The result was better because you checked the details."},
+    {intent:"recognize-contribution",text:"That was the kind of quiet contribution that keeps a team moving."},
+    {intent:"shared-history",text:"{memoryReference}"}
   ],
   conflict:[
-    "I disagree with how we are handling {workTitle}.",
-    "We need to resolve our disagreement about {workTitle}.",
-    "I do not think the current approach to {workTitle} is working.",
-    "We are seeing {workTitle} differently.",
-    "I want to be clear about my concern with {workTitle}."
+    {intent:"state-disagreement",text:"I disagree with how we are handling {workTitle}."},
+    {intent:"seek-resolution",text:"We need to resolve our disagreement about {workTitle}."},
+    {intent:"challenge-approach",text:"I do not think the current approach to {workTitle} is working."},
+    {intent:"state-disagreement",text:"We are seeing {workTitle} differently."},
+    {intent:"state-concern",text:"I want to be clear about my concern with {workTitle}."},
+    {intent:"state-concern",text:"I do not think we are working from the same assumptions."},
+    {intent:"seek-resolution",text:"We should address the disagreement directly before it affects the work."},
+    {intent:"challenge-approach",text:"I need stronger evidence before I can support this approach."},
+    {intent:"state-disagreement",text:"I understand your position, but I do not agree with the conclusion."},
+    {intent:"seek-resolution",text:"Let us separate the facts from the frustration and work through this."}
   ],
   repair:[
-    "I want to clear up what happened around {workTitle}.",
-    "I am sorry for how I handled the discussion about {workTitle}.",
-    "Can we reset and work through {workTitle} constructively?",
-    "I want to follow up on our disagreement about {workTitle}.",
-    "Let us find a better way forward on {workTitle}."
+    {intent:"clarify",text:"I want to clear up what happened around {workTitle}."},
+    {intent:"apologize",text:"I am sorry for how I handled the discussion about {workTitle}."},
+    {intent:"reset",text:"Can we reset and work through {workTitle} constructively?"},
+    {intent:"follow-up",text:"I want to follow up on our disagreement about {workTitle}."},
+    {intent:"seek-way-forward",text:"Let us find a better way forward on {workTitle}."},
+    {intent:"apologize",text:"I could have handled that conversation better."},
+    {intent:"clarify",text:"I want to make sure the disagreement does not become the relationship."},
+    {intent:"reset",text:"I think we can disagree and still work together well."},
+    {intent:"seek-way-forward",text:"Can we agree on the next step even if we still see part of this differently?"},
+    {intent:"shared-history",text:"{memoryReference}"}
   ],
   casual:[
-    "It has been a busy day.",
-    "I am taking a minute before the next task.",
-    "The office feels active today.",
-    "I needed a short break from the screen.",
-    "It is good to have a quiet moment."
+    {intent:"small-talk",text:"It has been a busy day."},
+    {intent:"break",text:"I am taking a minute before the next task."},
+    {intent:"observe-office",text:"The office feels active today."},
+    {intent:"break",text:"I needed a short break from the screen."},
+    {intent:"small-talk",text:"It is good to have a quiet moment."},
+    {intent:"check-in",text:"How are you holding up today?"},
+    {intent:"observe-office",text:"Everyone seems to be moving between three things at once."},
+    {intent:"break",text:"I am trying to take a real pause instead of carrying work into the break."},
+    {intent:"small-talk",text:"It is nice to talk without an agenda for a minute."},
+    {intent:"shared-history",text:"{memoryReference}"}
   ],
   company_news:[
-    "The team is talking about {newsTopic}.",
-    "I saw the update about {newsTopic}.",
-    "The news about {newsTopic} will affect how people plan.",
-    "I am still thinking through the update on {newsTopic}.",
-    "We should keep an eye on what {newsTopic} means for the team."
+    {intent:"share-news",text:"The team is talking about {newsTopic}."},
+    {intent:"acknowledge-news",text:"I saw the update about {newsTopic}."},
+    {intent:"interpret-news",text:"The news about {newsTopic} will affect how people plan."},
+    {intent:"interpret-news",text:"I am still thinking through the update on {newsTopic}."},
+    {intent:"watch-impact",text:"We should keep an eye on what {newsTopic} means for the team."},
+    {intent:"acknowledge-news",text:"The company update reached people quickly."},
+    {intent:"interpret-news",text:"Different teams are going to read the announcement differently."},
+    {intent:"watch-impact",text:"I want to see what changes in the work after the announcement."},
+    {intent:"share-news",text:"People are comparing the official update with what they see day to day."},
+    {intent:"watch-impact",text:"The next few days will tell us whether the update changes behavior."}
   ],
   celebration:[
-    "We should celebrate the progress on {workTitle}.",
-    "The result on {workTitle} is worth recognizing.",
-    "The team earned this moment on {workTitle}.",
-    "It is good to see {workTitle} reach this point.",
-    "We made meaningful progress on {workTitle}."
+    {intent:"celebrate-progress",text:"We should celebrate the progress on {workTitle}."},
+    {intent:"recognize-result",text:"The result on {workTitle} is worth recognizing."},
+    {intent:"recognize-team",text:"The team earned this moment on {workTitle}."},
+    {intent:"celebrate-progress",text:"It is good to see {workTitle} reach this point."},
+    {intent:"recognize-result",text:"We made meaningful progress on {workTitle}."},
+    {intent:"celebrate-progress",text:"It is worth stopping for a minute to recognize what just happened."},
+    {intent:"recognize-team",text:"A lot of quiet work went into this result."},
+    {intent:"recognize-result",text:"The milestone gives the team something real to build on."},
+    {intent:"recognize-team",text:"People kept showing up for the hard parts, and it paid off."},
+    {intent:"shared-history",text:"{memoryReference}"}
   ]
 };
+const SOCIAL_DIALOGUE_CLOSINGS=[
+  {intent:"goodbye",text:"Thanks. I will let you get back to it."},
+  {intent:"goodbye",text:"That helps. I understand the next step."},
+  {intent:"goodbye",text:"All right. Let us pick this up again if the situation changes."},
+  {intent:"goodbye",text:"I appreciate the conversation. I am heading back to work."},
+  {intent:"goodbye",text:"Good talk. I have what I need for now."},
+  {intent:"goodbye",text:"Thanks. I understand where you stand."},
+  {intent:"goodbye",text:"Thanks. I have enough to continue."},
+  {intent:"goodbye",text:"Thanks for the time. I will see you later."}
+];
+function lowerDialogueStart(text){
+  if(!text||/^I(?:\s|'|am\b)/.test(text))return text;
+  return text.charAt(0).toLowerCase()+text.slice(1);
+}
+function applySocialDialogueWording(statement,voiceStyle,category){
+  if(voiceStyle==="reserved")return statement;
+  if(category==="greeting"){
+    if(voiceStyle==="professional")return `${statement} I hope things are going well.`;
+    if(voiceStyle==="extrovert")return `Hey! ${statement}`;
+    return `${statement} We made it to another office day.`;
+  }
+  if(voiceStyle==="professional")return `I want to be clear: ${lowerDialogueStart(statement)}`;
+  if(voiceStyle==="extrovert")return `Hey, ${lowerDialogueStart(statement)}`;
+  if(SOCIAL_CONVERSATION_RULES.humorSafeCategories.includes(category))return `Small office update: ${lowerDialogueStart(statement)}`;
+  return `No easy way to say it: ${lowerDialogueStart(statement)}`;
+}
 function buildSocialDialogueTemplateLibrary(){
   const library={};
   SOCIAL_CONVERSATION_RULES.categories.forEach(category=>{
     const statements=SOCIAL_DIALOGUE_STATEMENTS[category]||SOCIAL_DIALOGUE_STATEMENTS.casual;
     library[category]=[];
-    statements.forEach((statement,statementIndex)=>{
+    statements.forEach((statementRecord,statementIndex)=>{
+      const statement=typeof statementRecord==="string"?{intent:category,text:statementRecord}:statementRecord;
       SOCIAL_DIALOGUE_WRAPPERS.forEach((wrapper,wrapperIndex)=>{
+        const text=applySocialDialogueWording(statement.text,wrapper.voiceStyle,category);
         library[category].push({
           id:`${category}-${statementIndex}-${wrapperIndex}`,
           category,
-          text:wrapper.replace("{statement}",statement),
-          required:[...statement.matchAll(/\{(\w+)\}/g)].map(match=>match[1])
+          intent:statement.intent||category,
+          voiceStyle:wrapper.voiceStyle,
+          text,
+          required:[...text.matchAll(/\{(\w+)\}/g)].map(match=>match[1])
         });
       });
     });
@@ -1492,23 +1746,91 @@ function buildSocialDialogueTemplateLibrary(){
 }
 const SOCIAL_DIALOGUE_TEMPLATES=buildSocialDialogueTemplateLibrary();
 
+function socialEventRepairsConflict(event){
+  const sourceEventId=event?.id||event?.sourceEventId;
+  if(!sourceEventId)return false;
+  return (company?.socialConflicts||[]).some(conflict=>
+    conflict.resolutionSourceEventId===sourceEventId||
+    (conflict.repairAttempts||[]).some(attempt=>attempt.sourceEventId===sourceEventId)
+  );
+}
 function conversationCategoryForEvent(event){
   const type=String(event?.type||"");
   if(SOCIAL_CONVERSATION_RULES.categories.includes(event?.category))return event.category;
   if(type==="first_met")return "greeting";
+  if(type==="task_completed")return "celebration";
+  if(type==="department_return")return "current_work";
   if(type==="help_request")return "help_request";
-  if(["direct_help","blocker_resolved_together"].includes(type))return "giving_help";
+  if(type==="direct_help")return "giving_help";
+  if(type==="blocker_resolved_together")return "blockers";
   if(type==="onboarding_support"||type==="mentoring_interaction")return "mentoring";
   if(["recognition","recognition_shared"].includes(type))return "recognition";
   if(["milestone_success_together","shared_success"].includes(type))return "celebration";
   if(SOCIAL_ORGANIZATION_RULES.conflictExperienceTypes.includes(type))return "conflict";
-  if(SOCIAL_ORGANIZATION_RULES.repairExperienceTypes.includes(type))return "repair";
+  if(SOCIAL_CONVERSATION_RULES.explicitRepairTriggerTypes.includes(type)||socialEventRepairsConflict(event))return "repair";
+  if(["constructive_feedback","successful_collaboration"].includes(type))return "appreciation";
   if(type==="deadline_pressure_together")return "deadlines";
   if(["shared_meeting","same_meeting"].includes(type))return "meetings";
   if(["shared_break","same_break","conversation","casual_conversation"].includes(type))return "casual";
   if(type.includes("blocker"))return "blockers";
   if(type.includes("news")||type.includes("announcement"))return "company_news";
   return event?.workItemId||event?.context?.workItemId?"current_work":"casual";
+}
+function groundedConversationTriggerForEvent(event,experience=null){
+  const explicit=String(event?.context?.triggerType||experience?.context?.triggerType||"");
+  if(SOCIAL_CONVERSATION_RULES.groundedTriggerTypes.includes(explicit))return explicit;
+  const type=String(event?.type||experience?.type||"");
+  if(SOCIAL_CONVERSATION_RULES.explicitRepairTriggerTypes.includes(type)||socialEventRepairsConflict(event))return "repair";
+  if(type==="first_met")return "first-meeting";
+  if(type==="task_completed")return "task-finished";
+  if(type==="department_return")return "department-return";
+  if(["help_request","direct_help"].includes(type))return "help-request";
+  if(type==="blocker_resolved_together")return "blocker-resolved";
+  if(["milestone_success_together","milestone_failure_together","shared_success","recognition","recognition_shared"].includes(type))return "milestone";
+  if(SOCIAL_ORGANIZATION_RULES.conflictExperienceTypes.includes(type))return "conflict";
+  if(["mentoring_interaction","onboarding_support"].includes(type))return "mentoring";
+  if(["shared_break","same_break","casual_conversation","conversation"].includes(type))return event?.roomId==="break-area"?"break":"passing-coworker";
+  if(["shared_meeting","same_meeting"].includes(type))return "meeting-transition";
+  if(type==="deadline_pressure_together")return "deadline";
+  if(["shared_work_activity","successful_collaboration","failed_collaboration"].includes(type))return "work-coordination";
+  if(type.includes("news")||type.includes("announcement"))return "company-news";
+  return null;
+}
+function employeeHasCriticalConversationConflict(employee,triggerType){
+  if(!employee?.active||employee.offsite)return true;
+  if(!["passing-coworker","break","company-news","first-meeting","department-return","repair","mentoring","milestone","task-finished"].includes(triggerType))return false;
+  if(!["working","testing hardware"].includes(employee.action))return false;
+  const work=typeof activeWorkForEmployee==="function"?activeWorkForEmployee(employee):null;
+  if(!work)return employee.stress>=SOCIAL_CONVERSATION_RULES.criticalStressThreshold;
+  const deadlineNear=Number.isFinite(Number(work.deadlineDay))&&Number(work.deadlineDay)-company.day<=SOCIAL_CONVERSATION_RULES.criticalDeadlineWindowDays;
+  const blocked=Array.isArray(work.blockedBy)&&work.blockedBy.length>0;
+  const priority=Number(work.priority)||0;
+  return deadlineNear||blocked||priority>=SOCIAL_CONVERSATION_RULES.criticalPriorityThreshold||employee.stress>=SOCIAL_CONVERSATION_RULES.criticalStressThreshold;
+}
+function priorConversationMemory(owner,subject,event,category){
+  return socialMemoryRecords(owner.id,{subjectId:subject.id})
+    .filter(memory=>memory.sourceEventId!==event.id)
+    .map(memory=>({memory,score:socialMemoryRelevance(memory,{
+      tags:[category,event.type].filter(Boolean),
+      context:{projectId:event.projectId,workItemId:event.workItemId,roomId:event.roomId}
+    })}))
+    .sort((a,b)=>b.score-a.score||socialTimestampValue(b.memory.timestamp)-socialTimestampValue(a.memory.timestamp)||String(a.memory.id).localeCompare(String(b.memory.id)))[0]?.memory||null;
+}
+function groundedMemoryReference(owner,subject,event,category){
+  const memory=priorConversationMemory(owner,subject,event,category);
+  if(!memory)return null;
+  const workTitle=memory.context?.workTitle||memory.context?.projectTitle||null;
+  const ageDays=Math.max(0,company.day-(memory.timestamp?.day??company.day));
+  const when=ageDays===0?"earlier":ageDays===1?"yesterday":"before";
+  if(["helped_with_blocker","supportive_conversation"].includes(memory.type))return workTitle?`Thanks again for helping with ${workTitle} ${when}.`:`Thanks again for helping when I was stuck ${when}.`;
+  if(["reliable_collaboration","routine_collaboration"].includes(memory.type))return workTitle?`Our last pass on ${workTitle} worked well.`:"Our last collaboration gave us a useful starting point.";
+  if(memory.type==="shared_success")return workTitle?`The result on ${workTitle} still gives us something to build on.`:"The last result we shared still gives us something to build on.";
+  if(memory.type==="constructive_feedback")return workTitle?`Your earlier feedback on ${workTitle} helped.`:"Your earlier feedback helped me see the problem differently.";
+  if(memory.type==="fair_recognition")return "I appreciated that you recognized the contribution before.";
+  if(["apology_received","conflict_repaired"].includes(memory.type))return workTitle?`I am glad we sorted out the issue around ${workTitle}.`:"I am glad we sorted out the issue between us.";
+  if(memory.type==="onboarding_support")return "I still appreciate the support you gave me when I was getting started.";
+  if(socialMemoryValenceScore(memory)>0&&memory.intensity>=3)return "Our last conversation made the next step easier.";
+  return null;
 }
 function groundedCultureStatement(event){
   const evidence=(company.socialCulture?.evidence||[]).find(item=>item.sourceEventId===event.id);
@@ -1541,30 +1863,39 @@ function groundedConversationFacts(event,experience){
   return {
     actorName:actor?.name||"A coworker",
     subjectName:subject?.name||"a coworker",
-    workTitle:work?.title||context.workTitle||projectTitle||"the current work",
-    projectTitle:projectTitle||context.projectTitle||"the current project",
-    blocker:context.blocker||(work?.blockedBy||[])[0]||"the unresolved dependency",
-    purpose:context.purpose||"the next decision",
-    deadlineDay:socialHasFiniteNumber(context.deadlineDay)?Number(context.deadlineDay)+1:socialHasFiniteNumber(work?.deadlineDay)?Number(work.deadlineDay)+1:"the planned date",
-    newsTopic:context.newsTopic||projectTitle||context.topic||"the latest company update",
+    workTitle:work?.title||context.workTitle||projectTitle||null,
+    projectTitle:projectTitle||context.projectTitle||null,
+    blocker:context.blocker||(work?.blockedBy||[])[0]||null,
+    blockerResolution:event?.type==="blocker_resolved_together"
+      ?context.outcome||(context.blocker?`${context.blocker} was resolved`:null)
+      :null,
+    purpose:context.purpose||null,
+    deadlineDay:socialHasFiniteNumber(context.deadlineDay)?Number(context.deadlineDay)+1:socialHasFiniteNumber(work?.deadlineDay)?Number(work.deadlineDay)+1:null,
+    newsTopic:context.newsTopic||context.topic||projectTitle||null,
     timeGreeting:(company.minute||0)<720?"Good morning":(company.minute||0)<1020?"Hello":"Good afternoon",
     cultureStatement:groundedCultureStatement(event),
     groupStatement:groundedGroupStatement(actor,subject),
-    leadershipStatement:groundedLeadershipStatement(event)
+    leadershipStatement:groundedLeadershipStatement(event),
+    memoryReference:null
   };
 }
 function socialTemplateAvailable(template,facts){
   return (template.required||[]).every(key=>facts[key]!==null&&facts[key]!==undefined&&String(facts[key]).trim()!=="");
 }
-function personalityDialogueStyle(employee,text){
+function dialogueVoiceStyleForEmployee(employee,category){
   const personality=employee?.personality||{};
-  let styled=text;
   const formality=company?.socialCulture?.dimensions?.formality?.value??50;
-  if((personality.structureNeed||0)>.55||formality>=65)styled=styled.replace("Hey, ","").replace("I wanted to mention this: ","").replace("Quick note: ","").replace("For context, ","");
-  else if((personality.sociability||0)>.55&&!/^Hi|^Good morning/.test(styled))styled=`Hey, ${styled.charAt(0).toLowerCase()}${styled.slice(1)}`;
-  else if((personality.riskTolerance||0)<-.55&&!/^I may/.test(styled))styled=`I may be missing something, but ${styled.charAt(0).toLowerCase()}${styled.slice(1)}`;
-  else if((personality.detailOrientation||0)>.6&&!/^For context/.test(styled))styled=`For context, ${styled.charAt(0).toLowerCase()}${styled.slice(1)}`;
-  return styled;
+  if((personality.sociability||0)<-.28)return "reserved";
+  if(SOCIAL_CONVERSATION_RULES.humorSafeCategories.includes(category)&&(personality.sociability||0)>.25&&(personality.riskTolerance||0)>.15&&(employee?.morale||50)>=62)return "humorous";
+  if((personality.sociability||0)>.38)return "extrovert";
+  if((personality.structureNeed||0)>.25||(personality.detailOrientation||0)>.35||formality>=62)return "professional";
+  return "reserved";
+}
+function personalityDialogueStyle(employee,text,voiceStyle=null){
+  const personality=employee?.personality||{};
+  if((personality.riskTolerance||0)<-.62&&!/^I may|^Could|^Would|^How|^Do you/.test(text))return `I may be missing something, but ${lowerDialogueStart(text)}`;
+  if(voiceStyle==="reserved"&&(personality.sociability||0)<-.6)return text.replace(/^Hey[!,]\s*/,"");
+  return text;
 }
 function socialDialogueSelectionSignals(speaker,category,conversationContext={}){
   const relationship=conversationContext.relationship||SOCIAL_ORGANIZATION_RULES.neutralInterpretation;
@@ -1576,9 +1907,9 @@ function socialDialogueSelectionSignals(speaker,category,conversationContext={})
   const recentCategories=company.socialConversationState?.recentCategoryHistory?.[speaker.id]||[];
   return {
     relationship:{
-      trust:clamp(Number(relationship.trust)||50,0,100),
-      comfort:clamp(Number(relationship.comfort)||50,0,100),
-      professionalFriction:clamp(Number(relationship.professionalFriction)||0,0,100)
+      trust:clamp(socialNumberOr(relationship.trust,50),0,100),
+      comfort:clamp(socialNumberOr(relationship.comfort,50),0,100),
+      professionalFriction:clamp(socialNumberOr(relationship.professionalFriction,0),0,100)
     },
     emotion:{
       stress:clamp(Number(emotion.stress)||0,0,100),
@@ -1595,6 +1926,10 @@ function dialogueTemplateWeight(template,speaker,listener,category,event,lineInd
   const isDirect=wrapperIndex===0,isContextual=wrapperIndex===2||wrapperIndex===3;
   const textLength=template.text.length,relationship=signals.relationship,emotion=signals.emotion;
   let score=(hashText32(`${event.id}|${speaker.id}|${listener?.id??"none"}|${category}|${lineIndex}|${template.id}|${signals.recentCategoryCount}`)%10000)/1000;
+  const preferredVoice=dialogueVoiceStyleForEmployee(speaker,category);
+  score+=template.voiceStyle===preferredVoice?9:-Math.abs(SOCIAL_DIALOGUE_WRAPPERS.findIndex(item=>item.voiceStyle===template.voiceStyle)-SOCIAL_DIALOGUE_WRAPPERS.findIndex(item=>item.voiceStyle===preferredVoice))*.75;
+  if(template.voiceStyle==="humorous"&&!SOCIAL_CONVERSATION_RULES.humorSafeCategories.includes(category))score-=20;
+  if((template.required||[]).includes("memoryReference")&&conversationContext.memoryReference)score+=12;
   score+=isDirect*((personality.sociability||0)*1.2+(relationship.comfort-50)*.025+(emotion.frustration-20)*.018);
   score+=isContextual*((personality.structureNeed||0)*1.1+(relationship.professionalFriction)*.018+(50-relationship.trust)*.012);
   score+=(personality.detailOrientation||0)*(textLength-55)*.018;
@@ -1606,56 +1941,336 @@ function dialogueTemplateWeight(template,speaker,listener,category,event,lineInd
 function fillGroundedDialogueTemplate(template,facts){
   return template.text.replace(/\{(\w+)\}/g,(match,key)=>facts[key]??match);
 }
+function socialConversationPairHistory(aId,bId){
+  const state=company.socialConversationState,key=makeRelationshipKey(aId,bId);
+  const existing=state.pairHistory[key]&&typeof state.pairHistory[key]==="object"?state.pairHistory[key]:{};
+  state.pairHistory[key]={
+    recentTemplateIds:Array.isArray(existing.recentTemplateIds)?existing.recentTemplateIds.slice(0,SOCIAL_CONVERSATION_RULES.maxRecentPairTemplates):[],
+    recentTopics:Array.isArray(existing.recentTopics)?existing.recentTopics.slice(0,SOCIAL_CONVERSATION_RULES.maxRecentPairTopics):[],
+    recentCategories:Array.isArray(existing.recentCategories)?existing.recentCategories.slice(0,SOCIAL_CONVERSATION_RULES.maxRecentCategories):[],
+    lastConversationAt:socialHasFiniteNumber(existing.lastConversationAt)?Number(existing.lastConversationAt):null
+  };
+  return state.pairHistory[key];
+}
+function conversationPartnerRecencyPenalty(employeeId,candidateId){
+  const recent=company?.socialConversationState?.recentPartnersByEmployee?.[employeeId]||[];
+  const index=recent.indexOf(Number(candidateId));
+  return index<0?0:Math.max(1,8-index);
+}
 function selectGroundedDialogueTemplate(category,speaker,listener,event,lineIndex,facts,conversationContext={}){
-  const templates=(SOCIAL_DIALOGUE_TEMPLATES[category]||SOCIAL_DIALOGUE_TEMPLATES.casual).filter(template=>socialTemplateAvailable(template,facts));
+  let templates=(SOCIAL_DIALOGUE_TEMPLATES[category]||SOCIAL_DIALOGUE_TEMPLATES.casual).filter(template=>socialTemplateAvailable(template,facts));
+  if(category==="blockers"&&event?.type==="blocker_resolved_together"){
+    const resolvedTemplates=templates.filter(template=>template.required.includes("blockerResolution")||["confirm-resolution","recognize-resolution","reflect-on-resolution"].includes(template.intent));
+    if(resolvedTemplates.length)templates=resolvedTemplates;
+  }
   if(!templates.length)return null;
   const state=company.socialConversationState,usage=state.templateUsage[speaker.id]||[];
-  const fresh=templates.filter(template=>!usage.includes(template.id)),pool=fresh.length?fresh:templates;
+  const pairHistory=socialConversationPairHistory(speaker.id,listener.id);
+  const excluded=new Set(conversationContext.usedTemplateIds||[]);
+  const available=templates.filter(template=>!excluded.has(template.id));
+  const freshPair=available.filter(template=>!pairHistory.recentTemplateIds.includes(template.id));
+  const freshSpeaker=available.filter(template=>!usage.includes(template.id));
+  const pool=freshPair.length?freshPair:freshSpeaker.length?freshSpeaker:available.length?available:templates;
   const template=pool
-    .map(candidate=>({candidate,weight:dialogueTemplateWeight(candidate,speaker,listener,category,event,lineIndex,conversationContext)}))
+    .map(candidate=>({candidate,weight:dialogueTemplateWeight(candidate,speaker,listener,category,event,lineIndex,{...conversationContext,memoryReference:facts.memoryReference})}))
     .sort((a,b)=>b.weight-a.weight||String(a.candidate.id).localeCompare(String(b.candidate.id)))[0].candidate;
   state.templateUsage[speaker.id]=[template.id,...usage.filter(id=>id!==template.id)].slice(0,SOCIAL_CONVERSATION_RULES.maxRecentTemplateIds);
   return template;
+}
+function selectGroundedClosingTemplate(speaker,listener,event,lineIndex,conversationContext={}){
+  const category=conversationContext.category||"casual",pairHistory=socialConversationPairHistory(speaker.id,listener.id);
+  const candidates=SOCIAL_DIALOGUE_CLOSINGS.flatMap((statement,statementIndex)=>SOCIAL_DIALOGUE_WRAPPERS.map((wrapper,wrapperIndex)=>({
+    id:`closing-${statementIndex}-${wrapperIndex}`,
+    category,
+    intent:"goodbye",
+    voiceStyle:wrapper.voiceStyle,
+    text:applySocialDialogueWording(statement.text,wrapper.voiceStyle,category),
+    required:[]
+  })));
+  const unused=candidates.filter(candidate=>!pairHistory.recentTemplateIds.includes(candidate.id)&&!(conversationContext.usedTemplateIds||[]).includes(candidate.id));
+  const pool=unused.length?unused:candidates;
+  return pool.map(candidate=>({candidate,weight:dialogueTemplateWeight(candidate,speaker,listener,category,event,lineIndex,conversationContext)}))
+    .sort((a,b)=>b.weight-a.weight||String(a.candidate.id).localeCompare(String(b.candidate.id)))[0].candidate;
 }
 function conversationExchangeCount(sourceEventId){
   const span=SOCIAL_CONVERSATION_RULES.maximumExchanges-SOCIAL_CONVERSATION_RULES.minimumExchanges+1;
   return SOCIAL_CONVERSATION_RULES.minimumExchanges+(hashText32(`${sourceEventId}|exchange-count`)%Math.max(1,span));
 }
+function conversationTurnPlan(count){
+  const plan=[
+    {speaker:"actor",category:"greeting",intent:"greeting"},
+    {speaker:"actor",category:"topic",intent:"topic"},
+    {speaker:"subject",category:"topic",intent:"reply"}
+  ];
+  if(count>=5)plan.push({speaker:"actor",category:"topic",intent:"follow_up"});
+  plan.push({speaker:"subject",category:"closing",intent:"goodbye"});
+  return plan;
+}
+function conversationLineDurationMinutes(text,intent="topic"){
+  if(intent==="goodbye")return SOCIAL_CONVERSATION_RULES.goodbyeDurationMinutes;
+  const words=String(text||"").trim().split(/\s+/).filter(Boolean).length;
+  const raw=SOCIAL_CONVERSATION_RULES.baseLineDurationMinutes+words*SOCIAL_CONVERSATION_RULES.wordsPerDurationMinute;
+  const step=SOCIAL_CONVERSATION_RULES.lineDurationStepMinutes;
+  const rounded=Math.ceil(raw/step)*step;
+  return clamp(rounded,SOCIAL_CONVERSATION_RULES.minimumLineDurationMinutes,SOCIAL_CONVERSATION_RULES.maximumLineDurationMinutes);
+}
+function conversationScheduleForExchanges(exchanges,startedAt){
+  const start=socialTimestampValue(startedAt);
+  let cursor=SOCIAL_CONVERSATION_RULES.approachDurationMinutes;
+  const exchangeSchedule=exchanges.map((exchange,index)=>{
+    const durationMinutes=conversationLineDurationMinutes(exchange.text,exchange.intent);
+    const pauseAfterMinutes=index===exchanges.length-1?0:SOCIAL_CONVERSATION_RULES.pauseBetweenExchangesMinutes;
+    const item={exchangeIndex:index,startOffsetMinutes:cursor,durationMinutes,pauseAfterMinutes};
+    cursor+=durationMinutes+pauseAfterMinutes;
+    return item;
+  });
+  const conversationStartAt=start+SOCIAL_CONVERSATION_RULES.approachDurationMinutes;
+  const endAtAbsoluteMinute=start+cursor;
+  const resumeAt=endAtAbsoluteMinute+SOCIAL_CONVERSATION_RULES.resumeDurationMinutes;
+  return {exchangeSchedule,conversationStartAt,endAtAbsoluteMinute,resumeAt,visibleUntilAbsoluteMinute:resumeAt};
+}
+function normalizeStoredConversation(conversation){
+  if(!conversation?.sourceEventId||!Array.isArray(conversation.participantIds)||conversation.participantIds.length<2)return null;
+  let exchanges=Array.isArray(conversation.exchanges)?conversation.exchanges.filter(exchange=>exchange?.text):[];
+  if(!exchanges.length)return null;
+  const [actorId,subjectId]=conversation.participantIds.map(Number);
+  const existingGoodbye=exchanges.findLast?.(exchange=>exchange.intent==="goodbye")||[...exchanges].reverse().find(exchange=>exchange.intent==="goodbye");
+  let body=exchanges.filter(exchange=>exchange!==existingGoodbye&&exchange.intent!=="goodbye");
+  if(!body.some(exchange=>exchange.intent==="greeting")){
+    body=[{speakerId:actorId,listenerId:subjectId,templateId:"migration-greeting",intent:"greeting",voiceStyle:"reserved",text:"Hello. Do you have a minute?"},...body];
+  }
+  body=body.slice(0,SOCIAL_CONVERSATION_RULES.maximumExchanges-1).map((exchange,index)=>({
+    intent:exchange.intent||(index===0?"greeting":index===1?"topic":"reply"),
+    voiceStyle:exchange.voiceStyle||"reserved",
+    ...exchange
+  }));
+  const goodbye=existingGoodbye
+    ?{speakerId:subjectId,listenerId:actorId,templateId:"migration-goodbye",intent:"goodbye",voiceStyle:"reserved",...existingGoodbye}
+    :{speakerId:subjectId,listenerId:actorId,templateId:"migration-goodbye",intent:"goodbye",voiceStyle:"reserved",text:"Thanks. I will let you get back to it."};
+  exchanges=[...body,goodbye];
+  while(exchanges.length<SOCIAL_CONVERSATION_RULES.minimumExchanges){
+    exchanges.splice(exchanges.length-1,0,{speakerId:subjectId,listenerId:actorId,templateId:`migration-reply-${exchanges.length}`,intent:"reply",voiceStyle:"reserved",text:"I understand. Let us keep each other updated."});
+  }
+  const rebuiltSchedule=conversationScheduleForExchanges(exchanges,conversation.startedAt);
+  const schedule=Array.isArray(conversation.exchangeSchedule)&&conversation.exchangeSchedule.length===exchanges.length
+    ?{
+      exchangeSchedule:conversation.exchangeSchedule,
+      conversationStartAt:socialHasFiniteNumber(conversation.conversationStartAt)?Number(conversation.conversationStartAt):rebuiltSchedule.conversationStartAt,
+      endAtAbsoluteMinute:socialHasFiniteNumber(conversation.endAtAbsoluteMinute)?Number(conversation.endAtAbsoluteMinute):socialHasFiniteNumber(conversation.visibleUntilAbsoluteMinute)?Number(conversation.visibleUntilAbsoluteMinute):rebuiltSchedule.endAtAbsoluteMinute,
+      resumeAt:socialHasFiniteNumber(conversation.resumeAt)?Number(conversation.resumeAt):socialHasFiniteNumber(conversation.visibleUntilAbsoluteMinute)?Number(conversation.visibleUntilAbsoluteMinute):rebuiltSchedule.resumeAt,
+      visibleUntilAbsoluteMinute:socialHasFiniteNumber(conversation.visibleUntilAbsoluteMinute)?Number(conversation.visibleUntilAbsoluteMinute):socialHasFiniteNumber(conversation.resumeAt)?Number(conversation.resumeAt):rebuiltSchedule.visibleUntilAbsoluteMinute
+    }
+    :rebuiltSchedule;
+  const source=(company?.socialSourceEvents||[]).find(event=>event.id===conversation.sourceEventId);
+  return {
+    ...conversation,
+    exchanges,
+    triggerType:conversation.triggerType||groundedConversationTriggerForEvent(source)||null,
+    triggerEvidenceId:conversation.triggerEvidenceId||conversation.sourceEventId,
+    phase:conversation.phase||"completed",
+    phaseStartedAt:socialHasFiniteNumber(conversation.phaseStartedAt)?Number(conversation.phaseStartedAt):socialTimestampValue(conversation.startedAt),
+    currentExchangeIndex:Number.isInteger(conversation.currentExchangeIndex)?conversation.currentExchangeIndex:null,
+    presence:conversation.presence&&typeof conversation.presence==="object"?conversation.presence:null,
+    ...schedule
+  };
+}
 function conversationPairCooldownReady(aId,bId,timestamp){
-  const key=makeRelationshipKey(aId,bId),last=Number(company.socialConversationState.lastConversationByPair[key])||-999999;
+  const key=makeRelationshipKey(aId,bId),stored=company.socialConversationState.lastConversationByPair[key];
+  const last=socialHasFiniteNumber(stored)?Number(stored):-999999;
   return socialTimestampValue(timestamp)-last>=SOCIAL_CONVERSATION_RULES.conversationCooldownMinutes;
 }
 function conversationParticipantRoom(employee){
   return employee?.currentRoom||roomForZone?.(employee?.zone)||null;
 }
+function conversationTopicKey(category,facts,event){
+  return [
+    category,
+    event?.projectId||facts.projectTitle||"",
+    event?.workItemId||facts.workTitle||"",
+    facts.blocker||facts.newsTopic||facts.purpose||""
+  ].map(value=>String(value).trim().toLowerCase()).join("|");
+}
+function noteConversationPairHistory(conversation){
+  const [aId,bId]=conversation.participantIds,pairHistory=socialConversationPairHistory(aId,bId);
+  const templateIds=conversation.exchanges.map(exchange=>exchange.templateId).filter(Boolean);
+  pairHistory.recentTemplateIds=[...templateIds,...pairHistory.recentTemplateIds.filter(id=>!templateIds.includes(id))].slice(0,SOCIAL_CONVERSATION_RULES.maxRecentPairTemplates);
+  pairHistory.recentTopics=[conversation.topicKey,...pairHistory.recentTopics.filter(topic=>topic!==conversation.topicKey)].filter(Boolean).slice(0,SOCIAL_CONVERSATION_RULES.maxRecentPairTopics);
+  pairHistory.recentCategories=[conversation.category,...pairHistory.recentCategories.filter(category=>category!==conversation.category)].slice(0,SOCIAL_CONVERSATION_RULES.maxRecentCategories);
+  pairHistory.lastConversationAt=socialTimestampValue(conversation.startedAt);
+  [[aId,bId],[bId,aId]].forEach(([employeeId,partnerId])=>{
+    const recent=company.socialConversationState.recentPartnersByEmployee[employeeId]||[];
+    company.socialConversationState.recentPartnersByEmployee[employeeId]=[partnerId,...recent.filter(id=>id!==partnerId)].slice(0,SOCIAL_CONVERSATION_RULES.maxRecentPartnersPerEmployee);
+  });
+}
+function conversationZoneBounds(roomId){
+  const zoneId=typeof zoneForRoom==="function"?zoneForRoom(roomId):null;
+  const bounds=typeof zones!=="undefined"&&zoneId?zones[zoneId]:null;
+  return {zoneId,bounds:bounds||{x:[10,90],y:[10,90]}};
+}
+function conversationApproachTargets(actor,subject,roomId,sourceEventId){
+  const {zoneId,bounds}=conversationZoneBounds(roomId),space=SOCIAL_CONVERSATION_RULES.personalSpacePercent;
+  const xCenter=clamp(((Number(actor.x)||50)+(Number(subject.x)||50))/2,bounds.x[0]+space+1,bounds.x[1]-space-1);
+  const yCenter=clamp(((Number(actor.y)||50)+(Number(subject.y)||50))/2,bounds.y[0]+2,bounds.y[1]-2);
+  const verticalDirection=(hashText32(`${sourceEventId}|presence-offset`)%2)?1:-1;
+  const yOffset=SOCIAL_CONVERSATION_RULES.naturalOffsetPercent*verticalDirection;
+  return {
+    zoneId,
+    actor:{x:xCenter-space/2,y:clamp(yCenter-yOffset/2,bounds.y[0]+1,bounds.y[1]-1),facing:"right"},
+    subject:{x:xCenter+space/2,y:clamp(yCenter+yOffset/2,bounds.y[0]+1,bounds.y[1]-1),facing:"left"}
+  };
+}
+function setEmployeeConversationPresence(employee,conversation,partner,target){
+  if(!employee)return;
+  employee.conversationPresence={
+    conversationId:conversation.id,
+    partnerId:partner.id,
+    phase:"approach",
+    facing:target.facing,
+    gesture:"shift-weight",
+    roomId:conversation.roomId
+  };
+  if(target.zoneId)employee.zone=target.zoneId;
+  if(typeof moveEmployeeToPosition==="function")moveEmployeeToPosition(employee,target.x,target.y,{reason:"conversation-approach",flowCue:"approach-coworker"});
+}
+function stageConversationPresence(conversation,actor,subject){
+  const targets=conversationApproachTargets(actor,subject,conversation.roomId,conversation.sourceEventId);
+  conversation.presence={
+    phase:"approach",
+    previousPositions:{
+      [actor.id]:{x:actor.x,y:actor.y,zone:actor.zone,roomId:conversationParticipantRoom(actor)},
+      [subject.id]:{x:subject.x,y:subject.y,zone:subject.zone,roomId:conversationParticipantRoom(subject)}
+    },
+    targets:{[actor.id]:targets.actor,[subject.id]:targets.subject}
+  };
+  setEmployeeConversationPresence(actor,conversation,subject,{...targets.actor,zoneId:targets.zoneId});
+  setEmployeeConversationPresence(subject,conversation,actor,{...targets.subject,zoneId:targets.zoneId});
+}
+function conversationPhaseAt(conversation,now){
+  if(now<conversation.conversationStartAt)return {phase:"approach",exchangeIndex:null};
+  for(const item of conversation.exchangeSchedule||[]){
+    const starts=socialTimestampValue(conversation.startedAt)+item.startOffsetMinutes;
+    if(now>=starts&&now<starts+item.durationMinutes)return {phase:"speaking",exchangeIndex:item.exchangeIndex};
+    if(now>=starts+item.durationMinutes&&now<starts+item.durationMinutes+item.pauseAfterMinutes)return {phase:"pause",exchangeIndex:null};
+  }
+  if(now<conversation.resumeAt)return {phase:"resume",exchangeIndex:null};
+  return {phase:"completed",exchangeIndex:null};
+}
+function clearConversationPresence(conversation){
+  conversation.participantIds.forEach(employeeId=>{
+    const employee=socialEmployee(employeeId);
+    if(employee?.conversationPresence?.conversationId===conversation.id)employee.conversationPresence=null;
+  });
+}
+function refreshEmployeeConversationPresence(employee){
+  const presence=employee?.conversationPresence;
+  if(!presence)return;
+  const conversation=company.socialConversationState.history.find(item=>item.id===presence.conversationId);
+  if(!conversation){employee.conversationPresence=null;return;}
+  advanceConversationPresence(conversation,simulationTimestamp().absoluteMinute);
+}
+function advanceConversationPresence(conversation,now){
+  const snapshot=conversationPhaseAt(conversation,now);
+  if(snapshot.phase===conversation.phase&&snapshot.exchangeIndex===conversation.currentExchangeIndex)return snapshot;
+  const previousPhase=conversation.phase;
+  conversation.phase=snapshot.phase;
+  conversation.phaseStartedAt=now;
+  conversation.currentExchangeIndex=snapshot.exchangeIndex;
+  conversation.participantIds.forEach(employeeId=>{
+    const employee=socialEmployee(employeeId);
+    if(!employee?.active||employee.offsite)return;
+    const partnerId=conversation.participantIds.find(id=>id!==employeeId);
+    const presence=employee.conversationPresence?.conversationId===conversation.id?employee.conversationPresence:{
+      conversationId:conversation.id,
+      partnerId,
+      facing:conversation.presence?.targets?.[employeeId]?.facing||"right",
+      roomId:conversation.roomId
+    };
+    presence.phase=snapshot.phase;
+    presence.gesture="shift-weight";
+    if(snapshot.phase==="speaking"){
+      const exchange=conversation.exchanges[snapshot.exchangeIndex];
+      const gestureIndex=hashText32(`${conversation.id}|${snapshot.exchangeIndex}|${employeeId}`)%SOCIAL_CONVERSATION_RULES.gestures.length;
+      presence.gesture=exchange?.speakerId===employeeId?SOCIAL_CONVERSATION_RULES.gestures[gestureIndex]:"nod";
+      presence.role=exchange?.speakerId===employeeId?"speaker":"listener";
+    }else presence.role="participant";
+    employee.conversationPresence=presence;
+  });
+  if(snapshot.phase==="resume"&&previousPhase!=="resume"){
+    Object.entries(conversation.presence?.previousPositions||{}).forEach(([employeeId,position])=>{
+      const employee=socialEmployee(employeeId);
+      if(!employee?.active||employee.offsite||employee.conversationPresence?.conversationId!==conversation.id)return;
+      const pending=employee.officeFlow?.pendingPosition;
+      const destination=pending||position;
+      if(destination.zone)employee.zone=destination.zone;
+      if(destination.currentRoom)employee.currentRoom=destination.currentRoom;
+      if(employee.officeFlow?.pendingPosition)delete employee.officeFlow.pendingPosition;
+      if(typeof moveEmployeeToPosition==="function")moveEmployeeToPosition(employee,destination.x,destination.y,{reason:"conversation-resume",flowCue:"resume-activity"});
+    });
+  }
+  if(snapshot.phase==="completed"){
+    conversation.completedAt=now;
+    clearConversationPresence(conversation);
+  }
+  return snapshot;
+}
 function createGroundedConversationFromExperience(experience,event){
   ensureSocialOrganizationContainers();
   if(!experience||!event||event.privacy==="confidential")return null;
   if(company.socialConversationState.history.some(conversation=>conversation.sourceEventId===event.id))return null;
+  const eventAge=simulationTimestamp().absoluteMinute-socialTimestampValue(event.timestamp);
+  if(eventAge<0||eventAge>SOCIAL_CONVERSATION_RULES.sourceEventMaxAgeMinutes)return null;
   const actor=socialEmployee(event.actorId),subject=socialEmployee(event.subjectId);
   if(!actor?.active||!subject?.active||actor.offsite||subject.offsite)return null;
+  refreshEmployeeConversationPresence(actor);
+  refreshEmployeeConversationPresence(subject);
+  const triggerType=groundedConversationTriggerForEvent(event,experience);
+  if(!triggerType||!SOCIAL_CONVERSATION_RULES.groundedTriggerTypes.includes(triggerType))return null;
+  if(employeeHasCriticalConversationConflict(actor,triggerType)||employeeHasCriticalConversationConflict(subject,triggerType))return null;
+  if(actor.conversationPresence||subject.conversationPresence)return null;
   const room=event.roomId||conversationParticipantRoom(actor);
   if(!room||conversationParticipantRoom(actor)!==room||conversationParticipantRoom(subject)!==room)return null;
   if(!conversationPairCooldownReady(actor.id,subject.id,event.timestamp))return null;
-  const category=conversationCategoryForEvent(event),facts=groundedConversationFacts(event,experience),count=conversationExchangeCount(event.id),exchanges=[];
+  const category=conversationCategoryForEvent(event),facts=groundedConversationFacts(event,experience),count=conversationExchangeCount(event.id),exchanges=[],usedTemplateIds=[];
   const contexts={
     [actor.id]:buildSocialConversationContext(actor,subject,event,category),
     [subject.id]:buildSocialConversationContext(subject,actor,event,category)
   };
-  for(let index=0;index<count;index++){
-    const speaker=index%2===0?actor:subject,listener=index%2===0?subject:actor;
-    const template=selectGroundedDialogueTemplate(category,speaker,listener,event,index,facts,contexts[speaker.id]);
+  const memoryReferences={
+    [actor.id]:groundedMemoryReference(actor,subject,event,category),
+    [subject.id]:groundedMemoryReference(subject,actor,event,category)
+  };
+  const turnPlan=conversationTurnPlan(count);
+  for(let index=0;index<turnPlan.length;index++){
+    const turn=turnPlan[index],speaker=turn.speaker==="actor"?actor:subject,listener=speaker.id===actor.id?subject:actor;
+    const turnCategory=turn.category==="topic"?category:turn.category;
+    const lineFacts={...facts,subjectName:listener.name,memoryReference:memoryReferences[speaker.id]};
+    const selectionContext={...contexts[speaker.id],category,usedTemplateIds,memoryReference:lineFacts.memoryReference};
+    const template=turnCategory==="closing"
+      ?selectGroundedClosingTemplate(speaker,listener,event,index,selectionContext)
+      :selectGroundedDialogueTemplate(turnCategory,speaker,listener,event,index,lineFacts,selectionContext);
     if(!template)continue;
-    let text=fillGroundedDialogueTemplate(template,{...facts,subjectName:listener.name});
+    let text=fillGroundedDialogueTemplate(template,lineFacts);
     if(/\{\w+\}/.test(text))continue;
-    if(event.privacy==="private")text=index===0?"Can we talk privately for a moment?":"Yes, let us step through it.";
-    exchanges.push({speakerId:speaker.id,listenerId:listener.id,templateId:template.id,text:personalityDialogueStyle(speaker,text)});
+    if(event.privacy==="private"){
+      const privateLines=[
+        "Can we talk privately for a moment?",
+        "I would rather discuss the details away from the room.",
+        "Of course. Let us step somewhere quieter.",
+        "Thank you. I will keep this between us.",
+        "I will meet you there."
+      ];
+      text=privateLines[Math.min(index,privateLines.length-1)];
+    }
+    usedTemplateIds.push(template.id);
+    exchanges.push({speakerId:speaker.id,listenerId:listener.id,templateId:template.id,intent:turn.intent,voiceStyle:template.voiceStyle,text:personalityDialogueStyle(speaker,text,template.voiceStyle)});
   }
   if(exchanges.length<SOCIAL_CONVERSATION_RULES.minimumExchanges)return null;
   const start=socialTimestampValue(event.timestamp),conversation={
     id:socialStableId("conversation",event.id,actor.id,subject.id),
     ownerSystem:AI_SYSTEM_OWNERS.social,
     sourceEventId:event.id,
+    triggerType,
+    triggerEvidenceId:event.id,
     category,
     participantIds:[actor.id,subject.id],
     roomId:room,
@@ -1663,14 +2278,21 @@ function createGroundedConversationFromExperience(experience,event){
     privacy:event.privacy,
     confidence:event.confidence,
     facts,
+    memoryReferences,
+    topicKey:conversationTopicKey(category,facts,event),
     contexts,
     exchanges,
     startedAt:event.timestamp,
-    visibleUntilAbsoluteMinute:start+SOCIAL_CONVERSATION_RULES.visibleDurationMinutes
+    phase:"approach",
+    phaseStartedAt:start,
+    currentExchangeIndex:null,
+    ...conversationScheduleForExchanges(exchanges,event.timestamp)
   };
+  stageConversationPresence(conversation,actor,subject);
   company.socialConversationState.history.unshift(conversation);
   company.socialConversationState.history=company.socialConversationState.history.slice(0,SOCIAL_CONVERSATION_RULES.maxStored);
   company.socialConversationState.lastConversationByPair[makeRelationshipKey(actor.id,subject.id)]=start;
+  noteConversationPairHistory(conversation);
   conversation.participantIds.forEach(employeeId=>{
     const history=company.socialConversationState.recentCategoryHistory[employeeId]||[];
     company.socialConversationState.recentCategoryHistory[employeeId]=[category,...history].slice(0,SOCIAL_CONVERSATION_RULES.maxRecentCategories);
@@ -1695,8 +2317,10 @@ function createGroundedConversationFromExperience(experience,event){
     });
   });
   processConversationOverhearing(conversation,event);
-  applySocialMemoryRecallRecommendation(actor,subject,event,category);
-  applySocialMemoryRecallRecommendation(subject,actor,event,category);
+  if(!event.context?.presentationOnly){
+    applySocialMemoryRecallRecommendation(actor,subject,event,category);
+    applySocialMemoryRecallRecommendation(subject,actor,event,category);
+  }
   return conversation;
 }
 function employeeDistance(a,b){
@@ -1744,6 +2368,15 @@ function processVisibleConversationsMinute(){
   if(!company)return;
   ensureSocialOrganizationalSystems();
   const now=simulationTimestamp().absoluteMinute;
+  company.socialConversationState.history.forEach(conversation=>{
+    if(conversation.phase!=="completed"&&conversation.participantIds.some(employeeId=>!socialEmployee(employeeId)?.active||socialEmployee(employeeId)?.offsite)){
+      conversation.phase="completed";
+      conversation.completedAt=now;
+      clearConversationPresence(conversation);
+      return;
+    }
+    advanceConversationPresence(conversation,now);
+  });
   company.socialConversationState.history=company.socialConversationState.history.filter(conversation=>now-socialTimestampValue(conversation.startedAt)<=TIME_RULES.minutesPerDay*7).slice(0,SOCIAL_CONVERSATION_RULES.maxStored);
 }
 
@@ -1752,22 +2385,34 @@ function socialEscapeHtml(value){
 }
 function visibleSocialConversations(){
   if(!company?.socialConversationState)return [];
-  const now=simulationTimestamp().absoluteMinute;
   return company.socialConversationState.history
-    .filter(conversation=>conversation.visibleUntilAbsoluteMinute>=now||socialConversationUiState.hoveredId===conversation.id)
+    .filter(conversation=>conversation.phase==="speaking"&&Number.isInteger(conversation.currentExchangeIndex))
     .slice(0,SOCIAL_CONVERSATION_RULES.maxVisibleBubbles);
 }
 function renderVisibleConversations(){
   if(typeof document==="undefined")return;
   const now=simulationTimestamp().absoluteMinute;
+  document.querySelectorAll(".agent").forEach(agent=>{
+    agent.classList.remove("conversation-approaching","conversation-speaking","conversation-listening","conversation-paused","conversation-resuming","facing-left","facing-right","gesture-nod","gesture-glance","gesture-shift-weight","gesture-fold-arms","gesture-sip-coffee","gesture-hand-gesture");
+  });
+  (company.socialConversationState?.history||[]).filter(conversation=>conversation.phase!=="completed").forEach(conversation=>{
+    conversation.participantIds.forEach(employeeId=>{
+      const employee=socialEmployee(employeeId),agent=document.getElementById(`agent-${employeeId}`),presence=employee?.conversationPresence;
+      if(!agent||presence?.conversationId!==conversation.id)return;
+      const phaseClass={approach:"conversation-approaching",speaking:presence.role==="speaker"?"conversation-speaking":"conversation-listening",pause:"conversation-paused",resume:"conversation-resuming"}[presence.phase];
+      if(phaseClass)agent.classList.add(phaseClass);
+      if(presence.facing)agent.classList.add(`facing-${presence.facing}`);
+      if(presence.gesture)agent.classList.add(`gesture-${presence.gesture}`);
+    });
+  });
   const visible=visibleSocialConversations(),visibleIds=new Set(visible.map(conversation=>conversation.id));
   document.querySelectorAll(".speech-bubble").forEach(node=>{
     if(!visibleIds.has(node.dataset.conversationId))node.remove();
   });
   const stackBySpeaker={};
   visible.forEach(conversation=>{
-    const elapsed=Math.max(0,now-socialTimestampValue(conversation.startedAt));
-    const index=Math.floor(elapsed/SOCIAL_CONVERSATION_RULES.exchangeIntervalMinutes)%conversation.exchanges.length,exchange=conversation.exchanges[index];
+    const index=conversation.currentExchangeIndex,exchange=conversation.exchanges[index];
+    if(!exchange)return;
     const agent=document.getElementById(`agent-${exchange.speakerId}`);
     if(!agent)return;
     let bubble=document.querySelector(`.speech-bubble[data-conversation-id="${conversation.id}"]`);
@@ -1786,9 +2431,10 @@ function renderVisibleConversations(){
     const stackIndex=stackBySpeaker[exchange.speakerId]||0;
     stackBySpeaker[exchange.speakerId]=stackIndex+1;
     bubble.style.setProperty("--bubble-stack",String(stackIndex));
-    const remaining=conversation.visibleUntilAbsoluteMinute-now;
-    const fadeWindow=Math.max(1,SOCIAL_CONVERSATION_RULES.visibleDurationMinutes-SOCIAL_CONVERSATION_RULES.fadeStartMinutes);
-    bubble.style.opacity=socialConversationUiState.hoveredId===conversation.id?"1":String(clamp(remaining/fadeWindow,.12,1));
+    const schedule=(conversation.exchangeSchedule||[]).find(item=>item.exchangeIndex===index);
+    const starts=socialTimestampValue(conversation.startedAt)+(schedule?.startOffsetMinutes||0);
+    const remaining=Math.max(0,(schedule?.durationMinutes||SOCIAL_CONVERSATION_RULES.minimumLineDurationMinutes)-(now-starts));
+    bubble.style.opacity=socialConversationUiState.hoveredId===conversation.id?"1":String(clamp(remaining/5,.22,1));
     if(bubble.parentElement!==agent)agent.appendChild(bubble);
   });
 }
@@ -1807,13 +2453,30 @@ function showSocialConversationDetails(conversationId){
       return `${type}${context?` on ${context}`:""}${memory.resolved?" (resolved)":""}`;
     }).join("; ")
     :"A newer working relationship without a strong remembered pattern";
+  const triggerLabel={
+    "passing-coworker":"They crossed paths during a natural pause.",
+    "meeting-transition":"They were beginning or wrapping up a meeting.",
+    "help-request":"One coworker asked for help.",
+    "task-finished":"A task had just finished.",
+    "blocker-resolved":"They had just cleared a blocker together.",
+    milestone:"The team had reached an important milestone.",
+    conflict:"A real work disagreement needed to be addressed.",
+    repair:"They were following up after a disagreement.",
+    mentoring:"A mentoring opportunity brought them together.",
+    break:"They chose to talk during a break.",
+    "department-return":"One employee had just returned from another department.",
+    "work-coordination":"Their current work required coordination.",
+    deadline:"Schedule pressure prompted the conversation.",
+    "company-news":"A real company update gave them something to discuss.",
+    "first-meeting":"This was their first meaningful introduction."
+  }[conversation.triggerType]||"A real workplace event brought them together.";
   const detail=document.getElementById("conversationDetailBody");
   if(detail)detail.innerHTML=`
     <p>${socialEscapeHtml(participants.map(employee=>employee.name).join(" and "))} spoke in ${socialEscapeHtml(teamDisplayName(conversation.roomId)||conversation.roomId)}.</p>
     <div class="conversation-transcript">${conversation.exchanges.map(exchange=>`<p><strong>${socialEscapeHtml(socialEmployee(exchange.speakerId)?.name||"Employee")}</strong><br>${socialEscapeHtml(exchange.text)}</p>`).join("")}</div>
     <div class="detail-grid">
-      <div><strong>Why it happened</strong><br>${socialEscapeHtml(String(source?.type||conversation.category).replace(/_/g," "))}</div>
-      <div><strong>Source event</strong><br>${socialEscapeHtml(conversation.sourceEventId)}</div>
+      <div><strong>Why it happened</strong><br>${socialEscapeHtml(triggerLabel)}</div>
+      <div><strong>Conversation</strong><br>${socialEscapeHtml(String(conversation.category||source?.type||"workplace conversation").replace(/_/g," "))}</div>
       <div><strong>Related work</strong><br>${socialEscapeHtml(project||conversation.facts?.workTitle||"General company life")}</div>
       <div><strong>Relevant memories</strong><br>${socialEscapeHtml(memorySummary)}</div>
       <div><strong>Relationship</strong><br>${relationship?relationshipSummaryLabel(relationship):"Still developing"}</div>
@@ -1986,11 +2649,17 @@ function socialSystemsIntegrityAudit(){
   const employeeCounts={};
   records.forEach(memory=>employeeCounts[memory.ownerId]=(employeeCounts[memory.ownerId]||0)+1);
   if(Object.values(employeeCounts).some(count=>count>SOCIAL_MEMORY_RULES.perEmployeeCap))errors.push("employee memory cap exceeded");
-  const missingTemplateCategories=SOCIAL_CONVERSATION_RULES.categories.filter(category=>(SOCIAL_DIALOGUE_TEMPLATES[category]||[]).length<SOCIAL_CONVERSATION_RULES.templatesPerCategory||(SOCIAL_DIALOGUE_TEMPLATES[category]||[]).length>50);
+  const missingTemplateCategories=SOCIAL_CONVERSATION_RULES.categories.filter(category=>(SOCIAL_DIALOGUE_TEMPLATES[category]||[]).length<SOCIAL_CONVERSATION_RULES.templatesPerCategory||(SOCIAL_DIALOGUE_TEMPLATES[category]||[]).length>SOCIAL_CONVERSATION_RULES.maxTemplatesPerCategory);
   if(missingTemplateCategories.length)errors.push(`template coverage missing: ${missingTemplateCategories.join(", ")}`);
   if((company.socialConversationState.history||[]).some(conversation=>!sourceIds.has(conversation.sourceEventId)&&!records.some(memory=>memory.sourceEventId===conversation.sourceEventId)))errors.push("conversation lost source evidence");
   if((company.socialConversationState.history||[]).some(conversation=>conversation.privacy==="confidential"))errors.push("confidential conversation exposed");
   if((company.socialConversationState.history||[]).some(conversation=>(conversation.exchanges||[]).some(exchange=>/\{\w+\}/.test(exchange.text))))errors.push("conversation contains unresolved template data");
+  if((company.socialConversationState.history||[]).some(conversation=>!SOCIAL_CONVERSATION_RULES.groundedTriggerTypes.includes(conversation.triggerType)))errors.push("conversation without grounded trigger");
+  if((company.socialConversationState.history||[]).some(conversation=>(conversation.exchanges||[]).length<SOCIAL_CONVERSATION_RULES.minimumExchanges||(conversation.exchanges||[]).length>SOCIAL_CONVERSATION_RULES.maximumExchanges))errors.push("conversation exchange count out of bounds");
+  if((company.socialConversationState.history||[]).some(conversation=>conversation.exchanges?.[0]?.intent!=="greeting"||conversation.exchanges?.at(-1)?.intent!=="goodbye"||!conversation.exchanges?.some(exchange=>exchange.intent==="reply")))errors.push("conversation flow is incomplete");
+  if((company.socialConversationState.history||[]).some(conversation=>(conversation.exchangeSchedule||[]).length!==(conversation.exchanges||[]).length||!Number.isFinite(Number(conversation.resumeAt))))errors.push("conversation timing schedule missing");
+  if(Object.values(company.socialConversationState.pairHistory||{}).some(history=>(history.recentTemplateIds||[]).length>SOCIAL_CONVERSATION_RULES.maxRecentPairTemplates||(history.recentTopics||[]).length>SOCIAL_CONVERSATION_RULES.maxRecentPairTopics))errors.push("conversation pair history cap exceeded");
+  if(Object.values(company.socialConversationState.recentPartnersByEmployee||{}).some(partners=>partners.length>SOCIAL_CONVERSATION_RULES.maxRecentPartnersPerEmployee))errors.push("conversation partner history cap exceeded");
   const requiredGroupFields=["type","cohesion","stability","sharedHistoryScore","conflictScore","knowledgeFlowScore","formedAt","lastConfirmedAt","confidence","sourceEvidenceIds"];
   if((company.informalGroups||[]).some(group=>requiredGroupFields.some(field=>group[field]===undefined)))errors.push("informal group schema incomplete");
   if(Object.values(company.socialCulture.dimensions||{}).some(dimension=>!Number.isFinite(dimension.value)||dimension.value<0||dimension.value>100||dimension.confidence<0||dimension.confidence>100))errors.push("culture dimension out of bounds");

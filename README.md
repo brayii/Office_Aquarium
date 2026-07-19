@@ -77,6 +77,7 @@ The suite checks:
 - emotional homeostasis, personal baselines, anti-saturation, and visible positive/negative social reactions
 - Social AI model v4 ownership, deterministic migration, read-path RNG safety, and Work/Social/Emotional/Institutional trace separation
 - source-backed conflict, repair, bounded social memory, contextual recall, visible conversations, privacy, and overhearing
+- source-backed 4-5 turn conversations, personality-specific wording, pair-level anti-repetition, smooth approach/resume movement, personal space, critical-work protection, and deterministic save/load
 - evidence-backed culture, informal groups, team chemistry, bridges, and formal/informal leadership
 - compact backward-compatible saves, transient-debug exclusion, and mature-workforce browser-storage budget checks
 - isolated balance validation that cannot mutate the live company save
@@ -114,6 +115,7 @@ npm run test:social-preferences
 npm run test:social-reputation
 npm run test:social-emotion
 npm run test:social-conflict
+npm run test:conversation-presence
 npm run test:social-organization
 npm run test:emotional-homeostasis
 npm run test:social-emotional-long-run
@@ -239,7 +241,7 @@ src-tauri\target\release\office-aquarium.exe
 It also creates a Windows installer at:
 
 ```text
-src-tauri\target\release\bundle\nsis\Office Aquarium_0.39.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\Office Aquarium_0.40.0_x64-setup.exe
 ```
 
 If the build fails while downloading NSIS, rerun the build with network access available. The app executable may still compile successfully even if installer bundling fails.
@@ -254,7 +256,7 @@ After a successful clean build, the main release files are:
 dist\Office_Aquarium_itch_web.zip
 dist\desktop\
 src-tauri\target\release\office-aquarium.exe
-src-tauri\target\release\bundle\nsis\Office Aquarium_0.39.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\Office Aquarium_0.40.0_x64-setup.exe
 ```
 
 Use the ZIP for itch.io web upload. Use the NSIS setup EXE for a Windows desktop release.

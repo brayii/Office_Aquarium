@@ -63,13 +63,13 @@ async function main() {
     assert(socialRelationshipRecord(a.id, c.id) === null, "No encounter should mean no record");
 
     const beforeBoundary = companyBoundarySnapshot();
-    const beforeMovement = employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action }));
+    const beforeAssignments = employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration }));
     const first = recordSocialEncounter(a, b, { type: "shared_work_activity", gain: 2, sourceEventId: "unit-work-1", roomId: "software-studio", cooldownMinutes: 120 });
     assert(first && first.interactionCount === 1, "First valid encounter should create exactly one pair record");
     assert(first.firstMetAt && company.socialMemoryStore.records.some(m => m.type === "first_interaction" && ((m.ownerId === a.id && m.subjectId === b.id) || (m.ownerId === b.id && m.subjectId === a.id))), "First meeting should create canonical directional first-interaction memories");
     assert(first.familiarity > 0 && first.familiarity <= 100, "Familiarity should increase and remain bounded");
     assert(Object.keys(company.socialRelationships).filter(k => k === keyAB).length === 1, "Only one record should exist per pair");
-    assert(JSON.stringify(employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action }))) === JSON.stringify(beforeMovement), "Social observer must not change movement or action state");
+    assert(JSON.stringify(employees.map(e => ({ id: e.id, action: e.action, taskProgress: e.taskProgress, activeCollaboration: e.activeCollaboration }))) === JSON.stringify(beforeAssignments), "Social observation may stage physical presence but must not change work selection or progress");
     assert(company.chip === beforeBoundary.chip && company.software === beforeBoundary.software && company.integration === beforeBoundary.integration, "Social familiarity must not change product progress");
     assert(company.quality === beforeBoundary.quality, "Social familiarity must not directly change quality");
     assert(JSON.stringify(company.lessons || []) === beforeBoundary.lessons && JSON.stringify(company.learningEpisodes || []) === beforeBoundary.learningEpisodes, "Social familiarity must not change Institutional Learning");

@@ -768,10 +768,20 @@ function startCollaborationSession(e,target,ctx){
   const work=ctx.work||activeWorkForEmployee(e);
   if(!target||!work)return null;
   const sourceEventId=`collab-${work.id}-${company.day}-${company.minute}-${Math.min(e.id,target.id)}-${Math.max(e.id,target.id)}`;
-  const roomId=e.currentRoom||roomForZone?.(e.zone)||null;
+  const roomId=roomForZone?.(e.zone)||e.currentRoom||null;
   const session={partnerId:target.id,workItemId:work.id,sourceEventId,roomId,startedDay:company.day,startedMinute:company.minute,purpose:(work.blockedBy||[]).length?"blocker":"coordination"};
+  finishAction(target);
+  if(roomId){
+    const targetZone=zoneForRoom(roomId);
+    moveToZone(target,targetZone);
+    target.currentRoom=roomId;
+  }
+  target.action=`collaborating with ${e.name}`;
+  target.thought=thoughtFor("collaborate",target,workContext(target));
+  target.actionMinutes=Math.max(20,Math.min(e.actionMinutes||45,70));
   e.activeCollaboration=session;
-  target.activeCollaboration={...session,partnerId:e.id};
+  target.activeCollaboration={...session,partnerId:e.id,applied:true};
+  target.actionOutcomeContext=actionSnapshot(target,"collaborate");
   if(!work.collaborators.includes(e.id))work.collaborators.push(e.id);
   if(!work.collaborators.includes(target.id))work.collaborators.push(target.id);
   recordSocialEncounter?.(e,target,{
@@ -864,7 +874,18 @@ function applyCollaborationOutcome(e){
   const deadlinePressure=company.day>=Number(item.deadlineDay||company.day+socialRules.collaborationDeadlineLeadDays)-socialRules.collaborationDeadlineLeadDays;
   if(deadlinePressure||teamPressure>=socialRules.collaborationTeamPressure||(item.blockedBy||[]).length){
     const episode=Math.floor(company.day/socialRules.cooldownDays);
-    recordSharedExperience?.(e,partner,{type:"deadline_pressure_together",sourceEventId:`collaboration-pressure-${item.id}-${episode}`,projectId:item.projectId||null,participants:[e.id,partner.id],tone:"mixed",intensity:clamp(2+Math.round(teamPressure/35),2,4),requireSource:true});
+    recordSharedExperience?.(e,partner,{
+      type:"deadline_pressure_together",
+      sourceEventId:`collaboration-pressure-${item.id}-${episode}`,
+      roomId:session.roomId||null,
+      projectId:item.projectId||null,
+      participants:[e.id,partner.id],
+      tone:"mixed",
+      intensity:clamp(2+Math.round(teamPressure/35),2,4),
+      requireSource:true,
+      category:"deadlines",
+      context:{workItemId:item.id,workTitle:item.title,projectId:item.projectId||null,deadlineDay:item.deadlineDay}
+    });
   }
   if(item.blockedBy?.length){
     const chance=clamp(.12+fit*.25+stateModifier*.08,0,.55);
@@ -873,7 +894,18 @@ function applyCollaborationOutcome(e){
       addStoryBeat(item.storyId,`${e.name} and ${partner.name} resolved ${blocker} through collaboration.`,"unblocked");
       recordWeeklyEvent(`${e.name} and ${partner.name} unblocked ${item.title}.`,"work",2);
       if(item.projectId)recordProjectLedger(item.projectId,"collaboration","blocker",-1,`Resolved ${blocker}`);
-      recordSharedExperience?.(e,partner,{type:"blocker_resolved_together",sourceEventId:`blocker-${item.id}-${blocker}-${company.day}-${company.minute}`,projectId:item.projectId||null,participants:[e.id,partner.id],tone:"positive",intensity:3,requireSource:true});
+      recordSharedExperience?.(e,partner,{
+        type:"blocker_resolved_together",
+        sourceEventId:`blocker-${item.id}-${blocker}-${company.day}-${company.minute}`,
+        roomId:session.roomId||null,
+        projectId:item.projectId||null,
+        participants:[e.id,partner.id],
+        tone:"positive",
+        intensity:3,
+        requireSource:true,
+        category:"blockers",
+        context:{workItemId:item.id,workTitle:item.title,projectId:item.projectId||null,blocker,outcome:`${blocker} was resolved`}
+      });
       recordLearningEvidence({domain:"workforce",eventType:"collaboration",action:"resolve-blocker",outcome:"positive",magnitude:gain,confidence:76,department:item.assignedTeam,employeeIds:[e.id,partner.id],evidence:`Collaboration resolved ${blocker}`,contributors:[{type:"employee",id:e.id,weight:.45},{type:"employee",id:partner.id,weight:.45},{type:"workItem",id:item.id,weight:.1}]});
     }
   }

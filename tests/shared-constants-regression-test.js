@@ -47,7 +47,12 @@ assert(rules.social.trustDamagingConflictExperienceTypes.includes("credit_disput
 assert(rules.social.conflict.minimumRepairAgeMinutes > 0 && rules.social.conflict.repairAcceptanceThreshold > 0, "Conflict and repair thresholds should be centralized");
 assert(rules.social.memory.perRelationshipCap < rules.social.memory.perEmployeeCap && rules.social.memory.perEmployeeCap < rules.social.memory.globalCap, "Social memory bounds should be centralized and ordered");
 assert(rules.social.maxRelationshipCooldowns > 0 && rules.social.relationshipCooldownRetentionMinutes > 0, "Relationship cooldown retention should be centrally bounded");
-assert(rules.social.conversations.categories.length === 15 && rules.social.conversations.minimumExchanges === 2 && rules.social.conversations.maximumExchanges === 4, "Visible-conversation categories and exchange bounds should be centralized");
+assert(rules.social.conversations.categories.length === 15 && rules.social.conversations.templatesPerCategory >= 40 && rules.social.conversations.minimumExchanges === 4 && rules.social.conversations.maximumExchanges === 5, "Visible-conversation categories, template depth, and exchange bounds should be centralized");
+assert(rules.social.conversations.maxTemplatesPerCategory === 60 && rules.social.conversations.templatesPerCategory <= rules.social.conversations.maxTemplatesPerCategory, "Conversation template depth should use the centralized 40-60 range");
+assert(rules.social.conversations.maxStored > 0 && rules.social.conversations.maxStored <= 24 && rules.social.memory.maxSourceEvents <= 720, "Conversation and source-evidence retention should remain within the shared save budget");
+assert(rules.social.conversations.groundedTriggerTypes.includes("task-finished") && rules.social.conversations.groundedTriggerTypes.includes("department-return"), "Task completion and department return should be centralized grounded triggers");
+assert(rules.social.conversations.approachDurationMinutes > 0 && rules.social.conversations.resumeDurationMinutes > 0 && rules.social.conversations.personalSpacePercent > 0, "Conversation presence timing and personal-space rules should be centralized");
+assert(rules.rooms.departmentWorkRooms.includes("software-studio") && rules.rooms.departmentWorkRooms.includes("hardware-lab"), "Cross-department return rooms should be centralized");
 assert(rules.social.culture.dailyMaxDrift > 0 && rules.social.culture.dailyMaxDrift < 1, "Culture drift should use a small centralized daily bound");
 assert(rules.social.groups.updateIntervalDays > 0 && rules.social.groups.maxGroupSize > 1, "Informal-group lifecycle rules should be centralized");
 assert(rules.social.leadership.emotionalMultiplierMin > 0 && rules.social.leadership.emotionalMultiplierMax < 2, "Leadership emotional influence should be centrally bounded");
@@ -68,6 +73,7 @@ assert(rules.institutionalLearning.stateWeights.validated > rules.institutionalL
 assert(rules.institutionalLearning.suppressionIndependenceWindowDays > 0, "Suppression evidence independence should use a shared review window");
 assert(rules.institutionalLearning.maxEpisodes > 0 && rules.institutionalLearning.maxEvidenceRecords > rules.institutionalLearning.maxEpisodes, "Institutional-learning history bounds should be centralized");
 assert(Math.abs(Object.values(rules.riskPillars.weights).reduce((sum, weight) => sum + weight, 0) - 1) < 0.0001, "Risk-pillar weights should total one");
+assert(rules.riskPillars.valuationSnapshotDefault >= 0 && rules.riskPillars.valuationSnapshotDefault <= 100, "Valuation risk should have a centralized migration default");
 assert(rules.manufacturing.fulfillmentThreshold > 0 && rules.manufacturing.fulfillmentThreshold < 1, "Manufacturing fulfillment threshold should be canonical");
 assert(rules.dailyPipeline.stageOrder[0] === "employee-outcomes" && rules.dailyPipeline.stageOrder.at(-1) === "save", "Daily pipeline boundaries should be canonical");
 assert(new Set(rules.dailyPipeline.stageOrder).size === rules.dailyPipeline.stageOrder.length, "Daily pipeline stages should be unique");
@@ -84,6 +90,7 @@ const html = read("Office_Aquarium.html");
 const stateStartup = read("src/core/state-startup.js");
 const renderingValidation = read("src/ui/rendering-validation.js");
 const runtimeServices = read("src/services/runtime-services.js");
+const socialOrganization = read("src/systems/social-organizational.js");
 const consumers = [roleDefinitions, workforce, projects, operatingHealth, executiveMessages, marketValuation, stateStartup, renderingValidation].join("\n");
 
 assert(/const ROOM_RULES=OFFICE_AQUARIUM_CONSTANTS\.rooms/.test(roleDefinitions), "Room behavior should use shared room rules");
@@ -109,12 +116,26 @@ assert(/WORKFORCE_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.workforceLearning/.t
 assert(/INSTITUTIONAL_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.institutionalLearning/.test(institutionalLearning), "Institutional learning should use shared review rules");
 assert(/INSTITUTIONAL_LEARNING_RULES\.maxEpisodes/.test(institutionalLearning) && /INSTITUTIONAL_LEARNING_RULES\.maxEvidenceRecords/.test(institutionalLearning), "Institutional-learning history caps should use shared constants");
 assert(/RISK_PILLAR_RULES=OFFICE_AQUARIUM_CONSTANTS\.riskPillars/.test(workforce), "Company risk should use shared pillar rules");
+assert(/updateCompanyRiskComponents\(\{recordForValuation:true\}\)/.test(dailyPipeline), "The daily risk stage should publish the canonical valuation-risk snapshot");
+assert(/const valuationRisk=Number\.isFinite\(Number\(company\.valuationRiskScore\)\)/.test(marketValuation) && /riskMultiplier=clamp\(1-valuationRisk\/260/.test(marketValuation), "Daily valuation should consume the saved risk snapshot instead of a display cache");
+assert(!/function workforceFinancialPressureHtml\(\)\s*\{\s*ensureWorkforceEconomySystems\(\);updateCompanyRiskComponents\(\)/.test(workforce), "Rendering Workforce and Financial Pressure must not recalculate authoritative risk");
 assert(/HIRING_POLICY_MODES=WORKFORCE_HIRING_RULES\.policyModes/.test(workforce), "Workforce policy behavior should use shared policy modes");
 assert(/DAILY_PIPELINE_STAGE_ORDER=OFFICE_AQUARIUM_CONSTANTS\.dailyPipeline\.stageOrder/.test(dailyPipeline), "Daily close should use the shared stage order");
 assert(/MANUFACTURING_RULES=OFFICE_AQUARIUM_CONSTANTS\.manufacturing/.test(dailyPipeline), "Manufacturing fulfillment should use shared thresholds");
 assert(/dailyCloseCoreOrdered\(\)/.test(workforce), "The guarded daily close should call the canonical ordered pipeline");
 assert(html.indexOf("src/systems/market-valuation.js") < html.indexOf("src/systems/daily-pipeline.js"), "The daily pipeline should load after its market dependency");
 assert(html.indexOf("src/systems/daily-pipeline.js") < html.indexOf("src/facades/simulation-systems.js"), "The daily pipeline should load before compatibility facades");
+
+const conversationConsumers = `${socialOrganization}\n${stateStartup}`;
+Object.keys(rules.social.conversations).forEach(key => {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const directReference = new RegExp(`(?:SOCIAL_CONVERSATION_RULES|OFFICE_AQUARIUM_CONSTANTS\\.social\\.conversations)\\.${escaped}\\b`);
+  assert(directReference.test(conversationConsumers), `Conversation constant ${key} should have a runtime consumer`);
+});
+assert(/function\s+createGroundedConversationOpportunity\s*\(/.test(socialOrganization), "Presentation-only conversation opportunities should have one canonical creator");
+assert(/if\s*\(\s*!event\.context\?\.presentationOnly\s*\)/.test(socialOrganization), "Presentation-only conversations must not fabricate emotional recall outcomes");
+assert(/function\s+recordCompletedWorkConversationOpportunity\s*\(/.test(institutionalLearning), "Completed collaborative work should use the canonical conversation-opportunity producer");
+assert(/departmentWorkRooms\.includes\(previousRoom\)/.test(stateStartup), "Department-return conversations should consume canonical room definitions");
 
 if (failures.length) {
   console.error(JSON.stringify({ ok: false, failures }, null, 2));

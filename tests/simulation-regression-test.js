@@ -63,6 +63,49 @@ async function main() {
         reputationObservations: records.reduce((sum, record) => sum + (record.reputationObservations || []).length, 0)
       };
     }
+    function simulationFailureDiagnostics() {
+      const activeProjects = (company.projects || []).filter(project => ["active", "paused", "at-risk"].includes(project.status));
+      const activeWork = (company.workItems || []).filter(work => work.status === "open");
+      const socialTypes = (company.socialSourceEvents || []).reduce((counts, event) => {
+        const type = event?.type || "unknown";
+        counts[type] = (counts[type] || 0) + 1;
+        return counts;
+      }, {});
+      return {
+        day: company.day,
+        phase: company.phase,
+        quality: company.quality,
+        integration: company.integration,
+        trust: company.trust,
+        cash: company.cash,
+        crisis: structuredClone(company.crisis),
+        crisisSignals: typeof crisisSignals === "function" ? crisisSignals() : null,
+        activeProjects: activeProjects.map(project => ({
+          id: project.id,
+          title: project.title,
+          status: project.status,
+          progress: project.progress,
+          quality: project.quality,
+          risk: project.risk,
+          staffingCoverage: project.staffingCoverage
+        })),
+        activeWork: activeWork.map(work => ({
+          id: work.id,
+          projectId: work.projectId,
+          progress: work.progress,
+          qualityRisk: work.qualityRisk,
+          blockers: (work.blockedBy || []).length
+        })),
+        hiringPipeline: (company.hiringPipeline || []).map(request => ({
+          role: request.role,
+          department: request.department,
+          status: request.status,
+          quantity: request.quantity,
+          filled: request.filled
+        })),
+        socialTypes
+      };
+    }
     const legacySaveKey = "office-aquarium-regression-legacy-save";
     const legacyRepository = new SaveRepository(legacySaveKey, SAVE_VERSION);
     localStorage.setItem(legacySaveKey, JSON.stringify({
@@ -77,7 +120,7 @@ async function main() {
     const compactRoundTrip = saveRepository.expand(saveRepository.compact({ day: 4, nested: { sourceEventId: "source", "~0": "escaped-key" } }));
     const compactRoundTripOk = compactRoundTrip.day === 4 && compactRoundTrip.nested.sourceEventId === "source" && compactRoundTrip.nested["~0"] === "escaped-key";
     function authoritativeDifferencePaths(left, right, path = "", output = []) {
-      if (output.length >= 30 || Object.is(left, right)) return output;
+      if (output.length >= 30 || left === right || Object.is(left, right)) return output;
       if (left === null || right === null || typeof left !== "object" || typeof right !== "object") {
         output.push({ path, left, right });
         return output;
@@ -91,12 +134,44 @@ async function main() {
       });
       return output;
     }
-    function advanceToDay(targetDay, maxTicks = 30000) {
+    function continuationCheckpoint() {
+      const activeEmployees = employees.filter(employee => employee.active);
+      return {
+        day: company.day,
+        randomState: company.randomState,
+        valuation: company.valuation,
+        marketNoiseState: company.marketNoiseState,
+        latestValuation: structuredClone((company.valuationHistory || []).at(-1) || null),
+        valuationDrivers: structuredClone(company.valuationDrivers || null),
+        finance: structuredClone(company.finance || null),
+        portfolioHealth: structuredClone(company.portfolioHealth || null),
+        companyRiskComponents: structuredClone(company.companyRiskComponents || null),
+        organizationMaturity: structuredClone(company.organizationMaturity || null),
+        capabilityCoverage: structuredClone(company.capabilityCoverage || null),
+        quality: company.quality,
+        integration: company.integration,
+        trust: company.trust,
+        board: company.board,
+        customers: company.customers,
+        dailyRevenue: company.dailyRevenue,
+        employeeCount: activeEmployees.length,
+        averageStress: activeEmployees.length ? activeEmployees.reduce((sum, employee) => sum + Number(employee.stress || 0), 0) / activeEmployees.length : 0,
+        averageMorale: activeEmployees.length ? activeEmployees.reduce((sum, employee) => sum + Number(employee.morale || 0), 0) / activeEmployees.length : 0,
+        socialCulture: structuredClone(company.socialCulture || null),
+        authoritativeHash: stableSnapshotHash()
+      };
+    }
+    function advanceToDay(targetDay, maxTicks = 30000, checkpoints = null) {
       const oldValidationMode = typeof validationMode !== "undefined" ? validationMode : false;
       validationMode = true;
+      let recordedDay = company.day;
       for (let i = 0; i < maxTicks && company.day < targetDay; i += 1) {
         company.paused = false;
         simulateMinute(false);
+        if (Array.isArray(checkpoints) && company.day !== recordedDay) {
+          recordedDay = company.day;
+          checkpoints.push(continuationCheckpoint());
+        }
         if (company.gameOver || company.lastSimulationError) break;
       }
       validationMode = oldValidationMode;
@@ -196,7 +271,8 @@ async function main() {
       company: canonicalAuthoritativeState(company, "company"),
       employees: canonicalAuthoritativeState(employees, "employees")
     };
-    const reachedDay100A = reachedDay50 && advanceToDay(100, 14000);
+    const continuationTraceA = [];
+    const reachedDay100A = reachedDay50 && advanceToDay(100, 14000, continuationTraceA);
     const endDayA = company.day;
     const failureA = company.failureCode || company.failureType || null;
     const employeesA = employees.filter(e => e.active).length;
@@ -206,6 +282,7 @@ async function main() {
     const endASerializedCharacters = saveRepository.serialize(company, employees, "regression-end-a").length;
     const endALargestCompanySections = largestPersistentCompanySections();
     const endARelationshipStorage = relationshipStorageStats();
+    const endAFailureDiagnostics = simulationFailureDiagnostics();
     const scaledEmployeeCount = 29;
     const scaledEmployees = Array.from({ length: scaledEmployeeCount }, (_, id) => {
       const source = employees[id % employees.length];
@@ -278,7 +355,8 @@ async function main() {
     const day50ReloadDifferences = day50Hash === day50ReloadHash
       ? []
       : authoritativeDifferencePaths(day50Authoritative, day50ReloadAuthoritative);
-    const reachedDay100B = reloadDay50Ok && day50ReloadHash === day50Hash && advanceToDay(100, 14000);
+    const continuationTraceB = [];
+    const reachedDay100B = reloadDay50Ok && day50ReloadHash === day50Hash && advanceToDay(100, 14000, continuationTraceB);
     const endDayB = company.day;
     const failureB = company.failureCode || company.failureType || null;
     const employeesB = employees.filter(e => e.active).length;
@@ -289,6 +367,7 @@ async function main() {
       employees: canonicalAuthoritativeState(employees, "employees")
     };
     const continuationDifferences = hashA === hashB ? [] : authoritativeDifferencePaths(authoritativeA, authoritativeB);
+    const continuationTraceDifferences = hashA === hashB ? [] : authoritativeDifferencePaths(continuationTraceA, continuationTraceB);
     const deterministicContinuation = reachedDay100A === reachedDay100B && endDayA === endDayB && failureA === failureB && employeesA === employeesB && JSON.stringify(rolesA) === JSON.stringify(rolesB) && hashA === hashB;
     const workforceGrowthObserved = employeesA > 8 && rolesA.length > 8;
     return {
@@ -336,6 +415,7 @@ async function main() {
         endASerializedCharacters,
         endALargestCompanySections,
         endARelationshipStorage,
+        endAFailureDiagnostics,
         scaledEmployeeCount,
         scaledRelationshipPairs: scaledPairIndex,
         scaledWorkforceSerializedCharacters,
@@ -350,6 +430,7 @@ async function main() {
         hashA,
         hashB,
         continuationDifferences,
+        continuationTraceDifferences,
         deterministicContinuation
       }
     };
