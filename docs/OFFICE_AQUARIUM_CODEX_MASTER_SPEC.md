@@ -67,6 +67,7 @@ Current simulation integrity rules:
 - Social AI model 4 owns source-backed conflict/repair, bounded directional memory, grounded visible conversations, slow evidence-backed culture, derived informal groups and team chemistry, and evidence-backed formal/informal leadership.
 - Conversation Presence uses the shared rules in `src/core/constants.js` for grounded triggers, 4-5 turn structure, wording volume, timing, movement, spacing, critical-work protection, anti-repetition, and persistence bounds.
 - Social organizational state may influence only social preference, reporting interpretation, and bounded emotional recommendations. It must never become a direct project, work, hiring, customer, or Institutional Learning modifier.
+- The public gear menu opens the Simulation Handbook. Its structured content and behavior live in `src/ui/simulation-handbook.js`, its responsive styles live in `src/ui/simulation-handbook.css`, and reusable navigation defaults come from `src/core/constants.js`.
 
 ---
 
@@ -1057,9 +1058,9 @@ This strengthens the CEO role.
 The CEO Communications panel contains:
 
 - Inbox tab
-- Archive tab
-- message count
-- archived count
+- Old Messages tab
+- inbox message count
+- old-message count
 - memo cards
 - memo type
 - priority
@@ -1090,12 +1091,14 @@ communicationView
 ## 8.4 Required Behavior
 
 - A CEO event creates a communication.
-- The simulation pauses when a decision is required.
-- The inbox displays the active memo.
+- The message waits in the Inbox and does not open or pause the simulation automatically.
+- The player opens the message when ready.
+- Opening an active communication pauses simulated time while the player reads it.
+- The Inbox displays the selected active memo.
 - The player selects an option.
 - The result is recorded.
 - The memo moves into the archive.
-- The simulation resumes.
+- Filing an informational update or recording a CEO decision resumes the simulation.
 - Archived communications survive save/load.
 - Old saves without communication fields must migrate safely.
 - Memos reveal what the organization believes, not perfect simulation truth.
@@ -1424,6 +1427,24 @@ Mobile uses tabs:
 - thought bubbles may be hidden on very small screens
 - communications archive must remain usable
 - newspaper columns must stack
+
+## 15.4 Simulation Handbook
+
+The gear menu must expose a player-facing `Simulation Handbook` rather than the legacy `Game Instructions` page.
+
+The handbook must:
+
+- teach a new player through a short Welcome and Quick Start
+- provide all 15 canonical sections from Welcome through FAQ
+- document every major interface area and explain what it is, why it matters, and when to use it
+- use collapsible sections, a table of contents, previous/next navigation, and a return-to-top control
+- search across topics and jump directly to a matching section
+- provide valid cross-references between related topics
+- expose `openSimulationHandbook(sectionId, topicId)` for future context-help controls
+- fit desktop and mobile viewports without horizontal reader overflow
+- remain fully offline and require no external documentation for core gameplay
+
+Handbook content and behavior belong in `src/ui/simulation-handbook.js`. Responsive handbook styling belongs in `src/ui/simulation-handbook.css`. Shared navigation defaults belong in `src/core/constants.js`.
 
 ---
 
@@ -1831,6 +1852,21 @@ Test:
 - opening, archiving, deleting, and revisiting old messages preserves the chosen decision
 - decisions do not create duplicate timers or stale pending events
 - informational follow-ups are clearly marked when no CEO reply is required
+
+## 20.5.1 Simulation Handbook
+
+Test:
+
+- the gear button and modal use the `Simulation Handbook` label
+- all 15 canonical sections render in order
+- only the selected section is expanded during table-of-contents navigation
+- previous and next controls open the correct adjacent section
+- search finds and opens matching topics
+- every cross-reference resolves to an existing section and topic
+- the context-help API opens a requested section and topic
+- every major release UI area is documented
+- return-to-top works
+- desktop and mobile layouts remain within the viewport
 
 ## 20.6 Newspaper
 

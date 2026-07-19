@@ -194,7 +194,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     maxRecentInteractionTypes:8,
     maxRelationshipCooldowns:16,
     relationshipCooldownRetentionMinutes:360,
-    detailedRelationshipsPerEmployee:6,
+    detailedRelationshipsPerEmployee:5,
     minimumDetailedRelationships:24,
     maxSocialMemories:120,
     maxPreferenceHistory:80,
@@ -577,7 +577,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     qualifiedFteCapabilityWeight:.45,
     qualifiedFteMax:1.05,
     legacyFlagship:{
-      requiredHeadcount:{hardware:2.1,software:1.5,quality:.5,product:.75,finance:.75},
+      requiredHeadcount:{hardware:2.7,software:1.8,quality:.7,product:.9,finance:.9},
       requiredRoles:["Hardware Engineer","Chip Architect","Industrial Designer","Software Engineer","Firmware Engineer","Software QA Engineer","Product Manager","Finance Analyst"],
       requiredDepartments:["hardware","software","quality","product","finance"]
     }
@@ -786,6 +786,10 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     onboardingComplete:"Onboarding Complete",
     paused:"Paused",
     suppressed:"Suppressed"
+  },
+  handbook:{
+    defaultSection:"welcome",
+    searchResultLimit:10
   },
   startingCompany:{
     cash:18,

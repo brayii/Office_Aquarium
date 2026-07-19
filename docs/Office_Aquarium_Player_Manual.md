@@ -7,6 +7,8 @@ This manual describes the current save version 40 build. The game remains a stan
 
 The current build uses a main `Office_Aquarium.html` file plus ordered JavaScript files under `src/`. Keep the folder structure together, including `assets/audio` for optional sound, when moving the game to another PC or mobile device.
 
+The gear menu now opens the in-game **Simulation Handbook**. It is the complete core gameplay reference and includes a two-minute Quick Start, 15 collapsible sections, full UI coverage, topic search, previous/next navigation, cross-references, and direct context-help support. This longer manual remains available as an external reference, but it is not required to begin playing.
+
 ---
 
 # Current Build Notes
@@ -222,7 +224,7 @@ The Office panel contains the simulation controls.
 | Resume | Continues simulated time |
 | Sound dropdown | Chooses Muted, Alerts Only, Music Only, or Music + Alerts |
 
-New CEO messages wait in the Inbox and do not open or pause the simulation automatically. Pause manually when you want time to read or decide.
+New CEO messages wait in the Inbox and do not open or pause the simulation automatically. Opening a message pauses simulated time while you read; filing it or recording the decision resumes the simulation. You can also pause manually whenever you want time to inspect the company.
 
 Sound is optional. Background music uses the game music loop, while message alerts play when new CEO Inbox items arrive. If audio is unavailable or blocked by the browser, the simulation continues normally.
 
@@ -328,6 +330,8 @@ A memo may include:
 - estimated confidence
 
 The Inbox does not reveal perfect truth. It shows what the organization believes. A memo may be cautious, optimistic, incomplete, biased by department priorities, or wrong. Compare the memo with Operating Health, Project Portfolio, Department Briefings, Company Story, the newspaper, and previous outcomes.
+
+Queued messages do not pause the company. Opening a message pauses simulated time while it is active. Filing an informational update or recording the CEO decision resumes the clock.
 
 Current memos are written to feel like executive communication, not diagnostic reports. The main message explains the situation first. Supporting context, evidence, uncertainty, and department viewpoints come after the message. Internal severity scores, evidence IDs, audits, and hidden calculations are not shown in normal play.
 

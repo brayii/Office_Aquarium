@@ -79,6 +79,7 @@ function checkSharedConstants() {
     [/projectStatus\s*:/, "project status constants"],
     [/messageStatus\s*:/, "message status constants"],
     [/hiringStatus\s*:/, "hiring status constants"],
+    [/handbook\s*:/, "Simulation Handbook configuration"],
     [/modelVersion\s*:\s*4/, "Social AI model version"],
     [/organizationViews\s*:\s*\["culture","groups","network","leadership"\]/, "People and Culture views"],
     [/defaultOrganizationView\s*:\s*"culture"/, "People and Culture default view"],
@@ -215,6 +216,32 @@ function checkPublicReleaseUi() {
   return forbiddenPublicUi.length;
 }
 
+function checkSimulationHandbookStructure() {
+  const html = read("Office_Aquarium.html");
+  const handbook = read(path.join("src", "ui", "simulation-handbook.js"));
+  const required = [
+    [/Simulation Handbook/, "Simulation Handbook title"],
+    [/id="handbookSearch"/, "handbook search"],
+    [/id="handbookToc"/, "handbook table of contents"],
+    [/id="handbookPrevious"/, "previous navigation"],
+    [/id="handbookNext"/, "next navigation"],
+    [/id="handbookTop"/, "return-to-top control"],
+    [/openSimulationHandbook/, "context-help API"],
+    [/SIMULATION_HANDBOOK_SECTIONS/, "structured handbook content"]
+  ];
+  const combined = `${html}\n${handbook}`;
+  const missing = required.filter(([pattern]) => !pattern.test(combined)).map(([, label]) => label);
+  if (missing.length) throw new Error(`Missing Simulation Handbook component(s): ${missing.join(", ")}`);
+  if (/Game Instructions/.test(combined)) throw new Error("Legacy Game Instructions label remains in the public handbook");
+  const htmlScripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
+  const handbookIndex = htmlScripts.indexOf("src/ui/simulation-handbook.js");
+  const bindingsIndex = htmlScripts.indexOf("src/bootstrap/events-and-bindings.js");
+  if (handbookIndex < 0 || bindingsIndex < 0 || handbookIndex > bindingsIndex) {
+    throw new Error("Simulation Handbook must load before browser event bindings");
+  }
+  return required.length;
+}
+
 function checkAiOwnershipBoundaries() {
   const startup = read(path.join("src", "core", "state-startup.js"));
   const operatingHealth = read(path.join("src", "systems", "operating-health-simulation.js"));
@@ -252,5 +279,6 @@ const randomAndTimers = checkRandomAndTimers(collectJsFiles("src"));
 const causalLearningGuards = checkCausalLearningIntegrity();
 const validationIsolationGuards = checkValidationIsolationGuards(collectJsFiles("src"));
 const publicReleaseUiGuards = checkPublicReleaseUi();
+const simulationHandbookGuards = checkSimulationHandbookStructure();
 const aiOwnershipGuards = checkAiOwnershipBoundaries();
-console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, sharedConstants, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards, validationIsolationGuards, publicReleaseUiGuards, aiOwnershipGuards }, null, 2));
+console.log(JSON.stringify({ ok: true, htmlIds, htmlScripts, syntaxFiles, functions, sharedConstants, topLevelDeclarations, forbiddenChecks, randomAndTimers, causalLearningGuards, validationIsolationGuards, publicReleaseUiGuards, simulationHandbookGuards, aiOwnershipGuards }, null, 2));

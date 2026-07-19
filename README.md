@@ -8,7 +8,7 @@ Office Aquarium is a standalone offline organization simulation. Open `Office_Aq
 - `src/core/` - shared constants, role definitions, startup state, save migration, employee creation, and shared helpers
 - `src/services/` - reusable runtime services such as saving, sound, timers, and validation sessions
 - `src/systems/` - simulation systems such as projects, customers, workforce, executive messages, learning, valuation, social organization, and the canonical daily pipeline
-- `src/ui/` - rendering, debug views, validation tools, and timer startup
+- `src/ui/` - rendering, the Simulation Handbook, debug views, validation tools, and timer startup
 - `src/facades/` - OOP system facades used by newer code
 - `src/bootstrap/` - browser event bindings and startup wiring
 - `assets/audio/` - optional music and message-alert audio files
@@ -58,6 +58,7 @@ The suite checks:
 - Institutional, project, and workforce learning causality, review windows, independent evidence, and bounded influence
 - valuation sensitivity, once-per-day updates, chronological chart ranges, and Investor Relations forecast deduplication
 - browser launch/startup
+- Simulation Handbook sections, search, navigation, cross-references, context opening, and responsive layout
 - the manual failure-test page and its generated save scenarios
 - day rollover through daily close
 - save/load continuation
@@ -92,6 +93,7 @@ Useful targeted checks:
 npm run test:staffing-crisis
 npm run test:project
 npm run test:workforce
+npm run test:handbook
 npm run test:constants
 npm run test:daily-pipeline
 npm run test:learning-causality

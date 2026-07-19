@@ -1,7 +1,9 @@
 # Office Aquarium
-## Player Guide
+## Simulation Handbook Companion
 
 Office Aquarium is a living technology-company simulation.
+
+The searchable in-game **Simulation Handbook** is the complete core gameplay reference. Open it from the gear menu for a two-minute Quick Start, a table of contents, collapsible sections, topic search, cross-references, and direct explanations of every major interface area. This companion document remains useful for reading outside the game.
 
 You are the CEO. Your employees run their own workday, solve many problems without you, and bring important issues to your desk when leadership is needed. Your job is to understand the company, make strategic decisions, and help the organization survive.
 
@@ -69,14 +71,14 @@ Do not rush to fix every number. The company is supposed to breathe.
 | 12x | Very fast pace for letting days pass |
 | Gear | Opens sound, instructions, and restart controls |
 
-The game does not automatically open every email or memo. New messages wait in the CEO Inbox until you click them. You can pause manually whenever you want time to think.
+The game does not automatically open every email or memo. New messages wait in the CEO Inbox without pausing the company. When you open a message, the simulation pauses while you read; filing the update or recording the decision resumes it. You can also pause manually whenever you want time to think.
 
 ## Gear Menu
 
 | Button or Setting | What It Does |
 |---|---|
 | Sound dropdown | Chooses `Muted`, `Alerts Only`, `Music Only`, or `Music + Alerts` |
-| Game Instructions | Opens the in-game guide |
+| Simulation Handbook | Opens the searchable in-game reference |
 | Restart Company | Opens a confirmation screen before replacing the current saved company |
 
 Restarting is permanent for the current local save after confirmation.
@@ -110,6 +112,8 @@ Employee details can also show compact professional relationship, culture, group
 Shows executive emails and Board memos that need attention.
 
 Unread or active messages remain in the Inbox until you open them. Reading a message does not mean you have decided yet.
+
+Opening a message pauses simulated time while the communication is active. Filing an informational update or recording a CEO decision resumes the simulation.
 
 Messages usually explain:
 

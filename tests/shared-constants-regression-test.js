@@ -89,6 +89,7 @@ const dailyPipeline = read("src/systems/daily-pipeline.js");
 const html = read("Office_Aquarium.html");
 const stateStartup = read("src/core/state-startup.js");
 const renderingValidation = read("src/ui/rendering-validation.js");
+const simulationHandbook = read("src/ui/simulation-handbook.js");
 const runtimeServices = read("src/services/runtime-services.js");
 const socialOrganization = read("src/systems/social-organizational.js");
 const consumers = [roleDefinitions, workforce, projects, operatingHealth, executiveMessages, marketValuation, stateStartup, renderingValidation].join("\n");
@@ -110,6 +111,8 @@ assert(/SOCIAL_RULES\.modelVersion/.test(stateStartup), "Social model migration 
 assert(/SOCIAL_RULES\.workInputForbiddenKeys/.test(operatingHealth), "Work AI boundary guard should use shared forbidden input keys");
 assert(/function runwayDaysOrUnknown\(/.test(runtimeServices), "Runway sentinel handling should have one shared conversion helper");
 assert(/OFFICE_AQUARIUM_CONSTANTS\.storage\.compactFormat/.test(runtimeServices) && /serialize\(companyState,employeeState/.test(runtimeServices), "Save persistence should use the shared compact format");
+assert(rules.handbook.defaultSection === "welcome" && rules.handbook.searchResultLimit > 0, "Simulation Handbook navigation defaults should be centralized");
+assert(/SIMULATION_HANDBOOK_CONFIG\s*=\s*OFFICE_AQUARIUM_CONSTANTS\.handbook/.test(simulationHandbook), "Simulation Handbook behavior should consume shared configuration");
 assert(!/runwayDays\s*\|\|\s*(?:999|[A-Z_]+\.unknownFutureDay)/.test(consumers), "A zero-day runway must not be replaced by the unknown-runway sentinel");
 assert(/PROJECT_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.projectLearning/.test(projects), "Project learning should use shared lesson rules");
 assert(/WORKFORCE_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.workforceLearning/.test(workforce), "Workforce learning should use shared lesson bounds");
