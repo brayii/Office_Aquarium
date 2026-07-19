@@ -480,10 +480,13 @@
       .main-grid.living-first>.right-stack>section:nth-child(1) #commInboxView.hidden,
       .main-grid.living-first>.right-stack>section:nth-child(1) #commArchiveView.hidden{display:none}
       .main-grid.living-first>.right-stack>section:nth-child(1) #commInboxList{
-        flex:0 1 auto;max-height:min(260px,34vh);overflow:auto;padding-right:2px
+        flex:1 1 auto;min-height:0;max-height:none;overflow:auto;padding-right:2px
       }
       .main-grid.living-first>.right-stack>section:nth-child(1) .ceo-mail-scroll{
-        flex:1;min-height:0;overflow:auto;padding-right:2px
+        flex:0 0 auto;min-height:0;max-height:38%;overflow:visible;padding-right:2px
+      }
+      .main-grid.living-first>.right-stack>section:nth-child(1) #commArchiveView .ceo-mail-scroll{
+        flex:1 1 auto;overflow:auto
       }
       .main-grid.living-first>.right-stack>section:nth-child(2) .employee-list{
         flex:1;max-height:none;min-height:0
