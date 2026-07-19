@@ -8,14 +8,58 @@ function runwayDaysOrUnknown(finance=company?.finance){
 }
 
 class SaveRepository{
-  constructor(key,version){this.key=key;this.version=version;}
+  constructor(key,version){
+    this.key=key;
+    this.version=version;
+    this.compactKeyMap=new Map((OFFICE_AQUARIUM_CONSTANTS.storage.compactKeys||[]).map((name,index)=>[name,`~${index.toString(36)}`]));
+    this.expandedKeyMap=new Map([...this.compactKeyMap].map(([name,alias])=>[alias,name]));
+  }
   clone(value){return typeof structuredClone==="function"?structuredClone(value):JSON.parse(JSON.stringify(value));}
-  read(){try{const raw=localStorage.getItem(this.key);return raw?JSON.parse(raw):null;}catch(e){return null;}}
+  compact(value){
+    if(Array.isArray(value))return value.map(item=>this.compact(item));
+    if(!value||typeof value!=="object")return value;
+    const output={};
+    Object.entries(value).forEach(([key,item])=>{
+      const compactKey=this.compactKeyMap.get(key)||(key.startsWith("~")?`~${key}`:key);
+      output[compactKey]=this.compact(item);
+    });
+    return output;
+  }
+  expand(value){
+    if(Array.isArray(value))return value.map(item=>this.expand(item));
+    if(!value||typeof value!=="object")return value;
+    const output={};
+    Object.entries(value).forEach(([key,item])=>{
+      const expandedKey=this.expandedKeyMap.get(key)||(key.startsWith("~~")?key.slice(1):key);
+      output[expandedKey]=this.expand(item);
+    });
+    return output;
+  }
+  payload(companyState,employeeState,savedAt=new Date().toISOString()){
+    const saveCompany={...companyState};
+    (OFFICE_AQUARIUM_CONSTANTS.storage.transientCompanyKeys||["runtime"]).forEach(key=>delete saveCompany[key]);
+    return {saveVersion:this.version,savedAt,company:saveCompany,employees:employeeState};
+  }
+  serialize(companyState,employeeState,savedAt=new Date().toISOString()){
+    return JSON.stringify({
+      format:OFFICE_AQUARIUM_CONSTANTS.storage.compactFormat,
+      data:this.compact(this.payload(companyState,employeeState,savedAt))
+    });
+  }
+  read(){
+    try{
+      const raw=localStorage.getItem(this.key);
+      if(!raw)return null;
+      const parsed=JSON.parse(raw);
+      return parsed?.format===OFFICE_AQUARIUM_CONSTANTS.storage.compactFormat&&parsed?.data
+        ?this.expand(parsed.data)
+        :parsed;
+    }catch(e){return null;}
+  }
   exists(){return !!this.read();}
   remove(){try{localStorage.removeItem(this.key);}catch(e){}}
   write(companyState,employeeState){
-    const saveCompany={...companyState};delete saveCompany.runtime;
-    localStorage.setItem(this.key,JSON.stringify({saveVersion:this.version,savedAt:new Date().toISOString(),company:saveCompany,employees:employeeState}));
+    localStorage.setItem(this.key,this.serialize(companyState,employeeState));
   }
   summary(){
     const data=this.read();if(!data)return null;

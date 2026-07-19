@@ -1,9 +1,9 @@
 # Office Aquarium
-## Player Manual - Save Version 38
+## Player Manual - Save Version 39
 
 Office Aquarium is an autonomous technology-company simulation. You are the CEO of a company building hardware and software. Employees control themselves; your job is to watch the organization, understand what is happening, respond to important communications, and keep the company healthy enough to survive and grow.
 
-This manual describes the current save version 38 build. The game remains a standalone offline application and does not require an API key or online service.
+This manual describes the current save version 39 build. The game remains a standalone offline application and does not require an API key or online service.
 
 The current build uses a main `Office_Aquarium.html` file plus ordered JavaScript files under `src/`. Keep the folder structure together, including `assets/audio` for optional sound, when moving the game to another PC or mobile device.
 
@@ -37,7 +37,7 @@ Your job is to:
 
 The game is designed around indirect leadership. You influence the company; you do not puppeteer it.
 
-The current build includes project portfolios, derived operating health, hiring policy and recruiting pipelines, investor relations, valuation trends, customer and market intelligence, executive messages, company history, story threads, and evidence-based Institutional Learning.
+The current build includes project portfolios, derived operating health, hiring policy and recruiting pipelines, investor relations, valuation trends, customer and market intelligence, executive messages, company history, story threads, evidence-based Institutional Learning, professional social memory, visible conversations, and People & Culture reporting.
 
 ---
 
@@ -197,6 +197,7 @@ Every screen is a different lens on the same living organization.
 | CEO Inbox | Strategic decisions requiring leadership |
 | Department Briefings | Operational health by team |
 | Internal Reports | What employees have discovered or reported |
+| People & Culture | Supported culture, groups, networks, team chemistry, and leadership patterns |
 | Story Threads | Cause and effect over time |
 | Weekly Newspaper | A historical summary of company events |
 
@@ -255,6 +256,8 @@ The Office screen shows employees moving through:
 
 Employee labels show what they are currently doing. Busy employees display activity animation and thought text appears in the office. Select an employee to open the detailed profile.
 
+Short speech bubbles appear when a source-backed conversation is suitable for the live office. They may cover current work, help, blockers, meetings, deadlines, mentoring, recognition, conflict, repair, news, or celebration. A bubble contains a few exchanges and can be selected for a larger reading view. It fades naturally, pauses while hovered, and does not mean the CEO can direct the conversation. Private conversations are difficult to overhear; confidential conversations are never displayed.
+
 Roles have a primary workplace, although meetings, collaboration, breaks, and project needs can move employees elsewhere:
 
 | Primary Workplace | Roles |
@@ -287,6 +290,10 @@ Select an employee to open a detailed profile containing:
 - milestones
 - action reasoning
 - opinion of the CEO
+- professional relationship summary
+- strongest relevant social memories
+- culture and group context
+- formal or informal leadership influence
 
 ## CEO Inbox
 
@@ -332,7 +339,7 @@ Select a decision, then choose Record CEO Decision.
 
 ## Company
 
-The Company screen shows operating health, department briefings, project portfolio, workforce pressure, organizational dynamics, company story, story threads, company lessons, and company history when those sections have meaningful content.
+The Company screen shows operating health, department briefings, project portfolio, workforce pressure, organizational dynamics, People & Culture, company story, story threads, company lessons, and company history when those sections have meaningful content.
 
 Operating Health is a derived executive summary. It is not a separate set of progress bars. Hardware, software, manufacturing, customer, shareholder, morale, trust, cohesion, finance, and portfolio health are calculated from the current projects, employees, departments, customers, manufacturing, finance, board, and market state.
 
@@ -349,6 +356,15 @@ It also includes Organizational Dynamics, which summarizes long-running leadersh
 - organizational momentum
 
 The same area includes Workforce and Financial Pressure. This is the CEO-level view of payroll, operating cost, net cash flow, runway, staffing pressure, retention risk, employees searching, retirement watch, board strikes, PIP status, and company risk. Individual salary details remain hidden in normal play.
+
+People & Culture appears in the Reports workspace and contains four views:
+
+- Culture shows supported norms, direction of change, confidence, and warnings.
+- Groups shows informal groups that formed from repeated meaningful interaction.
+- Network shows mentoring, conflict, and bridge relationships.
+- Leadership separates formal authority from earned credibility and informal influence.
+
+Opening these views does not alter the simulation. They report accumulated evidence and may remain uncertain when the company has not observed enough.
 
 ## Paper
 
@@ -677,15 +693,24 @@ When a work item is blocked, the department briefing and related reports name th
 
 ## Relationships
 
-Relationships are professional, not a friendship mini-game. The current social AI has three layers:
+Relationships are professional, not a friendship mini-game. The current social AI builds them in layers:
 
 - familiarity from real encounters
 - shared experience history from work, meetings, breaks, help, pressure, and milestones
 - hidden relationship interpretation: trust, respect, comfort, and professional friction
+- source-backed conflict and later repair attempts
+- directional memory and contextual recall
+- visible conversations grounded in real events
+- slow culture, informal-group, and team-chemistry interpretation
+- formal and informal leadership evidence
 
 These hidden values affect how stressful or encouraging future interactions feel. They do not directly change project progress, quality, productivity, hiring, or company learning.
 
 Employees choose collaborators mainly from project need, role usefulness, skill fit, availability, focus, stress, and social compatibility. A coworker can be trusted but still difficult to work with, or comfortable to talk to but not the most useful collaborator for a technical problem.
+
+Conflict does not appear from nowhere. It can develop from a real disagreement, ignored request, interruption, credit dispute, deadline blame, failed collaboration, or dismissive exchange. A later apology, clarification, constructive follow-up, recognition, or successful joint effort may repair it, but employees do not accept every attempt.
+
+Culture and informal groups emerge slowly from repeated evidence. Sharing a room does not create a friendship, clique, conflict, or leadership reputation by itself. A manager has formal authority, but credibility must still be earned; a non-manager can become an informal leader through consistent mentoring, communication, and conflict handling.
 
 ## Memories
 
@@ -697,6 +722,10 @@ Employees remember important events, including:
 - collaboration
 - leadership pressure
 - successful or harmful decisions
+- meaningful conflict and repair
+- mentoring, recognition, and repeated shared outcomes
+
+Social memory is selective. Routine memories fade or compress over time, while important unresolved experiences can remain influential. Two employees may remember the same event differently because their personalities and prior relationships differ.
 
 ## Learning
 

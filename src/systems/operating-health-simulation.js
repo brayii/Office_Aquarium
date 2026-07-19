@@ -767,12 +767,33 @@ function recordQualityMistake(e,reason,severity=1){
 function startCollaborationSession(e,target,ctx){
   const work=ctx.work||activeWorkForEmployee(e);
   if(!target||!work)return null;
-  const session={partnerId:target.id,workItemId:work.id,startedDay:company.day,startedMinute:company.minute,purpose:(work.blockedBy||[]).length?"blocker":"coordination"};
+  const sourceEventId=`collab-${work.id}-${company.day}-${company.minute}-${Math.min(e.id,target.id)}-${Math.max(e.id,target.id)}`;
+  const roomId=e.currentRoom||roomForZone?.(e.zone)||null;
+  const session={partnerId:target.id,workItemId:work.id,sourceEventId,roomId,startedDay:company.day,startedMinute:company.minute,purpose:(work.blockedBy||[]).length?"blocker":"coordination"};
   e.activeCollaboration=session;
   target.activeCollaboration={...session,partnerId:e.id};
   if(!work.collaborators.includes(e.id))work.collaborators.push(e.id);
   if(!work.collaborators.includes(target.id))work.collaborators.push(target.id);
-  recordSocialEncounter?.(e,target,{type:(work.blockedBy||[]).length?"direct_help":"shared_work_activity",gain:(work.blockedBy||[]).length?3:2,sourceEventId:`collab-${work.id}-${company.day}-${company.minute}`,roomId:e.currentRoom||roomForZone?.(e.zone)||null,cooldownMinutes:240});
+  recordSocialEncounter?.(e,target,{
+    type:(work.blockedBy||[]).length?"direct_help":"shared_work_activity",
+    gain:(work.blockedBy||[]).length?3:2,
+    sourceEventId,
+    roomId,
+    projectId:work.projectId||null,
+    cooldownMinutes:240,
+    actorId:e.id,
+    subjectId:target.id,
+    category:(work.blockedBy||[]).length?"giving_help":"current_work",
+    confidence:88,
+    context:{
+      workItemId:work.id,
+      workTitle:work.title,
+      projectId:work.projectId||null,
+      blocker:(work.blockedBy||[])[0]||null,
+      purpose:session.purpose,
+      deadlineDay:work.deadlineDay
+    }
+  });
   return session;
 }
 function applyCollaborationOutcome(e){
@@ -795,6 +816,49 @@ function applyCollaborationOutcome(e){
   partner.taskProgress=(partner.taskProgress||0)+gain*.008;
   company.integration=clamp(company.integration+gain*.035,0,100);
   company.quality=clamp(company.quality+gain*.018,0,100);
+  const collaborationContext={
+    workItemId:item.id,
+    workTitle:item.title,
+    projectId:item.projectId||null,
+    blocker:(item.blockedBy||[])[0]||null,
+    purpose:session.purpose,
+    deadlineDay:item.deadlineDay,
+    outcome:`${gain.toFixed(2)} progress from completed collaboration`
+  };
+  if(gain>=3){
+    recordSocialEncounter?.(e,partner,{
+      type:"successful_collaboration",
+      gain:2.4,
+      sourceEventId:`${session.sourceEventId||`collab-${item.id}-${company.day}-${company.minute}`}-success`,
+      roomId:session.roomId||null,
+      projectId:item.projectId||null,
+      cooldownMinutes:180,
+      actorId:e.id,
+      subjectId:partner.id,
+      category:"appreciation",
+      confidence:92,
+      context:collaborationContext
+    });
+  }else{
+    const compatibility=personalityCompatibility(e,partner);
+    const highPressure=Math.max(e.stress||0,partner.stress||0)>=78;
+    const poorFocus=Math.min(e.focus||50,partner.focus||50)<35;
+    if(compatibility<.42&&(highPressure||poorFocus)){
+      recordSocialEncounter?.(e,partner,{
+        type:"failed_collaboration",
+        gain:.8,
+        sourceEventId:`${session.sourceEventId||`collab-${item.id}-${company.day}-${company.minute}`}-failed`,
+        roomId:session.roomId||null,
+        projectId:item.projectId||null,
+        cooldownMinutes:SOCIAL_RULES.conflict.duplicateCooldownMinutes,
+        actorId:e.id,
+        subjectId:partner.id,
+        category:"conflict",
+        confidence:84,
+        context:{...collaborationContext,outcome:"The collaboration produced limited progress under high pressure and a strong style mismatch."}
+      });
+    }
+  }
   const socialRules=OFFICE_AQUARIUM_CONSTANTS.social.projectExperience;
   const teamPressure=Number(company.teams?.[item.assignedTeam]?.pressure)||0;
   const deadlinePressure=company.day>=Number(item.deadlineDay||company.day+socialRules.collaborationDeadlineLeadDays)-socialRules.collaborationDeadlineLeadDays;
@@ -846,6 +910,52 @@ function applyMeetingOutcome(e){
       if(item.projectId)recordProjectLedger(item.projectId,"meeting","work-progress",item.progress-before,`${e.name} led ${meeting.purpose}`);
     }
   }
+  const participant=employees.find(candidate=>candidate.active&&candidate.id===meeting.participantId);
+  if(participant){
+    const sourceEventId=meeting.sourceEventId||`meeting-${e.id}-${participant.id}-${company.day}-${company.minute}`;
+    const context={
+      workItemId:item?.id||null,
+      workTitle:item?.title||"team coordination",
+      projectId:item?.projectId||null,
+      blocker:(item?.blockedBy||[])[0]||null,
+      purpose:meeting.purpose,
+      deadlineDay:item?.deadlineDay,
+      outcome:`Meeting clarity ${Math.round(clarity*100)}`
+    };
+    if(clarity>=.65){
+      recordSocialEncounter?.(e,participant,{
+        type:"constructive_feedback",
+        gain:1.8,
+        sourceEventId:`${sourceEventId}-constructive`,
+        roomId:meeting.roomId||null,
+        projectId:item?.projectId||null,
+        cooldownMinutes:180,
+        actorId:e.id,
+        subjectId:participant.id,
+        category:"appreciation",
+        confidence:88,
+        context
+      });
+    }else{
+      const pressure=Math.max(Number(t?.pressure)||0,e.stress||0,participant.stress||0);
+      const styleMismatch=1-personalityCompatibility(e,participant);
+      if(clarity<.38&&pressure>=72&&styleMismatch>=.55){
+        recordSocialEncounter?.(e,participant,{
+          type:"meeting_conflict",
+          gain:.8,
+          sourceEventId:`${sourceEventId}-conflict`,
+          roomId:meeting.roomId||null,
+          projectId:item?.projectId||null,
+          cooldownMinutes:SOCIAL_RULES.conflict.duplicateCooldownMinutes,
+          actorId:e.id,
+          subjectId:participant.id,
+          category:"conflict",
+          confidence:82,
+          context:{...context,outcome:"The meeting ended without enough clarity under high pressure and a strong style mismatch."}
+        });
+      }
+    }
+  }
 }
 function chooseAction(e){
   if(!e.active||e.sickDays>0)return;
@@ -872,7 +982,7 @@ function chooseAction(e){
     target=availableCollaborator(e);const room=roomForAction(e,a,{...ctx,collaborator:target});moveToZone(e,zoneForRoom(room));e.action=`collaborating with ${target?.name||"a teammate"}`;e.thought=thoughtFor("collaborate",e,ctx);e.actionMinutes=rand(35,70);e.cooldowns.collaborate=90;
     if(target){startCollaborationSession(e,target,ctx);addMemory(e,"COLLABORATION",`${target.name} helped move the work forward.`,"positive",8,target.name);}
   }else if(a==="meeting"){
-    const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="leading a meeting";e.thought=thoughtFor("meeting",e,ctx);e.actionMinutes=rand(35,65);e.cooldowns.meeting=110;e.activeMeeting={workItemId:ctx.work?.id||null,purpose:meetingPurposeFor(e,ctx),startedDay:company.day,startedMinute:company.minute};
+    const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="leading a meeting";e.thought=thoughtFor("meeting",e,ctx);e.actionMinutes=rand(35,65);e.cooldowns.meeting=110;e.activeMeeting={workItemId:ctx.work?.id||null,purpose:meetingPurposeFor(e,ctx),sourceEventId:`meeting-${e.id}-${ctx.work?.id||"general"}-${company.day}-${company.minute}`,roomId:room,startedDay:company.day,startedMinute:company.minute};
   }else if(a==="complain"){
     const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="venting";e.thought=thoughtFor("complain",e,ctx);e.actionMinutes=rand(20,45);e.cooldowns.complain=100;
   }else{
@@ -894,6 +1004,32 @@ function chooseAction(e){
           tone:null,
           intensity:1,
           requireSource:true
+        });
+      }
+    }else if(a==="meeting"&&preference?.selectedEmployeeId!=null){
+      target=employees.find(x=>x.id===preference.selectedEmployeeId)||null;
+      if(target&&e.activeMeeting){
+        e.activeMeeting.participantId=target.id;
+        const work=ctx.work||null;
+        recordSocialEncounter?.(e,target,{
+          type:"shared_meeting",
+          gain:1.5,
+          sourceEventId:e.activeMeeting.sourceEventId,
+          roomId:chosenRoom,
+          projectId:work?.projectId||null,
+          cooldownMinutes:180,
+          actorId:e.id,
+          subjectId:target.id,
+          category:"meetings",
+          confidence:86,
+          context:{
+            workItemId:work?.id||null,
+            workTitle:work?.title||null,
+            projectId:work?.projectId||null,
+            blocker:(work?.blockedBy||[])[0]||null,
+            purpose:e.activeMeeting.purpose,
+            deadlineDay:work?.deadlineDay
+          }
         });
       }
     }else if(a==="socialize"&&preference?.selectedEmployeeId!=null){
@@ -964,7 +1100,7 @@ function simulateMinute(renderNow=true){
   try{return simulateMinuteCore(renderNow);}
   catch(error){recordSimulationError(error,"simulateMinute");if(renderNow&&!validationMode){renderDecisionEvent();render();}}
 }
-function simulateMinuteCore(renderNow=true){if(company.gameOver)return;company.minute+=5;if(company.minute>=OFFICE_AQUARIUM_CONSTANTS.time.workdayEndMinute){company.day++;company.minute=OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute;dailyClose();if(company.paused||company.gameOver)return;}const periodic=company.minute%30===0;employees.forEach(e=>{if(company.paused||company.gameOver)return;if(!e.active)return;tickCooldowns(e,5);if(e.sickDays>0){finishAction(e);e.offsite=true;e.action="out sick";e.thought="I need time to recover before returning.";return;}if(e.offsite&&company.minute<OFFICE_AQUARIUM_CONSTANTS.time.offsiteReturnCutoffMinute){finishAction(e);e.offsite=false;moveToZone(e,e.homeZone);e.actionMinutes=0;}e.actionMinutes-=5;if(e.actionMinutes<=0){finishAction(e);chooseAction(e);}const roomEffect=e.offsite?{productivity:1,stress:0,focus:0,congestion:0}:applyRoomTickEffects(e);const working=e.action==="working"||e.action==="testing hardware";if(working){e.energy-=.37;applyEmployeeEmotionDelta(e,{stressDelta:company.directive==="speed"?.44:.23,reasonCode:"work-tick",sourceEventId:`work-${company.day}-${company.minute}`,ignoreCooldown:true});e.focus-=.09;const output=(e.focus/100)*(e.morale/100)*.075*(company.directive==="speed"?1.20:1)*(roomEffect.productivity||1);roleOutput(e,output);e.taskProgress+=output;const mistakeRisk=(company.directive==="speed"?.0032:.0011)+(e.focus<36?.004:0)+(e.stress>78?.003:0)+((100-(company.culture?.qualityDiscipline??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore))*.00004)+(Math.max(0,(roomEffect.congestion||0)-1)*.0012);if(simulationRandom()<mistakeRisk)recordQualityMistake(e,e.action==="testing hardware"?"a failed verification pass":"rushed technical work",e.action==="testing hardware"?.45:.55);}else if(e.action.includes("break")){const recovery=roomEffect.room==="break-area"?clamp(1.05-Math.max(0,(roomEffect.congestion||0)-1)*.22,.65,1.12):.75;e.energy+=.45*recovery;applyEmployeeEmotionDelta(e,{stressDelta:-.35*recovery,reasonCode:"break-recovery",sourceEventId:`break-${company.day}-${company.minute}`,ignoreCooldown:true});e.focus+=.18*recovery;}else if(e.action.includes("talking")){applyEmployeeEmotionDelta(e,{moraleDelta:.06,stressDelta:-.12,reasonCode:"talking",sourceEventId:`talk-${company.day}-${company.minute}`,ignoreCooldown:true});}else if(e.action.includes("collaborating")){applyEmployeeEmotionDelta(e,{moraleDelta:.04,stressDelta:.04,reasonCode:"collaboration-pressure",sourceEventId:`collab-${company.day}-${company.minute}`,ignoreCooldown:true});applyCollaborationOutcome(e);}else if(e.action==="leading a meeting"){const penalty=Math.max(0,(roomEffect.congestion||0)-1);applyEmployeeEmotionDelta(e,{stressDelta:.025+penalty*.05,reasonCode:"meeting-pressure",sourceEventId:`meeting-${company.day}-${company.minute}`,ignoreCooldown:true});e.focus-=.035+penalty*.05;applyMeetingOutcome(e);}else if(e.action==="venting"){applyEmployeeEmotionDelta(e,{moraleDelta:-.08,stressDelta:-.08,reasonCode:"venting",sourceEventId:`vent-${company.day}-${company.minute}`,ignoreCooldown:true});}if(company.directive==="people")applyEmployeeEmotionDelta(e,{moraleDelta:.014,reasonCode:"people-policy",sourceEventId:`directive-${company.day}-${company.minute}`,ignoreCooldown:true});if(company.directive==="cuts")applyEmployeeEmotionDelta(e,{stressDelta:.055,moraleDelta:-.035,reasonCode:"cuts-policy",sourceEventId:`directive-${company.day}-${company.minute}`,ignoreCooldown:true});if(company.directive==="quality"){applyEmployeeEmotionDelta(e,{stressDelta:-.012,reasonCode:"quality-policy",sourceEventId:`directive-${company.day}-${company.minute}`,ignoreCooldown:true});company.quality+=.003;}if(periodic)applyEmotionalHomeostasis(e);e.energy=clamp(e.energy,0,100);e.stress=clamp(e.stress,0,100);e.morale=clamp(e.morale,0,100);e.focus=clamp(e.focus,0,100);});observeRoomFamiliarity?.(5);if(company.paused||company.gameOver)return;clampCompany();maybePhaseAdvance();if(company.eventCooldown>0)company.eventCooldown--;if(periodic)maybeCreateDecisionEvent();if(company.minute%60===0)maybeEmergentEvent();if(periodic||company.cash<=0||company.board<20)evaluateFailure();if(renderNow&&!validationMode){renderDecisionEvent();render();}}
+function simulateMinuteCore(renderNow=true){if(company.gameOver)return;company.minute+=5;if(company.minute>=OFFICE_AQUARIUM_CONSTANTS.time.workdayEndMinute){company.day++;company.minute=OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute;dailyClose();if(company.paused||company.gameOver)return;}const periodic=company.minute%30===0;employees.forEach(e=>{if(company.paused||company.gameOver)return;if(!e.active)return;tickCooldowns(e,5);if(e.sickDays>0){finishAction(e);e.offsite=true;e.action="out sick";e.thought="I need time to recover before returning.";return;}if(e.offsite&&company.minute<OFFICE_AQUARIUM_CONSTANTS.time.offsiteReturnCutoffMinute){finishAction(e);e.offsite=false;moveToZone(e,e.homeZone);e.actionMinutes=0;}e.actionMinutes-=5;if(e.actionMinutes<=0){finishAction(e);chooseAction(e);}const roomEffect=e.offsite?{productivity:1,stress:0,focus:0,congestion:0}:applyRoomTickEffects(e);const working=e.action==="working"||e.action==="testing hardware";if(working){e.energy-=.37;applyEmployeeEmotionDelta(e,{stressDelta:company.directive==="speed"?.44:.23,reasonCode:"work-tick",sourceEventId:`work-${company.day}-${company.minute}`,ignoreCooldown:true});e.focus-=.09;const output=(e.focus/100)*(e.morale/100)*.075*(company.directive==="speed"?1.20:1)*(roomEffect.productivity||1);roleOutput(e,output);e.taskProgress+=output;const mistakeRisk=(company.directive==="speed"?.0032:.0011)+(e.focus<36?.004:0)+(e.stress>78?.003:0)+((100-(company.culture?.qualityDiscipline??OFFICE_AQUARIUM_CONSTANTS.defaults.neutralScore))*.00004)+(Math.max(0,(roomEffect.congestion||0)-1)*.0012);if(simulationRandom()<mistakeRisk)recordQualityMistake(e,e.action==="testing hardware"?"a failed verification pass":"rushed technical work",e.action==="testing hardware"?.45:.55);}else if(e.action.includes("break")){const recovery=roomEffect.room==="break-area"?clamp(1.05-Math.max(0,(roomEffect.congestion||0)-1)*.22,.65,1.12):.75;e.energy+=.45*recovery;applyEmployeeEmotionDelta(e,{stressDelta:-.35*recovery,reasonCode:"break-recovery",sourceEventId:`break-${company.day}-${company.minute}`,ignoreCooldown:true});e.focus+=.18*recovery;}else if(e.action.includes("talking")){applyEmployeeEmotionDelta(e,{moraleDelta:.06,stressDelta:-.12,reasonCode:"talking",sourceEventId:`talk-${company.day}-${company.minute}`,ignoreCooldown:true});}else if(e.action.includes("collaborating")){applyEmployeeEmotionDelta(e,{moraleDelta:.04,stressDelta:.04,reasonCode:"collaboration-pressure",sourceEventId:`collab-${company.day}-${company.minute}`,ignoreCooldown:true});applyCollaborationOutcome(e);}else if(e.action==="leading a meeting"){const penalty=Math.max(0,(roomEffect.congestion||0)-1);applyEmployeeEmotionDelta(e,{stressDelta:.025+penalty*.05,reasonCode:"meeting-pressure",sourceEventId:`meeting-${company.day}-${company.minute}`,ignoreCooldown:true});e.focus-=.035+penalty*.05;applyMeetingOutcome(e);}else if(e.action==="venting"){applyEmployeeEmotionDelta(e,{moraleDelta:-.08,stressDelta:-.08,reasonCode:"venting",sourceEventId:`vent-${company.day}-${company.minute}`,ignoreCooldown:true});}if(company.directive==="people")applyEmployeeEmotionDelta(e,{moraleDelta:.014,reasonCode:"people-policy",sourceEventId:`directive-${company.day}-${company.minute}`,ignoreCooldown:true});if(company.directive==="cuts")applyEmployeeEmotionDelta(e,{stressDelta:.055,moraleDelta:-.035,reasonCode:"cuts-policy",sourceEventId:`directive-${company.day}-${company.minute}`,ignoreCooldown:true});if(company.directive==="quality"){applyEmployeeEmotionDelta(e,{stressDelta:-.012,reasonCode:"quality-policy",sourceEventId:`directive-${company.day}-${company.minute}`,ignoreCooldown:true});company.quality+=.003;}if(periodic)applyEmotionalHomeostasis(e);e.energy=clamp(e.energy,0,100);e.stress=clamp(e.stress,0,100);e.morale=clamp(e.morale,0,100);e.focus=clamp(e.focus,0,100);});if(typeof observeRoomFamiliarity==="function")observeRoomFamiliarity(5);if(typeof processVisibleConversationsMinute==="function")processVisibleConversationsMinute();if(company.paused||company.gameOver)return;clampCompany();maybePhaseAdvance();if(company.eventCooldown>0)company.eventCooldown--;if(periodic)maybeCreateDecisionEvent();if(company.minute%60===0)maybeEmergentEvent();if(periodic||company.cash<=0||company.board<20)evaluateFailure();if(renderNow&&!validationMode){renderDecisionEvent();render();}}
 function clampCompany(){["chip","software","quality","integration","board","trust"].forEach(k=>company[k]=clamp(company[k],0,100));company.customers=Math.max(0,company.customers);company.valuation=Math.max(0,company.valuation);}
 function maybePhaseAdvance(){let next=company.phase;if(company.phase==="prototype"&&company.chip>=45&&company.software>=45)next="integration";if(company.phase==="integration"&&company.integration>=48&&company.quality>=50)next="customer trial";if(next!==company.phase){company.phase=next;company.log.push(`Product phase advanced to ${next}.`);recordWeeklyEvent(`Product phase advanced to ${next}.`,"product",4);}}
 

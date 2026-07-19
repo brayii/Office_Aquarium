@@ -71,7 +71,9 @@ async function main() {
     assert(exp.type === "shared_work_activity" && exp.emotionalTone === "positive", "Experience should preserve type and tone");
     assert(exp.intensity >= 1 && exp.intensity <= 5, "Experience intensity should be bounded");
     assert(exp.dedupeKey === "work-event-1:shared_work_activity:" + keyAB, "Experience should use stable dedupe key");
-    assert(exp.employeeReactions[a.id] && Number.isFinite(exp.employeeReactions[a.id].stressDelta), "Experience should record per-employee reactions");
+    assert(!("employeeReactions" in exp) && !("relationshipBefore" in exp) && !("relationshipAfter" in exp), "Bounded relationship history should not duplicate full emotional or relationship snapshots");
+    assert((company.socialEmotionTraces || []).some(trace => trace.sourceEventId === exp.id && trace.employeeId === a.id), "The canonical Emotional System trace should retain the per-employee reaction");
+    assert(company.socialMemoryStore.records.some(memory => memory.sourceEventId === "work-event-1" && memory.ownerId === a.id && memory.subjectId === b.id), "The canonical directional memory store should retain the source-backed social interpretation");
     assert(company.chip === before.chip && company.software === before.software && company.integration === before.integration, "Shared experience must not change product progress");
     assert(company.quality === before.quality && company.customers === before.customers, "Shared experience must not change quality or customers");
     assert(JSON.stringify(company.lessons || []) === before.lessons && JSON.stringify(company.learningEpisodes || []) === before.learningEpisodes, "Shared experience must not change Institutional Learning");
@@ -96,7 +98,7 @@ async function main() {
     for (let i = 0; i < 30; i++) {
       recordSharedExperience(a, b, { type: "shared_meeting", sourceEventId: `meeting-${i}`, tone: i % 2 ? "neutral" : "positive", intensity: 1 });
     }
-    assert(company.socialRelationships[keyAB].recentExperiences.length === 20, "Recent experience detail should be bounded");
+    assert(company.socialRelationships[keyAB].recentExperiences.length === SOCIAL_RULES.maxRecentExperiences, "Recent experience detail should honor the shared bounded-history constant");
     assert(company.socialRelationships[keyAB].experienceSummary.shared_meeting.count === 30, "Aggregate summary should retain expired detailed history");
 
     const saved = JSON.stringify(company.socialRelationships);

@@ -1159,7 +1159,9 @@ function projectPortfolioHtml(){
     const riskLabel=qualitativeBand(perf.riskTrend||p.visibleRisk||0,{low:35,high:70,lowText:"contained",midText:"visible",highText:"elevated"});
     const confidenceLabel=qualitativeBand(perf.strategicConfidence||p.visibleConfidence||0,{low:40,high:70,lowText:"uncertain",midText:"developing",highText:"strong"});
     const capabilityText=[...(p.requiredCapabilities||[]).map(c=>`${COMPANY_CAPABILITY_LABELS[c]||c} required`),...(p.preferredCapabilities||[]).slice(0,2).map(c=>`${COMPANY_CAPABILITY_LABELS[c]||c} preferred`)].join("; ")||"standard execution capabilities";
-    return `<div class="briefing-card"><strong>${p.title}</strong><small>${p.family} | ${p.originType} | ${projectStatusLabel(p)}${lineage}<br>Current Execution Health: ${overall} (base ${healthBreakdown.base}; company ${healthBreakdown.companyModifier>=0?"+":""}${healthBreakdown.companyModifier}; staffing ${healthBreakdown.staffingModifier>=0?"+":""}${healthBreakdown.staffingModifier}; risk ${healthBreakdown.riskModifier})<br>Dependencies: ${dependencyText}<br>Capabilities: ${capabilityText}<br>Progress ${Math.round(p.progress||0)}%; target ${targetDays||"?"} ${targetDays===1?"day":"days"}; pace ${paceLabel}; spend ${spend}<br>Timing: ${timing.short}; ${timing.status}; ${timing.confidenceLabel} confidence<br>Schedule ${perf.scheduleVariance??0}; budget ${perf.budgetVariance??0}; quality ${Math.round(perf.quality||p.quality||0)}; open work ${perf.backlogCount??0}; ${blockerText}<br>Required staff ${required}; allocated ${staffingRows||"none"}; project coverage ${currentStaffingCoverage}%; overload ${Math.round(perf.workloadOverload||projectOverloadPressure(p))}; missing ${missingText}<br>Customer interest ${Math.round(perf.customerInterest||p.customerInterest||0)}; risk is ${riskLabel}; confidence is ${confidenceLabel}<br>Commercial: ${commercialLabel}; readiness ${Math.round(p.commercialReadiness||0)}; potential ${Math.round(p.commercialPotential||0)}; ${commercialRevenueText}; customers ${Math.round(p.convertedCustomers||0)}<br>Recommendation: ${rec}</small><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${actions}</div></div>`;
+    const chemistry=company.projectTeamChemistry?.[p.id];
+    const chemistryText=chemistry?`<br>Team chemistry: coordination ${chemistry.coordination}; trust ${chemistry.trust}; communication ${chemistry.communication}; conflict load ${chemistry.conflictLoad}; ${chemistry.confidence}% evidence confidence`:"";
+    return `<div class="briefing-card"><strong>${p.title}</strong><small>${p.family} | ${p.originType} | ${projectStatusLabel(p)}${lineage}<br>Current Execution Health: ${overall} (base ${healthBreakdown.base}; company ${healthBreakdown.companyModifier>=0?"+":""}${healthBreakdown.companyModifier}; staffing ${healthBreakdown.staffingModifier>=0?"+":""}${healthBreakdown.staffingModifier}; risk ${healthBreakdown.riskModifier})<br>Dependencies: ${dependencyText}<br>Capabilities: ${capabilityText}<br>Progress ${Math.round(p.progress||0)}%; target ${targetDays||"?"} ${targetDays===1?"day":"days"}; pace ${paceLabel}; spend ${spend}<br>Timing: ${timing.short}; ${timing.status}; ${timing.confidenceLabel} confidence<br>Schedule ${perf.scheduleVariance??0}; budget ${perf.budgetVariance??0}; quality ${Math.round(perf.quality||p.quality||0)}; open work ${perf.backlogCount??0}; ${blockerText}<br>Required staff ${required}; allocated ${staffingRows||"none"}; project coverage ${currentStaffingCoverage}%; overload ${Math.round(perf.workloadOverload||projectOverloadPressure(p))}; missing ${missingText}${chemistryText}<br>Customer interest ${Math.round(perf.customerInterest||p.customerInterest||0)}; risk is ${riskLabel}; confidence is ${confidenceLabel}<br>Commercial: ${commercialLabel}; readiness ${Math.round(p.commercialReadiness||0)}; potential ${Math.round(p.commercialPotential||0)}; ${commercialRevenueText}; customers ${Math.round(p.convertedCustomers||0)}<br>Recommendation: ${rec}</small><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${actions}</div></div>`;
   };
   const cards=currentItems.map(projectCard).join("");
   const archiveCards=archiveItems.map(projectCard).join("");
@@ -2155,6 +2157,22 @@ function processDelayedDecisionEffects(){
     recordHistory(`Long-term result of "${x.choiceTitle}": ${x.message}`,"leadership",x.tone==="negative"?4:3);
     updateMemoOutcomeAccountability(x);
     attachDecisionThreadOutcome(x);
+    if(typeof recordLeadershipCompanyEvent==="function"){
+      recordLeadershipCompanyEvent({
+        sourceEventId:`ceo-outcome-${x.eventId||x.id||"decision"}-${x.dueDay}-${String(x.choiceTitle||"choice").replace(/\s+/g,"-").toLowerCase()}`,
+        type:"ceo-decision-outcome",
+        outcome:x.tone==="positive"?1:x.tone==="negative"?-1:0,
+        confidence:clamp(55+Math.abs((x.realizedScore||50)-(x.expectedScore||50)),45,92),
+        context:{
+          eventId:x.eventId||null,
+          decisionTitle:x.choiceTitle||null,
+          strategy:x.strategy||null,
+          projectId:x.projectImpact?.projectId||x.projectId||null,
+          realizedScore:x.realizedScore,
+          expectedScore:x.expectedScore
+        }
+      });
+    }
     if(typeof createOrReinforceLesson==="function"){
       const vectors={
         quality:{testing:x.tone==="positive"?.35:.15,planning:.2,riskTaking:x.tone==="negative"?-.25:.05},

@@ -7,7 +7,7 @@ Office Aquarium is a standalone offline organization simulation. Open `Office_Aq
 - `Office_Aquarium.html` - main launch file and page markup/styles
 - `src/core/` - shared constants, role definitions, startup state, save migration, employee creation, and shared helpers
 - `src/services/` - reusable runtime services such as saving, sound, timers, and validation sessions
-- `src/systems/` - simulation systems such as projects, customers, workforce, executive messages, learning, valuation, and the canonical daily pipeline
+- `src/systems/` - simulation systems such as projects, customers, workforce, executive messages, learning, valuation, social organization, and the canonical daily pipeline
 - `src/ui/` - rendering, debug views, validation tools, and timer startup
 - `src/facades/` - OOP system facades used by newer code
 - `src/bootstrap/` - browser event bindings and startup wiring
@@ -75,7 +75,10 @@ The suite checks:
 - Stage 4 Social Personality AI opportunity-bound social preferences
 - Stage 5 evidence-based multidimensional workplace reputation
 - emotional homeostasis, personal baselines, anti-saturation, and visible positive/negative social reactions
-- Social AI model v3 ownership, deterministic migration, read-path RNG safety, and Work/Social/Emotional/Institutional trace separation
+- Social AI model v4 ownership, deterministic migration, read-path RNG safety, and Work/Social/Emotional/Institutional trace separation
+- source-backed conflict, repair, bounded social memory, contextual recall, visible conversations, privacy, and overhearing
+- evidence-backed culture, informal groups, team chemistry, bridges, and formal/informal leadership
+- compact backward-compatible saves, transient-debug exclusion, and mature-workforce browser-storage budget checks
 - isolated balance validation that cannot mutate the live company save
 - executive memo context and weekly newspaper clarity
 - absence of recorded simulation errors during the regression run
@@ -110,8 +113,11 @@ npm run test:social-relationships
 npm run test:social-preferences
 npm run test:social-reputation
 npm run test:social-emotion
+npm run test:social-conflict
+npm run test:social-organization
 npm run test:emotional-homeostasis
 npm run test:social-emotional-long-run
+npm run test:social-organization-long-run
 ```
 
 On Windows systems that block the PowerShell `npm.ps1` shim, use `npm.cmd` in the same commands.
@@ -123,6 +129,10 @@ Stage 2 shared-experience behavior is documented in `docs/specs/social_ai_stage_
 Stage 3 relationship-interpretation behavior is documented in `docs/specs/social_ai_stage_3_relationship_interpretation.md`.
 Stage 4 opportunity-bound social preferences are documented in `docs/specs/social_ai_stage_4_social_preferences.md`.
 Stage 5 evidence-based workplace reputation is documented in `docs/specs/social_ai_stage_5_workplace_reputation.md`.
+Stage 6 conflict and repair are documented in `docs/specs/social_ai_stage_6_conflict_repair.md`.
+Stage 7 bounded social memory and contextual recall are documented in `docs/specs/social_ai_stage_7_memory_recall.md`.
+Stage 8 visible conversations and overhearing are documented in `docs/specs/social_ai_stage_8_visible_conversations.md`.
+Culture, groups, team chemistry, bridges, and leadership are documented in `docs/specs/social_systems_feature_complete.md`.
 Emotional baselines and homeostasis are documented in `docs/specs/emotional_homeostasis.md`.
 
 Balance projection tools are developer validation tools, not CEO gameplay controls. In normal play they are hidden. To expose the Developer Tools validation panel in a local browser session, open the game with `?dev=1` or set `officeAquariumDeveloperMode` to `true` in browser storage. These tools run isolated companies in memory and must not reset, save, or mutate the active company.
@@ -229,7 +239,7 @@ src-tauri\target\release\office-aquarium.exe
 It also creates a Windows installer at:
 
 ```text
-src-tauri\target\release\bundle\nsis\Office Aquarium_0.38.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\Office Aquarium_0.39.0_x64-setup.exe
 ```
 
 If the build fails while downloading NSIS, rerun the build with network access available. The app executable may still compile successfully even if installer bundling fails.
@@ -244,7 +254,7 @@ After a successful clean build, the main release files are:
 dist\Office_Aquarium_itch_web.zip
 dist\desktop\
 src-tauri\target\release\office-aquarium.exe
-src-tauri\target\release\bundle\nsis\Office Aquarium_0.38.0_x64-setup.exe
+src-tauri\target\release\bundle\nsis\Office Aquarium_0.39.0_x64-setup.exe
 ```
 
 Use the ZIP for itch.io web upload. Use the NSIS setup EXE for a Windows desktop release.

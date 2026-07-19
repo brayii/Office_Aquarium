@@ -17,6 +17,8 @@ assert(rules && typeof rules === "object", "Shared constants should initialize")
 assert(Object.isFrozen(rules), "Shared constants root should be frozen");
 assert(Object.isFrozen(rules.hiring?.onboarding), "Nested hiring constants should be frozen");
 assert(Object.isFrozen(rules.rooms?.capacities), "Room capacities should be frozen");
+assert(rules.storage.maxPersistedCharacters > 0 && rules.storage.transientCompanyKeys.includes("runtime"), "Save-size budget and transient state exclusions should be centralized");
+assert(rules.storage.compactFormat && rules.storage.compactKeys.length > 50 && new Set(rules.storage.compactKeys).size === rules.storage.compactKeys.length, "Compact-save format and append-only key dictionary should be centralized and unique");
 
 assert(rules.time.daysPerWeek === 7, "Calendar week should be centralized");
 assert(rules.time.daysPerMonth === 30, "Calendar month should be centralized");
@@ -35,11 +37,20 @@ assert(rules.hiring.onboarding.defaultDurationDays === 28, "Onboarding fallback 
 assert(rules.hiring.onboarding.minDurationDays < rules.hiring.onboarding.maxDurationDays, "Onboarding duration bounds should be valid");
 assert(rules.hiring.advancingRecruitingStatuses.every(status => rules.hiring.activeRecruitingStatuses.includes(status)), "Advancing recruiting stages should be active stages");
 assert(rules.executiveInbox.randomEventCooldownMinutes < rules.executiveInbox.decisionCooldownMinutes, "A completed CEO decision should create the longer inbox cooldown");
-assert(rules.social.modelVersion === 3, "Canonical Social AI model version should be centralized");
+assert(rules.social.modelVersion === 4, "Canonical Social AI model version should be centralized");
 assert(rules.social.neutralInterpretation.confidence === 0, "Unknown relationship interpretation should carry zero confidence");
+assert(rules.social.relationshipBands.substantialTrust < rules.social.relationshipBands.trusted && rules.social.relationshipBands.materialFriction < rules.social.relationshipBands.severeFriction, "Relationship interpretation bands should be centralized and ordered");
 assert(rules.social.workInputForbiddenKeys.includes("relationship") && rules.social.workInputForbiddenKeys.includes("reputation"), "Work AI social-state exclusions should be centralized");
 assert(rules.social.experienceAliases.onboarding_introduction === "onboarding_support", "Legacy social experience aliases should be centralized");
 assert(rules.social.passiveLegacyExperienceTypes.includes("same_room_presence"), "Passive legacy experience types should be centralized");
+assert(rules.social.trustDamagingConflictExperienceTypes.includes("credit_dispute") && !rules.social.trustDamagingConflictExperienceTypes.includes("professional_disagreement"), "Trust-damaging conflict types should distinguish misconduct from ordinary disagreement");
+assert(rules.social.conflict.minimumRepairAgeMinutes > 0 && rules.social.conflict.repairAcceptanceThreshold > 0, "Conflict and repair thresholds should be centralized");
+assert(rules.social.memory.perRelationshipCap < rules.social.memory.perEmployeeCap && rules.social.memory.perEmployeeCap < rules.social.memory.globalCap, "Social memory bounds should be centralized and ordered");
+assert(rules.social.maxRelationshipCooldowns > 0 && rules.social.relationshipCooldownRetentionMinutes > 0, "Relationship cooldown retention should be centrally bounded");
+assert(rules.social.conversations.categories.length === 15 && rules.social.conversations.minimumExchanges === 2 && rules.social.conversations.maximumExchanges === 4, "Visible-conversation categories and exchange bounds should be centralized");
+assert(rules.social.culture.dailyMaxDrift > 0 && rules.social.culture.dailyMaxDrift < 1, "Culture drift should use a small centralized daily bound");
+assert(rules.social.groups.updateIntervalDays > 0 && rules.social.groups.maxGroupSize > 1, "Informal-group lifecycle rules should be centralized");
+assert(rules.social.leadership.emotionalMultiplierMin > 0 && rules.social.leadership.emotionalMultiplierMax < 2, "Leadership emotional influence should be centrally bounded");
 assert(rules.laborMarket.departments.includes("hardware") && rules.laborMarket.departments.includes("people"), "Labor-market departments should be centralized");
 assert(Number.isFinite(rules.laborMarket.scarcity.software) && Number.isFinite(rules.laborMarket.baseline.acceptanceRate), "Labor-market modifiers should be centralized");
 assert(rules.employment.benefitsRate > 0 && rules.employment.payrollTaxRate > 0, "Recurring employment-cost rates should be centralized");
@@ -55,6 +66,7 @@ assert(rules.institutionalLearning.reviewRank.long > rules.institutionalLearning
 assert(rules.institutionalLearning.stateRank.validated > rules.institutionalLearning.stateRank.provisional, "Institutional lesson states should not regress");
 assert(rules.institutionalLearning.stateWeights.validated > rules.institutionalLearning.stateWeights.provisional, "Validated lessons should influence behavior more than provisional lessons");
 assert(rules.institutionalLearning.suppressionIndependenceWindowDays > 0, "Suppression evidence independence should use a shared review window");
+assert(rules.institutionalLearning.maxEpisodes > 0 && rules.institutionalLearning.maxEvidenceRecords > rules.institutionalLearning.maxEpisodes, "Institutional-learning history bounds should be centralized");
 assert(Math.abs(Object.values(rules.riskPillars.weights).reduce((sum, weight) => sum + weight, 0) - 1) < 0.0001, "Risk-pillar weights should total one");
 assert(rules.manufacturing.fulfillmentThreshold > 0 && rules.manufacturing.fulfillmentThreshold < 1, "Manufacturing fulfillment threshold should be canonical");
 assert(rules.dailyPipeline.stageOrder[0] === "employee-outcomes" && rules.dailyPipeline.stageOrder.at(-1) === "save", "Daily pipeline boundaries should be canonical");
@@ -90,10 +102,12 @@ assert(!/\["completed","canceled","(?:failed",)?"rejected","merged"\]/.test(cons
 assert(/SOCIAL_RULES\.modelVersion/.test(stateStartup), "Social model migration should use the shared model version");
 assert(/SOCIAL_RULES\.workInputForbiddenKeys/.test(operatingHealth), "Work AI boundary guard should use shared forbidden input keys");
 assert(/function runwayDaysOrUnknown\(/.test(runtimeServices), "Runway sentinel handling should have one shared conversion helper");
+assert(/OFFICE_AQUARIUM_CONSTANTS\.storage\.compactFormat/.test(runtimeServices) && /serialize\(companyState,employeeState/.test(runtimeServices), "Save persistence should use the shared compact format");
 assert(!/runwayDays\s*\|\|\s*(?:999|[A-Z_]+\.unknownFutureDay)/.test(consumers), "A zero-day runway must not be replaced by the unknown-runway sentinel");
 assert(/PROJECT_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.projectLearning/.test(projects), "Project learning should use shared lesson rules");
 assert(/WORKFORCE_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.workforceLearning/.test(workforce), "Workforce learning should use shared lesson bounds");
 assert(/INSTITUTIONAL_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.institutionalLearning/.test(institutionalLearning), "Institutional learning should use shared review rules");
+assert(/INSTITUTIONAL_LEARNING_RULES\.maxEpisodes/.test(institutionalLearning) && /INSTITUTIONAL_LEARNING_RULES\.maxEvidenceRecords/.test(institutionalLearning), "Institutional-learning history caps should use shared constants");
 assert(/RISK_PILLAR_RULES=OFFICE_AQUARIUM_CONSTANTS\.riskPillars/.test(workforce), "Company risk should use shared pillar rules");
 assert(/HIRING_POLICY_MODES=WORKFORCE_HIRING_RULES\.policyModes/.test(workforce), "Workforce policy behavior should use shared policy modes");
 assert(/DAILY_PIPELINE_STAGE_ORDER=OFFICE_AQUARIUM_CONSTANTS\.dailyPipeline\.stageOrder/.test(dailyPipeline), "Daily close should use the shared stage order");

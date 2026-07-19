@@ -1457,6 +1457,7 @@ function createRecruitingHireEmployee(item,candidate=null){
     }
   });
   employees[slot]=replacement;
+  if(typeof ensureEmployeeSocialOrganizationState==="function")ensureEmployeeSocialOrganizationState(replacement);
   if(backfill){
     const idx=company.openRoles.indexOf(role);
     if(idx>=0)company.openRoles.splice(idx,1);
@@ -1830,6 +1831,20 @@ function applyLeadershipFootprint(ev,choice){
   company.organizationalMomentum.culture=clamp(company.organizationalMomentum.culture+(delta.employeeWellbeing||0)*.08+(delta.transparency||0)*.06,-100,100);
   company.organizationalMomentum.innovation=clamp(company.organizationalMomentum.innovation+(delta.innovation||0)*.1,-100,100);
   company.organizationalMomentum.financial=clamp(company.organizationalMomentum.financial+(delta.financialDiscipline||0)*.1,-100,100);
+  if(typeof recordLeadershipCompanyEvent==="function"){
+    recordLeadershipCompanyEvent({
+      sourceEventId:`ceo-decision-${ev?.id||"general"}-${company.day}-${String(choice?.title||"choice").replace(/\s+/g,"-").toLowerCase()}`,
+      type:"ceo-decision",
+      outcome:0,
+      confidence:clamp(Number(choice?.estimatedConfidence)||65,20,95),
+      context:{
+        eventId:ev?.id||null,
+        decisionTitle:choice?.title||null,
+        strategy,
+        projectId:choice?.projectDecision?.id||choice?.projectId||null
+      }
+    });
+  }
 }
 function updateOrganizationalMomentum(){
   ensureLeadershipSystems();

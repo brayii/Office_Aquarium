@@ -52,6 +52,19 @@ function processDailyEmployeeLifecycle(){
       company.log.push(`${e.name} earned a promotion through sustained contribution.`);
       recordWeeklyEvent(`${e.name} earned a promotion.`,"people",4);
       recordHistory(`${e.name} was promoted to career level ${e.careerLevel}.`,"people",4);
+      const promotionWitness=employees.find(other=>other.active&&!other.offsite&&other.id!==e.id&&other.currentRoom&&other.currentRoom===e.currentRoom);
+      if(promotionWitness&&typeof recordSharedExperience==="function")recordSharedExperience(e,promotionWitness,{
+        type:"recognition_shared",
+        sourceEventId:`promotion-${e.id}-${company.day}`,
+        roomId:e.currentRoom,
+        tone:"positive",
+        intensity:4,
+        actorId:promotionWitness.id,
+        subjectId:e.id,
+        category:"celebration",
+        confidence:100,
+        context:{workTitle:`${e.name}'s promotion`,newsTopic:`${e.name}'s promotion`}
+      });
     }
     applyDailyPersonalityEmotion?.(e);
     if(e.performance){
@@ -209,6 +222,7 @@ function dailyPipelineHandlers(context){
       updateBoardConfidenceDaily(context.morale,context.stress);
     },
     workforce:()=>processDailyWorkforce(context),
+    "social-organization":()=>processSocialOrganizationDaily(),
     "organizational-friction":()=>updateDepartmentFrictionDaily(),
     "risk-pillars":()=>updateCompanyRiskComponents(),
     "crisis-lifecycle":()=>{updateCrisisRiskSystem();evaluateFailure();if(!company.gameOver)advanceCrisisDay();},

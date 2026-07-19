@@ -68,7 +68,8 @@ function checkSharedConstants() {
   const constants = read(path.join("src", "core", "constants.js"));
   const required = [
     [/Codex\/reviewer rule/, "reviewer instruction"],
-    [/saveVersion\s*:\s*38/, "save version constant"],
+    [/saveVersion\s*:\s*39/, "save version constant"],
+    [/transientCompanyKeys\s*:/, "transient save-state exclusions"],
     [/workdayStartMinute\s*:\s*480/, "workday start constant"],
     [/workdayEndMinute\s*:\s*1200/, "workday end constant"],
     [/neutralScore\s*:\s*50/, "neutral score constant"],
@@ -78,7 +79,9 @@ function checkSharedConstants() {
     [/projectStatus\s*:/, "project status constants"],
     [/messageStatus\s*:/, "message status constants"],
     [/hiringStatus\s*:/, "hiring status constants"],
-    [/modelVersion\s*:\s*3/, "Social AI model version"],
+    [/modelVersion\s*:\s*4/, "Social AI model version"],
+    [/organizationViews\s*:\s*\["culture","groups","network","leadership"\]/, "People and Culture views"],
+    [/defaultOrganizationView\s*:\s*"culture"/, "People and Culture default view"],
     [/workInputForbiddenKeys\s*:/, "Work AI social-state exclusions"]
   ];
   const missing = required.filter(([pattern]) => !pattern.test(constants)).map(([, label]) => label);

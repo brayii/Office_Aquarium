@@ -292,6 +292,7 @@ function developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo){
   const socialPreferenceDebug=socialPreferenceDebugHtml?.(e)||"No social preference data.";
   const workplaceReputationDebug=workplaceReputationDebugHtml?.(e)||"No workplace reputation data.";
   const socialEmotionDebug=socialEmotionTraceDebugHtml?.(e)||"No social emotional effect data.";
+  const socialOrganizationDebug=typeof socialOrganizationDebugHtml==="function"?socialOrganizationDebugHtml(e):"Social organization systems are unavailable.";
   return `<div class="debug-panel"><h3>AI Debug</h3>
     <details class="debug-section"><summary>Employee AI</summary><div class="debug-section-content"><strong>Utility Scores</strong><br><code>${scoreLines||"No scores yet"}</code><br><br><strong>Cooldowns</strong><br>${cooldowns}<br><br><strong>Memory Bias</strong><br>${strongestMemory?`${strongestMemory.type}: ${Math.round(strongestMemory.strength)}`:"None"}<br><br><strong>Collaborator Candidate</strong><br>${availableCollaborator(e)?.name||"None"}<br><br><strong>Repetition</strong><br>${e.lastAction||"None"} x ${e.repeatCount||0}<br><br><strong>Duration</strong><br>${Math.round(e.actionMinutes||0)} minutes<br><br><strong>CEO Opinion</strong><br>Trust ${Math.round(ceo.trust||0)}, Fairness ${Math.round(ceo.fairness||0)}, Competence ${Math.round(ceo.competence||0)}, Support ${Math.round(ceo.support||0)}, Fear ${Math.round(ceo.fear||0)}</div></details>
     <details class="debug-section"><summary>Roles and Rooms</summary><div class="debug-section-content">${roleRoomDebug}</div></details>
@@ -300,6 +301,7 @@ function developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo){
     <details class="debug-section"><summary>Social Preferences</summary><div class="debug-section-content">${socialPreferenceDebug}</div></details>
     <details class="debug-section"><summary>Workplace Reputation</summary><div class="debug-section-content">${workplaceReputationDebug}</div></details>
     <details class="debug-section"><summary>Last Social Emotional Effect</summary><div class="debug-section-content">${socialEmotionDebug}</div></details>
+    <details class="debug-section"><summary>Social Memory, Culture, Groups, and Leadership</summary><div class="debug-section-content">${socialOrganizationDebug}</div></details>
     <details class="debug-section"><summary>AI System Ownership</summary><div class="debug-section-content">${ownershipDebug}</div></details>
     <details class="debug-section"><summary>Policy Transition</summary><div class="debug-section-content">${policyDebug}</div></details>
     <details class="debug-section"><summary>Company Capabilities</summary><div class="debug-section-content">${capabilityDebug}</div></details>
@@ -336,7 +338,7 @@ function showEmployee(id){
   const topGoals=Object.entries(e.goals||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k}: ${Math.round(v*100)}`).join("<br>");
   const scoreLines=Object.entries(e.decisionTrace?.scores||{}).slice(0,5).map(([k,v])=>`${k}: ${Math.round(v)}`).join("<br>");
   const memories=(e.memories||[]).slice(0,4).map(m=>`<li>${m.text} <small>(strength ${Math.round(m.strength)})</small></li>`).join("")||"<li>No strong memories yet.</li>";
-  const social=best?getRelationshipView(e,best):null;selectedEmployeeId=id;const ceo=e.opinionOfCEO||{},cooldowns=Object.entries(e.cooldowns||{}).filter(([,v])=>v>0).map(([k,v])=>`${k}: ${Math.round(v)}`).join("<br>")||"None";const strongestMemory=(e.memories||[]).slice().sort((a,b)=>b.strength-a.strength)[0];const debugHtml=debugMode?developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo):"";
+  const social=best?getRelationshipView(e,best):null;selectedEmployeeId=id;const ceo=e.opinionOfCEO||{},cooldowns=Object.entries(e.cooldowns||{}).filter(([,v])=>v>0).map(([k,v])=>`${k}: ${Math.round(v)}`).join("<br>")||"None";const strongestMemory=(e.memories||[]).slice().sort((a,b)=>b.strength-a.strength)[0];const socialProfile=typeof employeeSocialProfileHtml==="function"?employeeSocialProfileHtml(e):"";const debugHtml=debugMode?developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo):"";
   document.getElementById("detailBody").innerHTML=`
     <div class="detail-grid">
       <div><strong>Status</strong><br>${e.active?e.action:"Resigned"}</div>
@@ -357,7 +359,7 @@ function showEmployee(id){
       <div><strong>Recent Messages</strong><br>${(e.knownMessages||[]).slice(0,3).map(m=>m.subject).join("<br>")||"No recent messages"}</div>
     </div>
     <h3>Recent memories</h3>
-    <ul>${memories}</ul>${debugHtml}`;
+    <ul>${memories}</ul>${socialProfile}${debugHtml}`;
   document.getElementById("employeeModal").classList.remove("hidden");
 }
 function normalizeCompanyView(view){
@@ -426,6 +428,7 @@ function render(){
     n.querySelector(".thought").textContent=e.thought;
     n.querySelector("small").textContent=`${e.name}: ${e.action}`;
   });
+  if(typeof renderVisibleConversations==="function")renderVisibleConversations();
   if(typeof updateDecisionActionButtonState==="function")updateDecisionActionButtonState();
   setTrack("manufacturing",health.labels.manufacturing,health.manufacturingHealth,"%");
   setTrack("shareholder","Investor Confidence",health.investorConfidence??health.shareholderConfidence);
@@ -438,6 +441,7 @@ function render(){
   const hist=document.getElementById("companyHistory");if(hist){const html=companyHistoryHtml();hist.innerHTML=html;setContentSectionVisibility("companyHistoryWrap",!!html);}
   const dash=document.getElementById("operationalDashboard");if(dash)dash.innerHTML=operationalDashboardHtml();
   const reports=document.getElementById("internalReports");if(reports){const html=internalReportsHtml();reports.innerHTML=html;setContentSectionVisibility("internalReportsWrap",!!html);}
+  if(typeof renderSocialOrganizationPanel==="function")renderSocialOrganizationPanel();
   renderDeveloperTools();
   renderOrganizationalDynamics();renderWorkforcePressure();renderNewspapers();
   applyCompanyView();

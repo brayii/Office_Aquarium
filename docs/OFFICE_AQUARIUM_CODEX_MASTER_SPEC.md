@@ -1,7 +1,7 @@
 ﻿# Office Aquarium — Master Product, Design, and Engineering Specification
 
 **Current source of truth:** `Office_Aquarium.html` and the `src/` JavaScript source tree  
-**Current save version:** `38`  
+**Current save version:** `39`
 **Target environment:** Standalone browser application, desktop and Android/mobile  
 **Architecture:** Standalone offline HTML page with external local JavaScript  
 **Player role:** CEO  
@@ -44,7 +44,7 @@ The HTML file and ordered JavaScript source files are the runtime source of trut
 
 # Current Build Notes
 
-- Save version remains `38`.
+- Save version is `39`.
 - The player-facing runtime is `Office_Aquarium.html` plus ordered source files under `src/`.
 - Browser/mobile release packages are generated under `dist/`.
 - Desktop release packages are generated under `src-tauri/target/`.
@@ -64,6 +64,8 @@ Current simulation integrity rules:
 - Daily rollover is owned by `src/systems/daily-pipeline.js`. Every canonical stage must run through `runDailyStage()` in the order defined by `OFFICE_AQUARIUM_CONSTANTS.dailyPipeline.stageOrder`.
 - Valuation and investor reaction update at most once per simulated day unless an explicit validation force flag is used. Reading Board or market views must not consume RNG or create duplicate forecasts.
 - Company-wide, project, and workforce lessons require an attributable reviewed episode and independent evidence group. Unreviewed events may record evidence but cannot change department, employee, project-estimation, recruiting, or onboarding behavior.
+- Social AI model 4 owns source-backed conflict/repair, bounded directional memory, grounded visible conversations, slow evidence-backed culture, derived informal groups and team chemistry, and evidence-backed formal/informal leadership.
+- Social organizational state may influence only social preference, reporting interpretation, and bounded emotional recommendations. It must never become a direct project, work, hiring, customer, or Institutional Learning modifier.
 
 ---
 
@@ -481,9 +483,25 @@ Save version 35 adds the market, board, and valuation intelligence layer. Valuat
 * Projects now track `closeoutReadyDays` and can complete through sustained closeout readiness at 99.5% progress, 99.5% work-item progress with no blockers, 95% closed project work with no blockers, or clean near-deadline closeout. This prevents projects from stabilizing below 100% forever.
 * Work-item maintenance now has hard caps and attempt guards, executive-briefing trim logic has a guard, long-run collections are pruned at day close, employee work output no longer runs full system/audit normalization every five simulated minutes, learning audits are cached per simulated day, and expensive event/failure checks are throttled.
 
+## Implemented in save version 39
+
+Save version 39 completes Social Personality AI Stages 6-8 and adds an evidence-backed organizational interpretation layer.
+
+* Negative workplace interactions can create source-backed professional conflicts with directional memory, relationship before/after state, personality interpretation, temporary frustration, and bounded emotional recommendations.
+* Conflict repair requires a real unresolved conflict and a later apology, clarification, constructive follow-up, recognition, or other credible repair action. Failed and accepted attempts remain attributable.
+* Social memory is directional, deterministic, saveable, bounded per relationship and employee, compressed under pressure, aged by simulated time, and always linked to source events.
+* Contextual recall can request a small stress or morale reaction through the Emotional System. Cooldowns and caps prevent repeated emotional spam.
+* Grounded two-to-four exchange conversations appear briefly in the live office for real greetings, work, help, blockers, meetings, deadlines, mentoring, recognition, conflict, repair, news, and celebration events.
+* Nearby attentive employees may overhear ordinary dialogue at reduced confidence. Private dialogue is difficult to overhear; confidential dialogue is never shown or overheard.
+* Organizational culture changes slowly from repeated evidence and tracks confidence. Informal groups, project and department chemistry, bridge employees, and leadership influence derive from source-backed relationship evidence.
+* Formal authority remains separate from earned credibility and informal influence. Listener trust and culture can scale only bounded emotional recommendations.
+* The Reports workspace includes People & Culture views for culture, groups, network, and leadership. Raw pair weights, hidden memory scores, and repair calculations remain Debug-only.
+* Shared rules live in `src/core/constants.js`; dedicated deterministic 90-, 180-, and 365-day social-system tests enforce bounds, source retention, save/load, UI read safety, and Work AI isolation.
+* Production saves omit transient social diagnostics, compact repeated field names through a versioned backward-compatible envelope, and bound detailed relationship evidence, cooldowns, memories, conversations, reputation observations, and Institutional Learning records. Older plain JSON saves remain readable, and regression tests enforce the release storage budget against a mature 29-employee complete relationship graph.
+
 ## Implemented in save version 38
 
-Save version 38 is the current source-of-truth build. It focuses on causal learning integrity, executive-message integrity, customer/market intelligence, and long-run deterministic safety rather than adding another broad foundational system.
+Save version 38 focused on causal learning integrity, executive-message integrity, customer/market intelligence, and long-run deterministic safety rather than adding another broad foundational system.
 
 * Institutional Learning now uses domain-specific episode channels and attribution quality. A lesson should be reinforced by meaningful evidence, not by a policy countdown, a message being displayed, or a short observation that cannot prove causality.
 * Typed project and workforce learning use the same causal gate. Starting recruiting, coaching, policy, or project actions records evidence only. Completed onboarding, completed projects, successful PIP recovery, and reviewed delayed consequences can update future behavior when attribution and independence requirements are met.
@@ -770,17 +788,24 @@ Memories decay over time.
 
 ## 5.7 Social Relationships
 
-Current social state is owned by the staged Social Personality AI. `company.socialAIModelVersion = 3` marks the consolidated ownership and migration model.
+Current social state is owned by the staged Social Personality AI. `company.socialAIModelVersion = 4` marks the consolidated ownership and migration model.
 
 The canonical pair-level Social Personality AI stores hidden professional relationship records in `company.socialRelationships[pairKey]`:
 
 - Stage 1: familiarity from real encounters
 - Stage 2: shared experience history with tone, intensity, dedupe keys, and source events
 - Stage 3: derived trust, respect, comfort, and professional friction
+- Stage 4: opportunity-bound voluntary social preference
+- Stage 5: multidimensional workplace reputation
+- Stage 6: source-backed professional conflict and repair
+- Stage 7: bounded directional memory and contextual recall
+- Stage 8: grounded visible conversations, privacy, and overhearing
+
+The organizational layer derives slow evidence-backed culture, informal groups, department and project team chemistry, bridge employees, and formal or informal leadership influence. It reports social reality without becoming a direct work-output system.
 
 Legacy employee-local fields such as `employee.relationship` and `employee.social`, plus the old `getSocial()`, `socialScore()`, and `adjustSocial()` APIs, are migration inputs only. They are removed during save migration and do not exist as production adapters. Read-only callers use `getRelationshipView()`; source-backed social events use `recordSharedExperience()`.
 
-Passive co-presence can increase familiarity, but it must not create shared-experience history or emotional effects unless a concrete source event exists.
+Passive co-presence can increase familiarity, but it must not create shared-experience history, social memory, conflict, culture evidence, group evidence, leadership evidence, visible dialogue, or emotional effects unless a concrete source event exists.
 
 Relationship interpretation is derived from accumulated history, recency, and personality compatibility. It must not directly write work output, project progress, hiring, Institutional Learning, or task selection.
 
@@ -789,6 +814,9 @@ Relationships influence:
 - stress and morale reactions through the central emotional system
 - debug visibility in AI Debug
 - natural-language employee profile summaries
+- bounded voluntary social preference
+- evidence-backed People & Culture reporting
+- grounded visible conversations
 
 Relationships do not score collaborator usefulness or work outcomes. Project need, role fit, skills, focus, current morale, current stress, workload, and availability determine collaboration matching and resolution. Social AI may affect later work only through the employee's bounded current stress and morale.
 
@@ -1742,6 +1770,15 @@ Test:
 - social preferences use only opportunities that already exist
 - workplace reputation remains multidimensional, evidence-based, and hidden
 - emotional baselines, homeostasis, and anti-saturation keep stress and morale non-monotonic
+- source-backed conflict and repair preserve attribution and relationship history
+- social memory remains bounded, deterministic, contextual, and linked to source events
+- visible conversations remain grounded, privacy-aware, and free of unresolved placeholders
+- culture drifts slowly from evidence and stays bounded
+- informal groups derive from meaningful interaction rather than passive proximity
+- project and department team chemistry derive all documented dimensions
+- formal authority, earned credibility, and informal leadership remain distinct
+- UI reads do not recalculate or mutate authoritative culture, group, chemistry, or leadership state
+- 90-, 180-, and 365-day social runs remain deterministic and within configured caps
 
 ## 20.4 Company Systems
 

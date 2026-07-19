@@ -50,6 +50,7 @@ async function main() {
     ensureBibleSystems();
     const rngBeforeMigration = company.randomState;
     delete company.socialRelationships;
+    delete company.socialMemoryStore;
     delete company.socialMemories;
     delete company.roomPresenceCounters;
     ensureSocialAISystems();
@@ -65,7 +66,7 @@ async function main() {
     const beforeMovement = employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action }));
     const first = recordSocialEncounter(a, b, { type: "shared_work_activity", gain: 2, sourceEventId: "unit-work-1", roomId: "software-studio", cooldownMinutes: 120 });
     assert(first && first.interactionCount === 1, "First valid encounter should create exactly one pair record");
-    assert(first.firstMetAt && company.socialMemories.some(m => m.type === "first_met" && m.employeeIds.includes(a.id) && m.employeeIds.includes(b.id)), "First meeting should create a hidden first_met memory");
+    assert(first.firstMetAt && company.socialMemoryStore.records.some(m => m.type === "first_interaction" && ((m.ownerId === a.id && m.subjectId === b.id) || (m.ownerId === b.id && m.subjectId === a.id))), "First meeting should create canonical directional first-interaction memories");
     assert(first.familiarity > 0 && first.familiarity <= 100, "Familiarity should increase and remain bounded");
     assert(Object.keys(company.socialRelationships).filter(k => k === keyAB).length === 1, "Only one record should exist per pair");
     assert(JSON.stringify(employees.map(e => ({ id: e.id, zone: e.zone, x: e.x, y: e.y, action: e.action }))) === JSON.stringify(beforeMovement), "Social observer must not change movement or action state");

@@ -17,7 +17,43 @@ function deepFreezeConstants(value){
 globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
   storage:{
     saveKey:"office-aquarium-living-office-v3",
-    saveVersion:38
+    saveVersion:39,
+    transientCompanyKeys:[
+      "runtime",
+      "socialMemoryDebug",
+      "socialConflictDebug",
+      "socialLeadershipDebug",
+      "lastSocialSystemsAudit"
+    ],
+    maxPersistedCharacters:4700000,
+    compactFormat:"office-aquarium-compact-v1",
+    // Append new keys only. Reordering this list would invalidate existing compact saves.
+    compactKeys:[
+      "saveVersion","savedAt","company","employees","ownerSystem","id","type","category",
+      "day","minute","absoluteMinute","timestamp","createdDay","startedDay","completedDay",
+      "lastDay","reviewedDay","lastUpdatedDay","employeeId","employeeIds","ownerId","subjectId",
+      "actorId","participantIds","relatedEmployeeIds","sourceEventId","sourceId","projectId",
+      "workItemId","messageId","decisionId","department","role","status","confidence","intensity",
+      "context","outcome","action","strategy","title","name","tone","privacy","roomId","reasonCode",
+      "stressDelta","moraleDelta","emotionalTone","sourceEvidenceIds","memberIds","employeeAId",
+      "employeeBId","familiarity","interactionCount","firstMetAt","lastInteractionAt","lastSeenAt",
+      "coPresenceMinutes","positiveExperienceCount","neutralExperienceCount","negativeExperienceCount",
+      "recentExperiences","experienceSummary","interpretation","relationshipInputs",
+      "lastRelationshipEvaluationAt","recentInteractionTypes","reputationObservations","cooldowns",
+      "stressHistory","moraleHistory","count","positive","negative","neutral","mixed","lastAt",
+      "records","summaries","compressedCount","emotionalRecallCooldowns","history","templateUsage",
+      "recentCategoryHistory","knowledge","lastConversationByPair","exchanges","facts","contexts",
+      "startedAt","visibleUntilAbsoluteMinute","speakerId","listenerId","templateId","text",
+      "dimensions","evidence","value","trend","evidenceTypes","active","offsite","skills",
+      "performance","learning","personality","emotionalState","memories","beliefs","goals",
+      "communication","baseline","expectedChannels","attributionSources","observations",
+      "contradictions","resolution","hypotheses","reviewSchedule","employeeReactions","dedupeKey",
+      "relationshipBefore","relationshipAfter","projectTitle","workTitle","deadlineDay","purpose",
+      "description","recommendation","risks","benefits","choices","decision","read","deleted",
+      "eventId","priority","from","date","message","structuredMessage","laterOutcome","progress",
+      "quality","risk","cash","board","trust","morale","stress","customers","dailyRevenue",
+      "valuation","phase","randomState","nextRuntimeId"
+    ]
   },
   determinism:{
     defaultRandomState:2463534242,
@@ -71,7 +107,10 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     commercial:["customer trial","pilot","launched"]
   },
   social:{
-    modelVersion:3,
+    modelVersion:4,
+    schemaVersion:1,
+    organizationViews:["culture","groups","network","leadership"],
+    defaultOrganizationView:"culture",
     neutralInterpretation:{
       trust:50,
       respect:50,
@@ -79,27 +118,77 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       professionalFriction:0,
       confidence:0
     },
+    relationshipBands:{
+      substantialTrust:58,
+      trusted:68,
+      respected:65,
+      comfortable:62,
+      materialFriction:20,
+      severeFriction:65
+    },
     experienceTypes:[
       "shared_work_activity","shared_meeting","shared_break","conversation","direct_help",
       "help_request","blocker_resolved_together","deadline_pressure_together",
       "milestone_success_together","milestone_failure_together","recognition_shared",
       "interruption_shared","conflict_observed","crisis_response_together",
-      "onboarding_support","mentoring_interaction"
+      "onboarding_support","mentoring_interaction",
+      "shared_success","successful_collaboration","constructive_feedback","recognition",
+      "successful_repair","apology","apology_accepted","clarification","constructive_follow_up","same_meeting","same_break",
+      "casual_conversation","routine_collaboration","professional_disagreement",
+      "interrupted","ignored_request","credit_dispute","deadline_blame",
+      "failed_collaboration","dismissive_comment","meeting_conflict"
     ],
     experienceAliases:{
       shared_work_event:"shared_work_activity",
       first_meeting:"conversation",
       onboarding_introduction:"onboarding_support",
-      professional_disagreement:"conflict_observed"
+      successful_help:"direct_help",
+      shared_milestone:"shared_success",
+      repaired_conflict:"successful_repair"
     },
-    passiveLegacyExperienceTypes:["same_room_presence","same_meeting","room_presence","co_presence"],
-    maxRecentExperiences:20,
-    maxRecentInteractionTypes:12,
+    passiveLegacyExperienceTypes:["same_room_presence","room_presence","co_presence"],
+    positiveExperienceTypes:[
+      "direct_help","shared_success","successful_collaboration","constructive_feedback",
+      "recognition","recognition_shared","successful_repair","apology_accepted",
+      "blocker_resolved_together","milestone_success_together","onboarding_support",
+      "mentoring_interaction"
+    ],
+    neutralExperienceTypes:[
+      "shared_work_activity","shared_meeting","shared_break","conversation","same_meeting",
+      "same_break","casual_conversation","routine_collaboration","help_request",
+      "deadline_pressure_together","crisis_response_together","apology",
+      "clarification","constructive_follow_up"
+    ],
+    negativeExperienceTypes:[
+      "professional_disagreement","interrupted","ignored_request","credit_dispute",
+      "deadline_blame","failed_collaboration","dismissive_comment","meeting_conflict",
+      "interruption_shared","conflict_observed","milestone_failure_together"
+    ],
+    conflictExperienceTypes:[
+      "professional_disagreement","interrupted","ignored_request","credit_dispute",
+      "deadline_blame","failed_collaboration","dismissive_comment","meeting_conflict",
+      "interruption_shared","conflict_observed"
+    ],
+    trustDamagingConflictExperienceTypes:[
+      "ignored_request","credit_dispute","deadline_blame","failed_collaboration",
+      "dismissive_comment"
+    ],
+    repairExperienceTypes:[
+      "constructive_feedback","successful_repair","apology","apology_accepted",
+      "clarification","constructive_follow_up","recognition",
+      "direct_help","blocker_resolved_together","successful_collaboration"
+    ],
+    maxRecentExperiences:8,
+    maxRecentInteractionTypes:8,
+    maxRelationshipCooldowns:16,
+    relationshipCooldownRetentionMinutes:360,
+    detailedRelationshipsPerEmployee:6,
+    minimumDetailedRelationships:24,
     maxSocialMemories:120,
     maxPreferenceHistory:80,
     maxPreferenceDebugEntries:24,
     maxEmotionTraces:80,
-    maxReputationObservations:36,
+    maxReputationObservations:8,
     maxReputationChanges:12,
     familiarityKnownThreshold:15,
     passiveBreakThresholdMinutes:20,
@@ -123,9 +212,159 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     },
     minFamiliarity:0,
     maxFamiliarity:100,
+    conflict:{
+      schemaVersion:1,
+      maxActiveRecords:120,
+      maxDebugRecords:160,
+      duplicateCooldownMinutes:60,
+      ignoredRequestCooldownMinutes:1440,
+      minimumRepairAgeMinutes:60,
+      automaticRepairAgeMinutes:240,
+      repairAcceptanceThreshold:48,
+      frustrationHomeostasisRate:.018,
+      conflictFatigueHomeostasisRate:.012
+    },
+    memory:{
+      schemaVersion:1,
+      types:[
+        "helped_with_blocker","shared_success","reliable_collaboration","constructive_feedback",
+        "fair_recognition","apology_received","conflict_repaired","supportive_conversation",
+        "interruption","ignored_request","failed_commitment","dismissive_response","unfair_credit",
+        "unresolved_disagreement","repeated_friction","unreliable_collaboration",
+        "routine_meeting","routine_collaboration","casual_conversation","first_interaction",
+        "mixed_outcome","stale_contact"
+      ],
+      typeByExperience:{
+        first_met:"first_interaction",
+        direct_help:"helped_with_blocker",
+        blocker_resolved_together:"helped_with_blocker",
+        help_request:"supportive_conversation",
+        shared_success:"shared_success",
+        milestone_success_together:"shared_success",
+        successful_collaboration:"reliable_collaboration",
+        routine_collaboration:"routine_collaboration",
+        shared_work_activity:"routine_collaboration",
+        constructive_feedback:"constructive_feedback",
+        mentoring_interaction:"constructive_feedback",
+        recognition:"fair_recognition",
+        recognition_shared:"fair_recognition",
+        apology:"apology_received",
+        apology_accepted:"apology_received",
+        successful_repair:"conflict_repaired",
+        clarification:"conflict_repaired",
+        constructive_follow_up:"conflict_repaired",
+        conversation:"supportive_conversation",
+        onboarding_support:"supportive_conversation",
+        interrupted:"interruption",
+        interruption_shared:"interruption",
+        ignored_request:"ignored_request",
+        milestone_failure_together:"failed_commitment",
+        deadline_blame:"failed_commitment",
+        dismissive_comment:"dismissive_response",
+        credit_dispute:"unfair_credit",
+        professional_disagreement:"unresolved_disagreement",
+        meeting_conflict:"unresolved_disagreement",
+        conflict_observed:"unresolved_disagreement",
+        failed_collaboration:"unreliable_collaboration",
+        shared_meeting:"routine_meeting",
+        same_meeting:"routine_meeting",
+        shared_break:"casual_conversation",
+        same_break:"casual_conversation",
+        casual_conversation:"casual_conversation",
+        deadline_pressure_together:"mixed_outcome",
+        crisis_response_together:"mixed_outcome"
+      },
+      perRelationshipCap:32,
+      perEmployeeCap:96,
+      globalCap:720,
+      maxSummaries:360,
+      maxDebugRecords:160,
+      maxSourceEvents:900,
+      maxSourceEventAgeDays:730,
+      significanceThreshold:1,
+      unresolvedPreserveIntensity:3,
+      routineDecayDays:14,
+      ordinaryDecayDays:75,
+      unresolvedDecayDays:220,
+      repairedDecayDays:105,
+      recallLimit:6,
+      emotionalRecallCooldownMinutes:360,
+      emotionalRecallMinimumIntensity:2.75,
+      emotionalRecallStressMaximum:1.8,
+      emotionalRecallMoraleMaximum:1.2
+    },
+    conversations:{
+      schemaVersion:1,
+      categories:[
+        "greeting","current_work","help_request","giving_help","blockers",
+        "meetings","deadlines","appreciation","mentoring","recognition",
+        "conflict","repair","casual","company_news","celebration"
+      ],
+      templatesPerCategory:20,
+      maxStored:32,
+      maxRecentTemplateIds:72,
+      maxRecentCategories:16,
+      maxKnowledgePerEmployee:24,
+      minimumExchanges:2,
+      maximumExchanges:4,
+      maxVisibleBubbles:4,
+      bubbleDurationMs:7200,
+      exchangeDurationMs:1800,
+      visibleDurationMinutes:30,
+      exchangeIntervalMinutes:5,
+      fadeStartMinutes:20,
+      conversationCooldownMinutes:90,
+      sourceEventMaxAgeMinutes:180,
+      overhearingRange:28,
+      overhearingConfidenceScale:.58,
+      ordinaryVolume:1,
+      privateVolume:.35,
+      confidentialVolume:0
+    },
+    culture:{
+      schemaVersion:1,
+      dimensions:[
+        "collaboration","competitiveness","formality","psychologicalSafety",
+        "learningOrientation","recognitionFairness","conflictTolerance",
+        "riskTolerance","socialWarmth","accountability","adaptability","inclusiveness"
+      ],
+      maxEvidence:240,
+      dailyMaxDrift:.025,
+      recentEvidenceDays:45,
+      adaptationRate:.015,
+      maxInterpretationModifier:.12,
+      minimumEvidenceConfidence:35,
+      evidenceStrengthScale:.08
+    },
+    groups:{
+      schemaVersion:1,
+      minimumMeaningfulInteractions:2,
+      edgeThreshold:44,
+      memberJoinThreshold:48,
+      maxGroupSize:5,
+      maxGroups:24,
+      maxHistory:100,
+      inactivityDays:45,
+      bridgeThreshold:58,
+      updateIntervalDays:7,
+      initialStability:45,
+      persistenceWeight:.72,
+      dissolutionStabilityThreshold:18,
+      minimumConfidence:8
+    },
+    leadership:{
+      schemaVersion:1,
+      maxEvidencePerEmployee:48,
+      maxDebugRecords:160,
+      emotionalMultiplierMin:.55,
+      emotionalMultiplierMax:1.4,
+      informalInfluenceThreshold:62,
+      updateIntervalDays:7
+    },
     workInputForbiddenKeys:[
       "social","relationship","friendship","rivalry","trust","respect",
-      "comfort","friction","reputation","affinity","familiarity"
+      "comfort","friction","reputation","affinity","familiarity","cultureAdaptation",
+      "informalGroup","leadershipInfluence","socialMemory"
     ]
   },
   cohesion:{
@@ -336,7 +575,10 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     work:"work-ai",
     social:"social-ai",
     institutional:"institutional-learning",
-    emotional:"emotional-system"
+    emotional:"emotional-system",
+    culture:"culture-system",
+    groups:"group-dynamics-system",
+    leadership:"leadership-influence-system"
   },
   projectLearning:{
     scoreMin:-10,
@@ -377,8 +619,10 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       obsolete:0,
       unknown:0
     },
-    maxLessons:36,
-    maxEvidencePerLesson:6,
+      maxLessons:36,
+      maxEpisodes:120,
+      maxEvidenceRecords:240,
+      maxEvidencePerLesson:6,
     maxEpisodeKeysPerLesson:12,
     maxIndependenceGroupsPerLesson:12
   },
@@ -424,6 +668,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       "investor-relations",
       "board",
       "workforce",
+      "social-organization",
       "organizational-friction",
       "risk-pillars",
       "crisis-lifecycle",

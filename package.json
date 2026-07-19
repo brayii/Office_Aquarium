@@ -1,6 +1,6 @@
 {
   "name": "office-aquarium",
-  "version": "0.38.0",
+  "version": "0.39.0",
   "private": true,
   "description": "Office Aquarium desktop and web packaging tools.",
   "scripts": {
@@ -49,8 +49,11 @@
     "test:social-preferences": "node tests/social-ai-social-preferences-test.js",
     "test:social-reputation": "node tests/social-ai-workplace-reputation-test.js",
     "test:social-emotion": "node tests/social-ai-emotional-integration-test.js",
+    "test:social-conflict": "node tests/social-conflict-memory-conversation-test.js",
+    "test:social-organization": "node tests/social-organizational-systems-test.js",
+    "test:social-organization-long-run": "node tests/social-organizational-long-run-test.js",
     "test:emotional-homeostasis": "node tests/emotional-homeostasis-test.js",
-    "test": "npm run test:static && npm run test:constants && npm run test:daily-pipeline && npm run test:learning-causality && npm run test:market-valuation && npm run test:smoke && npm run test:failure-page && npm run test:regression && npm run test:workforce && npm run test:hiring-recommendations && npm run test:message-recommendations && npm run test:rooms-roles && npm run test:all-role-hiring && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:risk && npm run test:crisis && npm run test:loss-path && npm run test:loss-paths && npm run test:recovery && npm run test:customer && npm run test:operating-health && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:communication && npm run test:newspaper && npm run test:release-messages && npm run test:personality && npm run test:ai-ownership && npm run test:social-boundary && npm run test:social-ai && npm run test:social-experiences && npm run test:social-relationships && npm run test:social-preferences && npm run test:social-reputation && npm run test:social-emotion && npm run test:emotional-homeostasis && npm run test:social-emotional-long-run",
+    "test": "npm run test:static && npm run test:constants && npm run test:daily-pipeline && npm run test:learning-causality && npm run test:market-valuation && npm run test:smoke && npm run test:failure-page && npm run test:regression && npm run test:workforce && npm run test:hiring-recommendations && npm run test:message-recommendations && npm run test:rooms-roles && npm run test:all-role-hiring && npm run test:capabilities && npm run test:staffing-crisis && npm run test:project && npm run test:friction && npm run test:risk && npm run test:crisis && npm run test:loss-path && npm run test:loss-paths && npm run test:recovery && npm run test:customer && npm run test:operating-health && npm run test:hidden-state && npm run test:validation-isolation && npm run test:memo && npm run test:communication && npm run test:newspaper && npm run test:release-messages && npm run test:personality && npm run test:ai-ownership && npm run test:social-boundary && npm run test:social-ai && npm run test:social-experiences && npm run test:social-relationships && npm run test:social-preferences && npm run test:social-reputation && npm run test:social-emotion && npm run test:social-conflict && npm run test:social-organization && npm run test:emotional-homeostasis && npm run test:social-emotional-long-run && npm run test:social-organization-long-run",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

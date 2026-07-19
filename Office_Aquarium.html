@@ -562,6 +562,51 @@
     .workspace-newspaper{margin:0!important;padding:16px}
     .paper-issue{background:#fffdf7;color:var(--text);border-color:rgba(173,137,71,.22)}
     .paper-section{background:rgba(255,249,234,.82);border-color:rgba(173,137,71,.2);color:var(--text)}
+    .speech-bubble{
+      position:absolute;left:50%;bottom:calc(52px + var(--bubble-stack, 0) * 58px);z-index:18;transform:translateX(-50%);
+      width:max-content;max-width:190px;padding:7px 9px;border:1px solid rgba(68,117,127,.2);
+      border-radius:8px;background:rgba(255,255,255,.98);box-shadow:0 8px 20px rgba(29,46,66,.18);
+      color:var(--text);font-size:max(.76rem,12px);font-weight:750;line-height:1.3;text-align:left;
+      cursor:pointer;animation:speechAppear .2s ease-out;transition:opacity .35s ease,bottom .2s ease,box-shadow .2s ease
+    }
+    .speech-bubble::after{
+      content:"";position:absolute;left:50%;bottom:-6px;width:10px;height:10px;
+      transform:translateX(-50%) rotate(45deg);background:inherit;border-right:inherit;border-bottom:inherit
+    }
+    .speech-bubble:hover{border-color:rgba(30,184,172,.65);box-shadow:0 10px 24px rgba(29,46,66,.24)}
+    .speech-conflict{border-color:rgba(239,111,108,.55);background:#fff7f6}
+    .speech-repair,.speech-appreciation,.speech-recognition,.speech-celebration{background:#f1fbf8}
+    .agent:has(.speech-bubble) .thought{bottom:112px}
+    @keyframes speechAppear{from{opacity:0;transform:translate(-50%,4px)}to{opacity:1;transform:translate(-50%,0)}}
+    .conversation-card{width:min(660px,100%)}
+    .conversation-transcript{display:grid;gap:8px;margin:14px 0}
+    .conversation-transcript p{margin:0;padding:10px;border-left:3px solid var(--aqua);background:#f7fbfa;line-height:1.45}
+    .social-view-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px}
+    .social-view-tabs button{
+      flex:0 0 auto;border:1px solid rgba(68,117,127,.16);border-radius:8px;background:#fff;
+      padding:8px 11px;color:var(--text);font-weight:850;cursor:pointer
+    }
+    .social-view-tabs button.active{background:var(--night);border-color:var(--night);color:#fff}
+    .social-view-hidden{display:none!important}
+    .social-summary-grid,.social-group-list,.social-leader-list{display:grid;gap:8px}
+    .social-summary-row,.social-group-row,.social-leader-row{
+      display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(100px,1fr) auto;
+      align-items:center;gap:10px;padding:10px;border:1px solid rgba(68,117,127,.14);
+      border-radius:8px;background:rgba(255,255,255,.7)
+    }
+    .social-summary-row small,.social-group-row small,.social-leader-row small{display:block;color:var(--muted);margin-top:2px}
+    .social-meter{height:8px;border-radius:999px;background:rgba(68,117,127,.12);overflow:hidden}
+    .social-meter span{display:block;height:100%;background:linear-gradient(90deg,var(--aqua),var(--leaf))}
+    .social-leader-row{width:100%;text-align:left;color:var(--text);cursor:pointer}
+    .social-note,.empty-social-state{margin:10px 0 0;color:var(--muted);line-height:1.45}
+    .social-network{width:100%;min-height:250px;border:1px solid rgba(68,117,127,.14);border-radius:8px;background:rgba(255,255,255,.65)}
+    .network-edge{stroke:rgba(42,183,169,.52)}
+    .network-edge-mentoring{stroke:rgba(72,116,194,.64);stroke-dasharray:2 3}
+    .network-edge-friction{stroke:rgba(239,111,108,.62);stroke-dasharray:5 4}
+    .network-node{cursor:pointer}
+    .network-node circle{fill:var(--night);stroke:#fff;stroke-width:3}
+    .network-node text{fill:#fff;font-size:10px;font-weight:900}
+    .network-node .network-label{fill:var(--text);font-size:10px;font-weight:750}
     .mobile-tabs{background:rgba(255,255,255,.92);border:1px solid var(--border);border-radius:14px}
     .mobile-tabs button{background:rgba(255,255,255,.82);border-color:rgba(68,117,127,.16);color:var(--muted)}
     .mobile-tabs button.active{background:var(--night);color:white;border-color:rgba(33,60,74,.2)}
@@ -573,6 +618,7 @@
       .top-status{justify-content:flex-start;flex-wrap:wrap}
     }
     @media(max-width:850px){
+      html{scroll-padding-top:72px}
       .app{width:min(100% - 16px,1800px)}
       .main-grid.living-first{grid-template-columns:1fr;grid-template-areas:"office" "inbox" "people"}
       .office{min-height:520px}
@@ -580,10 +626,14 @@
       .pill{min-width:0}
       .workspace-tabs{display:none}
       .workspace-tabs.active{display:block}
+      .workspace-tabs,.compact-section{scroll-margin-top:72px}
       body.ceo-review-active #commInboxView{display:block}
       body.ceo-review-active #applyDecision{margin-top:12px}
       body.old-message-review-active #commArchiveView .ceo-mail-scroll{display:block;overflow:auto}
       body.old-message-review-active #memoArchiveList{max-height:none}
+      .speech-bubble{max-width:145px}
+      .social-summary-row,.social-group-row,.social-leader-row{grid-template-columns:1fr auto}
+      .social-summary-row .social-meter{grid-column:1/-1}
     }
 
     /* Release readability pass: lift the smallest UI text without changing layout density. */
@@ -681,6 +731,7 @@
       <div class="guide-section"><strong>Mobile Tabs</strong><p>On smaller screens, use Office, Employees, CEO Inbox, Company, and Paper tabs to move between the main areas.</p></div>
       <div class="guide-section"><strong>Live Office</strong><p>Shows what employees are doing now. Click an employee to open details. Quiet periods usually mean teams are handling work locally.</p></div>
       <div class="guide-section"><strong>Employees</strong><p>Shows role, current work, stress, morale, focus, thoughts, and learning signals. Employees are autonomous; you influence them indirectly.</p></div>
+      <div class="guide-section"><strong>People and Culture</strong><p>Shows workplace culture, informal groups, cross-team connections, and emerging leadership. Speech bubbles come from real employee events; select one to see the work or relationship context behind it.</p></div>
       <div class="guide-section"><strong>CEO Communications</strong><ul><li><b>Inbox</b> holds unread and active emails or memos.</li><li>Click a message to read it.</li><li>Decision messages show choices below the office area.</li><li>Choose one option, then apply the decision.</li></ul></div>
       <div class="guide-section"><strong>Old Messages</strong><p>Read messages move to Old Messages. Deleted messages are hidden from the normal archive but can be viewed with the Deleted filter.</p></div>
       <div class="guide-section"><strong>Company View</strong><p>The View dropdown filters the company screen. Overview shows current health, Projects shows portfolio work, Workforce shows staffing and hiring, Story shows history, and All shows everything.</p></div>
@@ -848,6 +899,8 @@
       <div id="workforcePressure" class="intelligence-card" data-company-view="workforce all"></div>
       <button class="section-toggle collapsed" data-collapse-target="internalReportsWrap" data-company-view="workforce all">Internal Reports <small>employee signals</small></button>
       <div id="internalReportsWrap" class="compact-section collapsed" data-company-view="workforce all"><div id="internalReports" class="report-list compact-list"></div></div>
+      <button class="section-toggle collapsed" data-collapse-target="socialOrganizationWrap" data-company-view="overview workforce all">People and Culture <small>culture, groups, connections, leadership</small></button>
+      <div id="socialOrganizationWrap" class="compact-section collapsed" data-company-view="overview workforce all"><div id="socialOrganizationPanel" class="intelligence-card"></div></div>
     </section>
     <section class="panel section-stack workspace-panel-hidden" data-section="company" data-workspace-panel="history">
       <p class="eyebrow">Emergent Events</p>
@@ -879,6 +932,7 @@
 </main>
 
 <div id="employeeModal" class="detail-modal hidden"><div class="detail-card"><div class="panel-heading"><h2 id="detailName">Employee</h2><div class="modal-actions"><button id="closeEmployee" class="small-btn">Close</button></div></div><p id="detailRole"></p><div id="detailBody"></div></div></div>
+<div id="conversationModal" class="detail-modal hidden"><div class="detail-card conversation-card"><div class="panel-heading"><div><p class="eyebrow">Office Conversation</p><h2>Conversation Context</h2></div><button id="closeConversation" class="small-btn">Close</button></div><div id="conversationDetailBody"></div></div></div>
 
 <script src="src/core/constants.js"></script>
 <script src="src/services/runtime-services.js"></script>
@@ -891,6 +945,7 @@
 <script src="src/systems/executive-messages.js"></script>
 <script src="src/ui/rendering-validation.js"></script>
 <script src="src/systems/institutional-company-intelligence.js"></script>
+<script src="src/systems/social-organizational.js"></script>
 <script src="src/systems/market-valuation.js"></script>
 <script src="src/systems/daily-pipeline.js"></script>
 <script src="src/facades/simulation-systems.js"></script>

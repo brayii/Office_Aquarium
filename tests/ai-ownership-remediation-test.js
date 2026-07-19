@@ -69,7 +69,7 @@ async function main() {
     validationMode = true;
     reset(true, false, 617284);
     ensureBibleSystems();
-    assert(company.socialAIModelVersion === SOCIAL_RULES.modelVersion && SOCIAL_RULES.modelVersion === 3, "Canonical Social AI model should be version 3");
+    assert(company.socialAIModelVersion === SOCIAL_RULES.modelVersion && SOCIAL_RULES.modelVersion === 4, "Canonical Social AI model should be version 4");
 
     const isolatedReadRngChanges = [];
     [
@@ -287,7 +287,7 @@ async function main() {
     assert(!("friendship" in legacyA.goals) && legacyA.goals.socialConnection === 0.91, "Social migration should convert the legacy friendship goal to socialConnection");
     assert(!("relationship" in company.socialRelationships[legacyKey]) && company.socialRelationships[legacyKey].interpretation, "Social migration should use only canonical interpretation state");
     assert(company.socialRelationships[legacyKey].recentExperiences.every(experience => experience.type !== "same_room_presence" && experience.ownerSystem === AI_SYSTEM_OWNERS.social), "Migration should discard passive room evidence and tag preserved experiences with Social AI ownership");
-    assert(report.fromVersion === 2 && report.toVersion === 3 && report.relationshipsMigrated >= 1 && report.legacyRecordsRemoved >= 3 && report.experiencesPreserved === 1, "Migration report should account for preserved and removed state");
+    assert(report.fromVersion === 2 && report.toVersion === 4 && report.relationshipsMigrated >= 1 && report.legacyRecordsRemoved >= 3 && report.experiencesPreserved === 1, "Migration report should account for preserved and removed state");
 
     const saveRng = company.randomState;
     const saveRelationships = JSON.stringify(company.socialRelationships);

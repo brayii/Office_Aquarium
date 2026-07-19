@@ -9,7 +9,13 @@ const names=["Maya","Leo","Aisha","Noah","Priya","Ethan","Sofia","Marcus"];
 const roles=FOUNDING_ROLES;
 const colors=["#4a78c2","#ef6f6c","#2ab7a9","#d9972b","#7a5af8","#5f9f64","#d65b9e","#52606d"];
 const traits=[["perfectionist","ambitious"],["social","creative"],["focused","introverted"],["cautious","loyal"],["ambitious","social"],["skeptical","focused"],["creative","independent"],["cautious","analytical"]];
-const initialCompany={day:0,minute:OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute,randomState:OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState,nextRuntimeId:OFFICE_AQUARIUM_CONSTANTS.determinism.firstRuntimeId,cash:OFFICE_AQUARIUM_CONSTANTS.startingCompany.cash,board:OFFICE_AQUARIUM_CONSTANTS.startingCompany.board,trust:OFFICE_AQUARIUM_CONSTANTS.startingCompany.trust,chip:OFFICE_AQUARIUM_CONSTANTS.startingCompany.chip,software:OFFICE_AQUARIUM_CONSTANTS.startingCompany.software,quality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.quality,integration:OFFICE_AQUARIUM_CONSTANTS.startingCompany.integration,customers:0,dailyRevenue:0,valuation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuation,phase:OFFICE_AQUARIUM_CONSTANTS.startingCompany.phase,marketSentiment:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketSentiment,marketConfidence:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketConfidence,leadershipReputation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.leadershipReputation,valuationQuality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuationQuality,investorAppetite:OFFICE_AQUARIUM_CONSTANTS.startingCompany.investorAppetite,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastFundraisingMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationStoryDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:OFFICE_AQUARIUM_CONSTANTS.sound.defaultMode,soundEnabled:true,pendingEvent:null,pendingCommunication:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",communicationArchiveMode:"saved",selectedArchiveMessageIndex:null,messageThreads:[],nextMessageThreadId:1,messageFingerprints:{},messageQualityHistory:[],history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,capabilityNeeds:{...DEFAULT_COMPANY_CAPABILITY_NEEDS},capabilityCoverage:{},capabilityGaps:[],capabilityConsequences:{},capabilityPromotionCandidates:[],capabilityFulfillmentOptions:{},capabilityAudit:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},socialAIModelVersion:OFFICE_AQUARIUM_CONSTANTS.social.modelVersion,socialRelationships:{},socialMemories:[],socialAIMigrationReport:null,emotionalTraces:[],roomPresenceCounters:{},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
+const initialCompany={day:0,minute:OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute,randomState:OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState,nextRuntimeId:OFFICE_AQUARIUM_CONSTANTS.determinism.firstRuntimeId,cash:OFFICE_AQUARIUM_CONSTANTS.startingCompany.cash,board:OFFICE_AQUARIUM_CONSTANTS.startingCompany.board,trust:OFFICE_AQUARIUM_CONSTANTS.startingCompany.trust,chip:OFFICE_AQUARIUM_CONSTANTS.startingCompany.chip,software:OFFICE_AQUARIUM_CONSTANTS.startingCompany.software,quality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.quality,integration:OFFICE_AQUARIUM_CONSTANTS.startingCompany.integration,customers:0,dailyRevenue:0,valuation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuation,phase:OFFICE_AQUARIUM_CONSTANTS.startingCompany.phase,marketSentiment:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketSentiment,marketConfidence:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketConfidence,leadershipReputation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.leadershipReputation,valuationQuality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuationQuality,investorAppetite:OFFICE_AQUARIUM_CONSTANTS.startingCompany.investorAppetite,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastFundraisingMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationStoryDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:OFFICE_AQUARIUM_CONSTANTS.sound.defaultMode,soundEnabled:true,pendingEvent:null,pendingCommunication:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",communicationArchiveMode:"saved",selectedArchiveMessageIndex:null,messageThreads:[],nextMessageThreadId:1,messageFingerprints:{},messageQualityHistory:[],history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,capabilityNeeds:{...DEFAULT_COMPANY_CAPABILITY_NEEDS},capabilityCoverage:{},capabilityGaps:[],capabilityConsequences:{},capabilityPromotionCandidates:[],capabilityFulfillmentOptions:{},capabilityAudit:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},socialAIModelVersion:OFFICE_AQUARIUM_CONSTANTS.social.modelVersion,socialRelationships:{},socialMemories:[],socialMemoryStore:null,socialSourceEvents:[],socialConflicts:[],socialTemporaryStates:{},socialConversationState:null,socialCulture:null,informalGroups:[],informalGroupHistory:[],teamChemistry:{},socialBridges:[],socialLeadership:{},socialLeadershipDebug:[],socialAIMigrationReport:null,emotionalTraces:[],roomPresenceCounters:{},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
+Object.assign(initialCompany,{
+  socialMemoryDebug:[],
+  socialConflictDebug:[],
+  projectTeamChemistry:{},
+  socialOrganizationView:OFFICE_AQUARIUM_CONSTANTS.social.defaultOrganizationView
+});
 let company,employees,timer=null,debugMode=false,selectedEmployeeId=null,validationMode=false,currentSimulationContext=null,lastValidationReport=null,lastInboxSoundCount=null,musicUnavailable=false,alertsUnavailable=false,pausedBeforeResetPrompt=false,socialAIValidatedCompany=null;
 function updatePauseButton(){
   const button=document.getElementById("pauseBtn");
@@ -24,7 +30,7 @@ const simulationTimer=new SimulationTimer();
 const validationSession=new ValidationSession(saveRepository,simulationTimer);
 const musicAudio=soundController.music,messageAudio=soundController.alert;
 function createSafeAudio(src,options={}){return soundController.create(src,options);}
-const PERSONALITY_KEYS=["workPace","sociability","collaboration","riskTolerance","adaptability","initiative","resilience","detailOrientation","empathy","structureNeed"];
+const PERSONALITY_KEYS=["workPace","sociability","collaboration","riskTolerance","adaptability","initiative","resilience","detailOrientation","empathy","structureNeed","forgivenessRate"];
 const SOCIAL_EXPERIENCE_TYPES=new Set(SOCIAL_RULES.experienceTypes);
 const EMPTY_RELATIONSHIP_INTERPRETATION=SOCIAL_RULES.neutralInterpretation;
 function hashText32(text){
@@ -112,7 +118,9 @@ function ensureEmployeePersonality(e,{force=false,salt=""}={}){
   if(!e)return e;
   if(force||!Number.isFinite(e.personalitySeed))e.personalitySeed=personalitySeedForEmployee(e,e.role,salt);
   if(force||!e.personality||typeof e.personality!=="object")e.personality=generateEmployeePersonality(e.personalitySeed,e.role);
+  const hadForgiveness=Number.isFinite(e.personality.forgivenessRate);
   PERSONALITY_KEYS.forEach(k=>{if(!Number.isFinite(e.personality[k]))e.personality[k]=0;});
+  if(!hadForgiveness)e.personality.forgivenessRate=Number(clamp((e.personality.empathy||0)*.45+(e.personality.adaptability||0)*.35+(e.personality.resilience||0)*.2,-1,1).toFixed(3));
   e.personalityArchetypes=Array.isArray(e.personalityArchetypes)&&e.personalityArchetypes.length&&!force?e.personalityArchetypes:derivePersonalityArchetypes(e.personality);
   ensureEmployeeEmotionalProfile(e,{force});
   e.emotionalState={...defaultEmotionalState(e.personality),...(e.emotionalState||{})};
@@ -200,6 +208,9 @@ function applyEmotionalHomeostasis(e,{timestamp=null}={}){
   const newMorale=clamp(moveToward(oldMorale,profile.moraleBaseline,profile.moraleRecoveryRate),0,100);
   const newStress=clamp(moveToward(oldStress,profile.stressBaseline,profile.stressRecoveryRate),0,100);
   e.morale=Number(newMorale.toFixed(4));e.stress=Number(newStress.toFixed(4));
+  const state=e.emotionalState||{};
+  state.frustration=Number(moveToward(Number(state.frustration)||0,15,SOCIAL_RULES.conflict.frustrationHomeostasisRate).toFixed(4));
+  state.conflictFatigue=Number(moveToward(Number(state.conflictFatigue)||0,0,SOCIAL_RULES.conflict.conflictFatigueHomeostasisRate).toFixed(4));
   const trace={ownerSystem:AI_SYSTEM_OWNERS.emotional,type:"emotional_homeostasis",employeeId:e.id,oldMorale,moraleBaseline:profile.moraleBaseline,moraleDrift:Number((e.morale-oldMorale).toFixed(4)),newMorale:e.morale,oldStress,stressBaseline:profile.stressBaseline,stressDrift:Number((e.stress-oldStress).toFixed(4)),newStress:e.stress,simulationTime:ts};
   e.lastEmotionalHomeostasis=trace;
   return recordEmotionalTrace(trace);
@@ -253,7 +264,28 @@ function applyEmotionalRecommendation({employeeId,stressDelta=0,moraleDelta=0,re
   if(socialTrace.status==="applied_with_cap"&&(socialTrace.moraleDeltaApplied!==0||socialTrace.stressDeltaApplied!==0))socialTrace.status="applied";
   return logSocialEmotionalTrace(socialTrace);
 }
-const emotionalSystem={applyRecommendation:applyEmotionalRecommendation,applyDelta:applyEmployeeEmotionDelta,homeostasis:applyEmotionalHomeostasis};
+function applyEmotionalDriverRecommendation({employeeId,frustrationDelta=0,conflictFatigueDelta=0,reasonCode="social-driver",sourceEventId=null,timestamp=null}={}){
+  const e=(employees||[]).find(x=>x.id===Number(employeeId)&&x.active),ts=timestamp||simulationTimestamp();
+  if(!e)return recordEmotionalTrace({type:"emotional_driver",employeeId:Number(employeeId),reasonCode,sourceEventId,status:"employee_missing",timestamp:ts});
+  ensureEmployeePersonality(e);
+  const state=e.emotionalState||{};
+  const before={frustration:Number(state.frustration)||0,conflictFatigue:Number(state.conflictFatigue)||0};
+  state.frustration=Number(clamp(before.frustration+(Number(frustrationDelta)||0),0,100).toFixed(3));
+  state.conflictFatigue=Number(clamp(before.conflictFatigue+(Number(conflictFatigueDelta)||0),0,100).toFixed(3));
+  return recordEmotionalTrace({
+    type:"emotional_driver",
+    employeeId:e.id,
+    reasonCode,
+    sourceEventId,
+    frustrationDeltaApplied:Number((state.frustration-before.frustration).toFixed(3)),
+    conflictFatigueDeltaApplied:Number((state.conflictFatigue-before.conflictFatigue).toFixed(3)),
+    before,
+    after:{frustration:state.frustration,conflictFatigue:state.conflictFatigue},
+    status:"applied",
+    timestamp:ts
+  });
+}
+const emotionalSystem={applyRecommendation:applyEmotionalRecommendation,applyDrivers:applyEmotionalDriverRecommendation,applyDelta:applyEmployeeEmotionDelta,homeostasis:applyEmotionalHomeostasis};
 function applyEmployeeEmotionalReaction(args){
   const e=args?.employee;if(!e)return null;
   const reaction=evaluateEmployeeEmotionalReaction(args);
@@ -286,10 +318,43 @@ function canonicalMigratedSocialExperienceType(type){
   const alias=SOCIAL_RULES.experienceAliases[raw];
   return alias&&SOCIAL_EXPERIENCE_TYPES.has(alias)?alias:null;
 }
-function normalizeMigratedSocialExperience(experience){
+function compactSocialRelationshipExperience(experience){
   const type=canonicalMigratedSocialExperienceType(experience?.type);
   if(!type||!experience?.sourceEventId)return null;
-  return {...experience,type,ownerSystem:AI_SYSTEM_OWNERS.social};
+  const timestamp=experience.timestamp&&typeof experience.timestamp==="object"
+    ?{
+      day:Number(experience.timestamp.day)||0,
+      minute:Number(experience.timestamp.minute)||0,
+      absoluteMinute:Number.isFinite(Number(experience.timestamp.absoluteMinute))
+        ?Number(experience.timestamp.absoluteMinute)
+        :(Number(experience.timestamp.day)||0)*TIME_RULES.minutesPerDay+(Number(experience.timestamp.minute)||0)
+    }
+    :simulationTimestamp();
+  return {
+    ownerSystem:AI_SYSTEM_OWNERS.social,
+    id:String(experience.id||`${experience.sourceEventId}:${type}`),
+    type,
+    category:String(experience.category||type),
+    timestamp,
+    sourceEventId:String(experience.sourceEventId),
+    roomId:experience.roomId||null,
+    projectId:experience.projectId||null,
+    emotionalTone:["positive","neutral","negative","mixed"].includes(experience.emotionalTone)?experience.emotionalTone:"neutral",
+    intensity:clamp(Number(experience.intensity)||1,1,5),
+    dedupeKey:String(experience.dedupeKey||experience.id||`${experience.sourceEventId}:${type}`)
+  };
+}
+function normalizeMigratedSocialExperience(experience){
+  return compactSocialRelationshipExperience(experience);
+}
+function pruneSocialRelationshipCooldowns(record,nowAbsoluteMinute=simulationTimestamp().absoluteMinute){
+  const cutoff=Number(nowAbsoluteMinute)-SOCIAL_RULES.relationshipCooldownRetentionMinutes;
+  const entries=Object.entries(record?.cooldowns||{})
+    .filter(([,value])=>Number.isFinite(Number(value))&&Number(value)>=cutoff)
+    .sort((a,b)=>Number(b[1])-Number(a[1])||String(a[0]).localeCompare(String(b[0])))
+    .slice(0,SOCIAL_RULES.maxRelationshipCooldowns);
+  record.cooldowns=Object.fromEntries(entries);
+  return record.cooldowns;
 }
 function normalizeMigratedExperienceSummary(summary,recentExperiences=[]){
   const normalized={};
@@ -354,6 +419,7 @@ function normalizeSocialRelationshipRecord(record,key,{deriveInterpretation=true
   record.interactionCount=preservedInteractionCount;
   if(record.interactionCount<=0){record.firstMetAt=null;record.lastInteractionAt=null;}
   record.cooldowns=record.cooldowns&&typeof record.cooldowns==="object"?record.cooldowns:{};
+  pruneSocialRelationshipCooldowns(record);
   record.stressHistory=Number(record.stressHistory)||0;
   record.moraleHistory=Number(record.moraleHistory)||0;
   const evidenceCount=record.positiveExperienceCount+record.neutralExperienceCount+record.negativeExperienceCount+
@@ -432,6 +498,7 @@ function ensureSocialAISystems({forceNormalize=false}={}){
     };
   }
   socialAIValidatedCompany=company;
+  if(typeof ensureSocialOrganizationalSystems==="function")ensureSocialOrganizationalSystems({forceNormalize:migrationRequired});
 }
 function workplaceReputationFor(employeeOrId,{create=false}={}){
   ensureSocialAISystems();
@@ -455,6 +522,8 @@ function workplaceReputationObservationDelta(type,tone,intensity=1){
   else if(type==="milestone_failure_together"){delta.reliability-=3*scale;delta.professionalism-=1*scale;}
   else if(type==="interruption_shared"){delta.professionalism-=4*scale;delta.approachability-=2*scale;}
   else if(type==="conflict_observed"){delta.approachability-=4*scale;delta.professionalism-=5*scale;delta.reliability-=1*scale;}
+  else if(SOCIAL_RULES.conflictExperienceTypes.includes(type)){delta.approachability-=3.5*scale;delta.professionalism-=4.5*scale;delta.reliability-=type==="ignored_request"||type==="failed_collaboration"?3*scale:1*scale;}
+  else if(SOCIAL_RULES.repairExperienceTypes.includes(type)){delta.approachability+=3*scale;delta.professionalism+=3*scale;delta.reliability+=2*scale;}
   else if(type==="onboarding_support"||type==="mentoring_interaction"){delta.approachability+=3*scale;delta.professionalism+=2*scale;delta.reliability+=2*scale;}
   if(negative){delta.approachability-=1.5*scale;delta.professionalism-=1.5*scale;}
   if(positive){delta.professionalism+=.8*scale;}
@@ -551,21 +620,24 @@ function evaluateRelationshipInterpretation(record,{skipEnsure=false,timestamp=n
     return record.interpretation;
   }
   const positiveRatio=positive/total,negativeRatio=negative/total;
-  const directHelp=pairExperienceMetric(record,"direct_help"),blockers=pairExperienceMetric(record,"blocker_resolved_together"),work=pairExperienceMetric(record,"shared_work_activity"),meetings=pairExperienceMetric(record,"shared_meeting"),breaks=pairExperienceMetric(record,"shared_break");
-  const deadline=pairExperienceMetric(record,"deadline_pressure_together"),success=pairExperienceMetric(record,"milestone_success_together"),failure=pairExperienceMetric(record,"milestone_failure_together"),recognition=pairExperienceMetric(record,"recognition_shared"),interruptions=pairExperienceMetric(record,"interruption_shared"),conflict=pairExperienceMetric(record,"conflict_observed"),crisis=pairExperienceMetric(record,"crisis_response_together"),onboarding=pairExperienceMetric(record,"onboarding_support"),mentoring=pairExperienceMetric(record,"mentoring_interaction");
-  const recentHelp=recentExperienceWeight(record,["direct_help","blocker_resolved_together","onboarding_support","mentoring_interaction"]);
-  const recentFriction=recentExperienceWeight(record,["deadline_pressure_together","milestone_failure_together","interruption_shared","conflict_observed"]);
+  const directHelp=pairExperienceMetric(record,"direct_help"),blockers=pairExperienceMetric(record,"blocker_resolved_together"),work=pairExperienceMetric(record,"shared_work_activity")+pairExperienceMetric(record,"routine_collaboration"),meetings=pairExperienceMetric(record,"shared_meeting")+pairExperienceMetric(record,"same_meeting"),breaks=pairExperienceMetric(record,"shared_break")+pairExperienceMetric(record,"same_break");
+  const deadline=pairExperienceMetric(record,"deadline_pressure_together"),success=pairExperienceMetric(record,"milestone_success_together")+pairExperienceMetric(record,"shared_success")+pairExperienceMetric(record,"successful_collaboration"),failure=pairExperienceMetric(record,"milestone_failure_together")+pairExperienceMetric(record,"failed_collaboration"),recognition=pairExperienceMetric(record,"recognition_shared")+pairExperienceMetric(record,"recognition"),interruptions=pairExperienceMetric(record,"interruption_shared")+pairExperienceMetric(record,"interrupted"),conflict=SOCIAL_RULES.conflictExperienceTypes.reduce((sum,type)=>sum+pairExperienceMetric(record,type),0),trustDamagingConflict=SOCIAL_RULES.trustDamagingConflictExperienceTypes.reduce((sum,type)=>sum+pairExperienceMetric(record,type),0),repair=pairExperienceMetric(record,"successful_repair")+pairExperienceMetric(record,"apology_accepted")+(Number(record.resolvedConflictCount)||0),crisis=pairExperienceMetric(record,"crisis_response_together"),onboarding=pairExperienceMetric(record,"onboarding_support"),mentoring=pairExperienceMetric(record,"mentoring_interaction");
+  const recentHelp=recentExperienceWeight(record,["direct_help","blocker_resolved_together","onboarding_support","mentoring_interaction","successful_collaboration","successful_repair","apology_accepted"]);
+  const recentFriction=recentExperienceWeight(record,["deadline_pressure_together","milestone_failure_together",...SOCIAL_RULES.conflictExperienceTypes]);
   const paceMismatch=Math.abs((a.personality.workPace||0)-(b.personality.workPace||0)),detailMismatch=Math.abs((a.personality.detailOrientation||0)-(b.personality.detailOrientation||0)),structureMismatch=Math.abs((a.personality.structureNeed||0)-(b.personality.structureNeed||0));
   const styleMismatch=(paceMismatch*.45+detailMismatch*.35+structureMismatch*.20);
   const sharedPressure=deadline+crisis+failure;
-  const trust=clamp(18+familiarity*.22+positiveRatio*20+directHelp*3.5+blockers*5+onboarding*3+mentoring*3+crisis*2.5+recentHelp*1.1-negativeRatio*16-failure*3-conflict*4-interruptions*2,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
-  const respect=clamp(22+familiarity*.13+work*1.3+meetings*.9+success*5+recognition*4.5+blockers*5+directHelp*2.2+mentoring*3+sharedPressure*1.4-negativeRatio*7,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
-  const comfort=clamp(24+familiarity*.28+compat*22+breaks*4+meetings*1.3+positiveRatio*12+directHelp*1.2+onboarding*2.5-conflict*5-interruptions*3-failure*2.2-styleMismatch*9,SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
-  const professionalFriction=clamp(8+negativeRatio*22+deadline*4.2+failure*4+interruptions*5+conflict*8+styleMismatch*22+recentFriction*1.1-Math.min(12,comfort*.08)-Math.min(8,trust*.05),SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+  const memoryAdjustment=typeof socialRelationshipMemoryAdjustment==="function"?socialRelationshipMemoryAdjustment(record,a,b):{trust:0,respect:0,comfort:0,friction:0,unresolved:0,repaired:0};
+  const forgiveness=clamp(((a.personality.forgivenessRate||0)+(b.personality.forgivenessRate||0))/2,-1,1);
+  const repairEffect=repair*(1+Math.max(0,forgiveness)*.35)+Number(memoryAdjustment.repaired||0)*.6;
+  const trust=clamp(18+familiarity*.22+positiveRatio*20+directHelp*3.5+blockers*5+onboarding*3+mentoring*3+crisis*2.5+recentHelp*1.1+repairEffect*2-negativeRatio*16-failure*3-conflict*.75-trustDamagingConflict*3.25-interruptions*2+Number(memoryAdjustment.trust||0),SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+  const respect=clamp(22+familiarity*.13+work*1.3+meetings*.9+success*5+recognition*4.5+blockers*5+directHelp*2.2+mentoring*3+sharedPressure*1.4+repairEffect*1.4-negativeRatio*7+Number(memoryAdjustment.respect||0),SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+  const comfort=clamp(24+familiarity*.28+compat*22+breaks*4+meetings*1.3+positiveRatio*12+directHelp*1.2+onboarding*2.5+repairEffect*2-conflict*5-interruptions*3-failure*2.2-styleMismatch*9+Number(memoryAdjustment.comfort||0),SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
+  const professionalFriction=clamp(8+negativeRatio*22+deadline*4.2+failure*4+interruptions*5+conflict*8+styleMismatch*22+recentFriction*1.1+Number(memoryAdjustment.friction||0)-repairEffect*(2.4+Math.max(0,forgiveness)*1.4)-Math.min(12,comfort*.08)-Math.min(8,trust*.05),SCORE_DEFAULTS.minScore,SCORE_DEFAULTS.maxScore);
   const evidenceDiversity=Object.values(record.experienceSummary||{}).filter(item=>(Number(item?.count)||0)>0).length;
   const confidence=clamp(evidenceCount*9+evidenceDiversity*5+Math.min(50,familiarity)*.25,0,100);
   record.interpretation={trust:Math.round(trust),respect:Math.round(respect),comfort:Math.round(comfort),professionalFriction:Math.round(professionalFriction),confidence:Math.round(confidence)};
-  record.relationshipInputs={familiarity:Math.round(familiarity),positive,neutral,negative,compatibility:Number(compat.toFixed(3)),styleMismatch:Number(styleMismatch.toFixed(3)),recentHelp:Number(recentHelp.toFixed(2)),recentFriction:Number(recentFriction.toFixed(2)),counts:{directHelp,blockers,work,meetings,breaks,deadline,success,failure,recognition,interruptions,conflict,crisis,onboarding,mentoring}};
+  record.relationshipInputs={familiarity:Math.round(familiarity),positive,neutral,negative,compatibility:Number(compat.toFixed(3)),styleMismatch:Number(styleMismatch.toFixed(3)),recentHelp:Number(recentHelp.toFixed(2)),recentFriction:Number(recentFriction.toFixed(2)),forgiveness:Number(forgiveness.toFixed(3)),memoryAdjustment,counts:{directHelp,blockers,work,meetings,breaks,deadline,success,failure,recognition,interruptions,conflict,trustDamagingConflict,repair,crisis,onboarding,mentoring}};
   record.lastRelationshipEvaluationAt=timestamp||simulationTimestamp();
   return record.interpretation;
 }
@@ -598,28 +670,45 @@ function socialExperienceTone(reactions={},fallback="neutral"){
   if(negative)return "negative";
   return fallback;
 }
-function socialExperienceReaction(employee,coworker,type,intensity,tone){
+function socialExperienceReaction(employee,coworker,type,intensity,tone,context={}){
   ensureEmployeePersonality(employee);
   const p=employee.personality||{};
   let moraleDelta=0,stressDelta=0,reasonCode=`experience_${type}`;
-  if(type==="shared_break"){moraleDelta=1.2+(p.sociability||0)*.7;stressDelta=-(.8+(p.empathy||0)*.25);}
-  else if(type==="shared_meeting"){moraleDelta=(p.collaboration||0)*.55;stressDelta=(p.structureNeed||0)>.35?-.4:.6-(p.collaboration||0)*.3;}
-  else if(type==="direct_help"){moraleDelta=2.1+(p.empathy||0)*.7+(p.collaboration||0)*.45;stressDelta=-(1+(p.empathy||0)*.35);}
+  if(type==="shared_break"||type==="same_break"){moraleDelta=1.2+(p.sociability||0)*.7;stressDelta=-(.8+(p.empathy||0)*.25);}
+  else if(type==="shared_meeting"||type==="same_meeting"){moraleDelta=(p.collaboration||0)*.55;stressDelta=(p.structureNeed||0)>.35?-.4:.6-(p.collaboration||0)*.3;}
+  else if(type==="direct_help"||type==="onboarding_support"||type==="mentoring_interaction"){moraleDelta=2.1+(p.empathy||0)*.7+(p.collaboration||0)*.45;stressDelta=-(1+(p.empathy||0)*.35);}
   else if(type==="blocker_resolved_together"){moraleDelta=2.6+(p.collaboration||0)*.55;stressDelta=-(.7+(p.resilience||0)*.35);}
   else if(type==="deadline_pressure_together"){moraleDelta=(p.resilience||0)*.35-.8;stressDelta=2.1-(p.resilience||0)*.45;}
-  else if(type==="milestone_success_together"||type==="recognition_shared"){moraleDelta=2.2+(p.sociability||0)*.4;stressDelta=-.7;}
+  else if(SOCIAL_RULES.positiveExperienceTypes.includes(type)){moraleDelta=2.2+(p.sociability||0)*.4+(p.empathy||0)*.25;stressDelta=-.7-(p.resilience||0)*.2;}
   else if(type==="milestone_failure_together"){moraleDelta=-1.4;stressDelta=2.4-(p.resilience||0)*.45;}
-  else if(type==="interruption_shared"){moraleDelta=-.8;stressDelta=1.5;}
-  else if(type==="conflict_observed"){moraleDelta=-1.4;stressDelta=2.3;}
+  else if(SOCIAL_RULES.conflictExperienceTypes.includes(type)){
+    const forgiveness=Math.max(-1,Math.min(1,Number(p.forgivenessRate)||0));
+    moraleDelta=-1.3-(p.empathy||0)*.35;
+    stressDelta=2.15-(p.resilience||0)*.4-forgiveness*.2;
+  }
   else {moraleDelta=.7+(p.collaboration||0)*.35;stressDelta=(tone==="negative"?1.2:0)-(tone==="positive"?.6:0);}
   if(tone==="negative"){moraleDelta-=.8;stressDelta+=1.1;}
   if(tone==="positive"){moraleDelta+=.7;stressDelta-=.5;}
   if(tone==="mixed"){moraleDelta+=.2;stressDelta+=.7;}
+  if(typeof socialCultureExperienceRecommendation==="function"){
+    const cultureRecommendation=socialCultureExperienceRecommendation(employee,type,tone);
+    moraleDelta+=cultureRecommendation.moraleDelta;
+    stressDelta+=cultureRecommendation.stressDelta;
+  }
   const relationshipReaction=relationshipEmotionalReaction(employee,coworker,type==="interruption_shared"?"interruption":type==="deadline_pressure_together"?"pressure":type==="direct_help"||type==="blocker_resolved_together"?"helpful_nearby":"social");
   moraleDelta+=relationshipReaction.moraleDelta*.45;
   stressDelta+=relationshipReaction.stressDelta*.45;
+  const leadershipMultiplier=typeof leadershipRecommendationMultiplier==="function"
+    ?leadershipRecommendationMultiplier(context.actorId??coworker?.id,employee.id,context)
+    :1;
   const scale=clamp((Number(intensity)||1)/3,.45,1.35);
-  return {moraleDelta:Math.round(clamp(moraleDelta*scale,-3,3)),stressDelta:Math.round(clamp(stressDelta*scale,-4,4)),reasonCode,sourceEventId:null,relatedEmployeeIds:[coworker.id]};
+  return {
+    moraleDelta:Number(clamp(moraleDelta*scale*leadershipMultiplier,-3,3).toFixed(3)),
+    stressDelta:Number(clamp(stressDelta*scale*leadershipMultiplier,-4,4).toFixed(3)),
+    reasonCode,
+    sourceEventId:null,
+    relatedEmployeeIds:[coworker.id]
+  };
 }
 function applySocialReaction(employee,reaction){
   const trace=emotionalSystem.applyRecommendation({employeeId:employee?.id,stressDelta:reaction?.stressDelta||0,moraleDelta:reaction?.moraleDelta||0,reasonCode:reaction?.reasonCode||"social_reaction",sourceEventId:reaction?.sourceEventId||null,relatedEmployeeIds:reaction?.relatedEmployeeIds||[],timestamp:simulationTimestamp()});
@@ -633,30 +722,73 @@ function recordSocialInteractionEvidence(a,b,record,{type,sourceEventId,roomId=n
   record.interactionCount++;
   if(first){
     record.firstMetAt=now;
-    company.socialMemories.unshift({ownerSystem:AI_SYSTEM_OWNERS.social,type:"first_met",employeeIds:[a.id,b.id],timestamp:now,roomId:roomId||null,sourceEventId});
-    company.socialMemories=company.socialMemories.slice(0,SOCIAL_RULES.maxSocialMemories);
+    if(typeof recordFirstMeetingMemory==="function"){
+      recordFirstMeetingMemory(a,b,{sourceEventId,roomId,showConversation:false});
+    }else{
+      company.socialMemories=Array.isArray(company.socialMemories)?company.socialMemories:[];
+      company.socialMemories.unshift({ownerSystem:AI_SYSTEM_OWNERS.social,type:"first_met",employeeIds:[a.id,b.id],timestamp:now,roomId:roomId||null,sourceEventId});
+      company.socialMemories=company.socialMemories.slice(0,SOCIAL_RULES.maxSocialMemories);
+    }
   }
   record.lastInteractionAt=now;
   record.lastSeenAt=now;
   record.recentInteractionTypes=[{ownerSystem:AI_SYSTEM_OWNERS.social,type,day:company.day,minute:company.minute,sourceEventId,gain:Number(gain)||0},...(record.recentInteractionTypes||[])].slice(0,SOCIAL_RULES.maxRecentInteractionTypes);
   return record;
 }
-function recordSharedExperience(a,b,{type="shared_work_activity",sourceEventId=null,roomId=null,projectId=null,participants=null,tone=null,intensity=1,interactionRecorded=false}={}){
+function recordSharedExperience(a,b,{
+  type="shared_work_activity",
+  sourceEventId=null,
+  roomId=null,
+  projectId=null,
+  participants=null,
+  tone=null,
+  intensity=1,
+  interactionRecorded=false,
+  actorId=null,
+  subjectId=null,
+  privacy="ordinary",
+  volume=null,
+  category=null,
+  confidence=80,
+  context={}
+}={}){
   if(!a?.active||!b?.active||a.id===b.id||!sourceEventId)return null;
   const experienceType=normalizeSocialExperienceType(type);
   const record=socialRelationshipRecord(a.id,b.id,{create:true}),pairKey=makeRelationshipKey(a.id,b.id),id=`${sourceEventId}:${experienceType}:${pairKey}`;
   if((record.recentExperiences||[]).some(x=>x.id===id))return record;
+  const relationshipBefore=JSON.parse(JSON.stringify(record.interpretation||emptyRelationshipInterpretation()));
   const boundedIntensity=clamp(Math.round(Number(intensity)||1),1,5);
   if(!interactionRecorded)recordSocialInteractionEvidence(a,b,record,{type:experienceType,sourceEventId,roomId,gain:clamp(.6+boundedIntensity*.45,.6,3)});
-  const reactionA=socialExperienceReaction(a,b,experienceType,boundedIntensity,tone||"neutral");
-  const reactionB=socialExperienceReaction(b,a,experienceType,boundedIntensity,tone||"neutral");
+  const eventContext={...context,actorId:actorId??a.id,subjectId:subjectId??b.id,projectId,roomId};
+  const reactionA=socialExperienceReaction(a,b,experienceType,boundedIntensity,tone||"neutral",eventContext);
+  const reactionB=socialExperienceReaction(b,a,experienceType,boundedIntensity,tone||"neutral",eventContext);
   reactionA.sourceEventId=id;reactionB.sourceEventId=id;
   const appliedA=applySocialReaction(a,reactionA),appliedB=applySocialReaction(b,reactionB);
   const reactions={[a.id]:{stressDelta:appliedA?.stressDelta||0,moraleDelta:appliedA?.moraleDelta||0,reasonCode:appliedA?.reasonCode||reactionA.reasonCode},[b.id]:{stressDelta:appliedB?.stressDelta||0,moraleDelta:appliedB?.moraleDelta||0,reasonCode:appliedB?.reasonCode||reactionB.reasonCode}};
   const emotionalTone=tone||socialExperienceTone(reactions,"neutral");
   const now=simulationTimestamp();
-  const experience={ownerSystem:AI_SYSTEM_OWNERS.social,id,type:experienceType,timestamp:now,sourceEventId,roomId:roomId||null,projectId:projectId||null,participants:participants||[a.id,b.id],emotionalTone,intensity:boundedIntensity,employeeReactions:reactions,dedupeKey:id};
-  record.recentExperiences=[experience,...(record.recentExperiences||[])].slice(0,SOCIAL_RULES.maxRecentExperiences);
+  const experience={
+    ownerSystem:AI_SYSTEM_OWNERS.social,
+    id,
+    type:experienceType,
+    category:category||experienceType,
+    timestamp:now,
+    sourceEventId,
+    roomId:roomId||null,
+    projectId:projectId||null,
+    participants:participants||[a.id,b.id],
+    actorId:actorId??a.id,
+    subjectId:subjectId??b.id,
+    privacy,
+    volume:volume!==null&&volume!==undefined&&volume!==""&&Number.isFinite(Number(volume))?Number(volume):null,
+    confidence:clamp(Number(confidence)||80,0,100),
+    context:{...context},
+    emotionalTone,
+    intensity:boundedIntensity,
+    employeeReactions:reactions,
+    dedupeKey:id
+  };
+  record.recentExperiences=[compactSocialRelationshipExperience(experience),...(record.recentExperiences||[])].filter(Boolean).slice(0,SOCIAL_RULES.maxRecentExperiences);
   const summary=record.experienceSummary[experienceType]||{count:0,positive:0,neutral:0,negative:0,mixed:0,lastAt:null};
   summary.count++;summary[emotionalTone]=(summary[emotionalTone]||0)+1;summary.lastAt=now.absoluteMinute;record.experienceSummary[experienceType]=summary;
   record.reputationObservations=[{ownerSystem:AI_SYSTEM_OWNERS.social,sourceEventId,type:experienceType,tone:emotionalTone,intensity:boundedIntensity,timestamp:now},...(record.reputationObservations||[])].slice(0,SOCIAL_RULES.maxReputationObservations);
@@ -664,8 +796,34 @@ function recordSharedExperience(a,b,{type="shared_work_activity",sourceEventId=n
   record.stressHistory=Number(((record.stressHistory||0)+(reactions[a.id].stressDelta||0)+(reactions[b.id].stressDelta||0)).toFixed(3));
   record.moraleHistory=Number(((record.moraleHistory||0)+(reactions[a.id].moraleDelta||0)+(reactions[b.id].moraleDelta||0)).toFixed(3));
   evaluateRelationshipInterpretation(record);
+  experience.relationshipBefore=relationshipBefore;
+  experience.relationshipAfter=JSON.parse(JSON.stringify(record.interpretation||emptyRelationshipInterpretation()));
   recordWorkplaceReputationObservation(a,{type:experienceType,tone:emotionalTone,intensity:boundedIntensity,sourceEventId:sourceEventId||id,experienceId:id});
   recordWorkplaceReputationObservation(b,{type:experienceType,tone:emotionalTone,intensity:boundedIntensity,sourceEventId:sourceEventId||id,experienceId:id});
+  const sourceEvent=typeof registerSocialSourceEvent==="function"
+    ?registerSocialSourceEvent({
+      id:sourceEventId,
+      type:experienceType,
+      category:category||experienceType,
+      actorId:experience.actorId,
+      subjectId:experience.subjectId,
+      participantIds:experience.participants,
+      roomId:experience.roomId,
+      projectId:experience.projectId,
+      privacy,
+      volume:experience.volume,
+      confidence:experience.confidence,
+      intensity:boundedIntensity,
+      tone:emotionalTone,
+      context:experience.context
+    })
+    :null;
+  if(typeof processSocialExperience==="function")processSocialExperience({experience,relationship:record,sourceEvent,a,b});
+  evaluateRelationshipInterpretation(record);
+  experience.relationshipAfter=JSON.parse(JSON.stringify(record.interpretation||emptyRelationshipInterpretation()));
+  const generatedConflict=company.socialConflicts?.find(conflict=>conflict.sourceEventId===sourceEventId);
+  if(generatedConflict)generatedConflict.relationshipAfter=JSON.parse(JSON.stringify(experience.relationshipAfter));
+  record.lastExperienceId=id;
   return record;
 }
 function socialPreferenceOpportunityRoom(employee,opportunity={}){
@@ -715,6 +873,8 @@ function socialPreferenceWeight(employee,candidate,opportunity={}){
   weight+=Math.max(0,morale-55)*.08-Math.max(0,stress-72)*.12;
   if(type==="mentoring"||type==="project_discussion")weight+=(respect-45)*.12+(p.collaboration||0)*6;
   if(familiarity<18)weight+=clamp((company.culture?.communication||50)-45,0,14)*.35+4;
+  if(typeof socialCulturePreferenceModifier==="function")weight+=socialCulturePreferenceModifier(employee,coworker,opportunity);
+  if(typeof socialGroupPreferenceModifier==="function")weight+=socialGroupPreferenceModifier(employee,coworker,opportunity);
   weight-=recentSocialPreferencePenalty(employee.id,coworker.id);
   return clamp(weight,3,100);
 }
@@ -724,8 +884,8 @@ function socialPreferenceReasonCode(employee,selected,opportunity={}){
     return battery<42||employee?.stress>70?"social_preference_recovery_alone":"social_preference_alone";
   }
   const view=getRelationshipView(employee.id,selected.id),rel=view.interpretation;
-  if((rel.professionalFriction||0)>65)return "social_preference_friction";
-  if((rel.trust||0)>60||(rel.comfort||0)>60)return "social_preference_trusted_coworker";
+  if((rel.professionalFriction||0)>SOCIAL_RULES.relationshipBands.severeFriction)return "social_preference_friction";
+  if((rel.trust||0)>SOCIAL_RULES.relationshipBands.substantialTrust||(rel.comfort||0)>60)return "social_preference_trusted_coworker";
   if((view.familiarity||0)<18)return "social_preference_new_contact";
   if((rel.respect||0)>60)return "social_preference_respected_coworker";
   return `social_preference_${opportunity.type||"conversation"}`;
@@ -794,7 +954,21 @@ function socialEmotionTraceDebugHtml(e){
   const morale=`${trace.oldMorale??"n/a"} -> ${trace.newMorale??"n/a"} (${trace.moraleDeltaApplied>0?"+":""}${trace.moraleDeltaApplied??0})`;
   return `Employee: ${employee?.name||trace.employeeId}<br>Event: ${trace.sourceEventId||"local"}<br>Reason: ${trace.reasonCode}<br>Stress: ${stress}<br>Morale: ${morale}<br>Applied: ${trace.status==="applied"?"yes":trace.status}<br>Blocked by cooldown: ${trace.blockedByCooldown?"yes":"no"}; blocked by daily cap: ${trace.blockedByCap?"yes":"no"}<br>Related employees: ${(trace.relatedEmployeeIds||[]).join(", ")||"none"}<br>UI notified: ${trace.uiNotified?"yes":"no"}`;
 }
-function recordSocialEncounter(a,b,{type="conversation",gain=.25,sourceEventId=null,roomId=null,cooldownMinutes=120}={}){
+function recordSocialEncounter(a,b,{
+  type="conversation",
+  gain=.25,
+  sourceEventId=null,
+  roomId=null,
+  projectId=null,
+  cooldownMinutes=120,
+  actorId=null,
+  subjectId=null,
+  privacy="ordinary",
+  volume=null,
+  category=null,
+  confidence=80,
+  context={}
+}={}){
   if(!a?.active||!b?.active||a.offsite||b.offsite||a.id===b.id||!sourceEventId)return null;
   if(SOCIAL_RULES.passiveLegacyExperienceTypes.includes(type)){
     return recordFamiliarityObservation(a,b,{roomId:roomId||"shared-space",gain,minutes:0,cooldownMinutes});
@@ -802,12 +976,30 @@ function recordSocialEncounter(a,b,{type="conversation",gain=.25,sourceEventId=n
   ensureSocialAISystems();
   const experienceType=normalizeSocialExperienceType(type);
   const record=socialRelationshipRecord(a.id,b.id,{create:true}),now=simulationTimestamp(),cooldownKey=`${experienceType}:${sourceEventId||roomId||"local"}`;
+  pruneSocialRelationshipCooldowns(record,now.absoluteMinute);
   const last=Number(record.cooldowns[cooldownKey])||-999999;
   if(now.absoluteMinute-last<cooldownMinutes)return record;
   const appliedGain=clamp(Number(gain)||0,0,5);
   record.cooldowns[cooldownKey]=now.absoluteMinute;
+  pruneSocialRelationshipCooldowns(record,now.absoluteMinute);
   recordSocialInteractionEvidence(a,b,record,{type:experienceType,sourceEventId,roomId,gain:appliedGain});
-  recordSharedExperience(a,b,{type:experienceType,sourceEventId,roomId,participants:[a.id,b.id],tone:null,intensity:experienceType==="direct_help"?2:experienceType==="shared_break"?1:1,interactionRecorded:true});
+  recordSharedExperience(a,b,{
+    type:experienceType,
+    sourceEventId,
+    roomId,
+    projectId,
+    participants:[a.id,b.id],
+    tone:null,
+    intensity:experienceType==="direct_help"?2:experienceType==="shared_break"?1:1,
+    interactionRecorded:true,
+    actorId:actorId??a.id,
+    subjectId:subjectId??b.id,
+    privacy,
+    volume,
+    category,
+    confidence,
+    context
+  });
   return record;
 }
 function recordFamiliarityObservation(a,b,{roomId=null,minutes=0,gain=0,cooldownMinutes=120}={}){
@@ -816,9 +1008,11 @@ function recordFamiliarityObservation(a,b,{roomId=null,minutes=0,gain=0,cooldown
   const record=socialRelationshipRecord(a.id,b.id,{create:true}),now=simulationTimestamp(),cooldownKey=`passive:${roomId}`;
   record.lastSeenAt=now;
   record.coPresenceMinutes=Math.max(0,(record.coPresenceMinutes||0)+(Number(minutes)||0));
+  pruneSocialRelationshipCooldowns(record,now.absoluteMinute);
   const last=Number(record.cooldowns[cooldownKey])||-999999;
   if(now.absoluteMinute-last<cooldownMinutes)return record;
   record.cooldowns[cooldownKey]=now.absoluteMinute;
+  pruneSocialRelationshipCooldowns(record,now.absoluteMinute);
   record.familiarity=clamp((record.familiarity||0)+clamp(Number(gain)||0,0,2),SOCIAL_RULES.minFamiliarity,SOCIAL_RULES.maxFamiliarity);
   return record;
 }

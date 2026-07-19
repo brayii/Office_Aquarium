@@ -42,7 +42,7 @@ function recordLearningEvidence({domain="institutional",eventType="general",acti
   }
   const rec={ownerSystem:AI_SYSTEM_OWNERS.institutional,id:`learn-${company.day}-${company.learningEvidence.length+1}-${Math.floor(simulationRandom()*9999)}`,episodeKey,day:company.day,lastDay:company.day,count:1,domain,eventType,action,outcome,magnitude:Number(magnitude)||0,confidence:clamp(Number(confidence)||55,0,100),department,employeeIds:Array.isArray(employeeIds)?employeeIds:[],projectId,context,contributors:Array.isArray(contributors)?contributors:[],evidence};
   company.learningEvidence.unshift(rec);
-  company.learningEvidence=company.learningEvidence.slice(0,420);
+  company.learningEvidence=company.learningEvidence.slice(0,INSTITUTIONAL_LEARNING_RULES.maxEvidenceRecords);
   return rec;
 }
 function companyLearningBaseline(){
@@ -105,7 +105,7 @@ function createLearningEpisode({domain="decision",subtype=null,sourceId=null,dec
   const initialAttributionQuality=Number.isFinite(attributionQuality)?attributionQuality:null;
   const episode={ownerSystem:AI_SYSTEM_OWNERS.institutional,id,domain,subtype,sourceId,decisionId,decisionTitle,choiceTitle,strategy,department,projectId,employeeIds:Array.isArray(employeeIds)?employeeIds:[],messageId,protectedChannel,customerSegmentIds:Array.isArray(customerSegmentIds)?customerSegmentIds:[],customerExperienceIds:Array.isArray(customerExperienceIds)?customerExperienceIds:[],interventionType,createdDay:company.day,baseline:baseline||companyLearningBaseline(),expectedChannels:expectedChannels||expectedChannelsForEpisode(domain,strategy,choiceTitle||decisionTitle),attributionSources:Array.isArray(attributionSources)?attributionSources:[],initialAttributionQuality,currentAttributionQuality:initialAttributionQuality,attributionQuality:initialAttributionQuality,reviewSchedule:reviewSchedule||[company.day+7,company.day+21,company.day+60],observations:[],contradictions:[],status:"pending",resolution:null,hypotheses:Array.isArray(hypotheses)?hypotheses:[]};
   company.learningEpisodes.unshift(episode);
-  company.learningEpisodes=company.learningEpisodes.slice(0,180);
+  company.learningEpisodes=company.learningEpisodes.slice(0,INSTITUTIONAL_LEARNING_RULES.maxEpisodes);
   return episode;
 }
 function learningCurrentState(){
@@ -304,9 +304,10 @@ function evaluateCommunicationOutcomeRecords(){
     }
   });
 }
-const NON_AUTHORITATIVE_PATHS=new Set(["company.runtime","company.uiCache","company.companyRiskComponents","company.riskPillars","company.staffingModel","company.workforceAllocationSnapshot","company.organizationMaturity","company.capabilityNeeds","company.capabilityCoverage","company.capabilityGaps","company.capabilityConsequences","company.capabilityContributors","company.capabilityPromotionCandidates","company.capabilityFulfillmentOptions","company.capabilityAudit","company.capabilityLearningSignals","company.capabilitySystemUpdatedDay","company.lastProjectRequirementAuditDay","company.executiveBriefing","company.executiveIntelligenceSnapshot","company.executiveObservations","company.debugState","company.dailyStageStatus","company.pendingCommunication.bodyPreview","company.crisis.currentProgressDetail"]);
+const TRANSIENT_COMPANY_PATHS=new Set((OFFICE_AQUARIUM_CONSTANTS.storage.transientCompanyKeys||[]).map(key=>`company.${key}`));
+const NON_AUTHORITATIVE_PATHS=new Set(["company.uiCache","company.companyRiskComponents","company.riskPillars","company.staffingModel","company.workforceAllocationSnapshot","company.organizationMaturity","company.capabilityNeeds","company.capabilityCoverage","company.capabilityGaps","company.capabilityConsequences","company.capabilityContributors","company.capabilityPromotionCandidates","company.capabilityFulfillmentOptions","company.capabilityAudit","company.capabilityLearningSignals","company.capabilitySystemUpdatedDay","company.lastProjectRequirementAuditDay","company.executiveBriefing","company.executiveIntelligenceSnapshot","company.executiveObservations","company.debugState","company.dailyStageStatus","company.pendingCommunication.bodyPreview","company.crisis.currentProgressDetail"]);
 function isNonAuthoritativePath(path){
-  if(NON_AUTHORITATIVE_PATHS.has(path))return true;
+  if(TRANSIENT_COMPANY_PATHS.has(path)||NON_AUTHORITATIVE_PATHS.has(path))return true;
   if(/^company\.(dailyStageStatus\.\d+|lastDailyCloseStatus)\.(startedAt|completedAt|hashBefore|hashAfter)$/.test(path))return true;
   if(/^company\.learningEpisodes\.\d+\.observations$/.test(path))return true;
   if(/^employees\.\d+\.(currentRoom|roomSelectionReason|roomEffect)$/.test(path))return true;
@@ -337,7 +338,7 @@ function stateHash(){return hashAuthoritativeState(company,employees);}
 function ensureInstitutionalLearning(){
   if(!company)return;
   company.lessons=Array.isArray(company.lessons)?company.lessons:[];
-  company.learningEvidence=Array.isArray(company.learningEvidence)?company.learningEvidence:[];
+  company.learningEvidence=Array.isArray(company.learningEvidence)?company.learningEvidence.slice(0,INSTITUTIONAL_LEARNING_RULES.maxEvidenceRecords):[];
   company.lessons=company.lessons.filter(lesson=>!lesson?.pendingEvidenceOnly);
   company.lessons.forEach(lesson=>{
     lesson.episodeKeys=Array.isArray(lesson.episodeKeys)?lesson.episodeKeys:[];
@@ -675,7 +676,7 @@ function ensureBibleSystems(){
   company.failureOwner=company.failureOwner||null;
   company.failureCode=company.failureCode||null;
   if(typeof normalizeCrisisState==="function")normalizeCrisisState();
-  company.learningEpisodes=Array.isArray(company.learningEpisodes)?company.learningEpisodes:[];
+  company.learningEpisodes=Array.isArray(company.learningEpisodes)?company.learningEpisodes.slice(0,INSTITUTIONAL_LEARNING_RULES.maxEpisodes):[];
   company.learningEpisodes.forEach(episode=>{episode.ownerSystem=AI_SYSTEM_OWNERS.institutional;});
   company.nextLearningEpisodeId=Math.max(1,Number(company.nextLearningEpisodeId)||1);
   company.actionOutcomes=Array.isArray(company.actionOutcomes)?company.actionOutcomes:[];
@@ -1018,7 +1019,8 @@ function reportWillingness(e,severity,confidence){
   const ceo=e.opinionOfCEO||{},culture=company.culture||{};
   const traitBoost=(e.traits||[]).includes("loyal")?8:(e.traits||[]).includes("ambitious")?5:(e.traits||[]).includes("skeptical")?-3:0;
   const learning=learningState(e);
-  return clamp(severity*.34+confidence*.28+(ceo.trust||58)*.16+(culture.communication||50)*.22+traitBoost+learning.reporting*2.2+learning.protectedEscalation*1.5-learning.politicalSuppression*2.6-learning.noiseFiltering*.8-(ceo.fear||0)*.26-(culture.politics||25)*.24,0,100);
+  const socialCultureModifier=typeof socialCultureReportingModifier==="function"?socialCultureReportingModifier(e):0;
+  return clamp(severity*.34+confidence*.28+(ceo.trust||58)*.16+(culture.communication||50)*.22+traitBoost+socialCultureModifier+learning.reporting*2.2+learning.protectedEscalation*1.5-learning.politicalSuppression*2.6-learning.noiseFiltering*.8-(ceo.fear||0)*.26-(culture.politics||25)*.24,0,100);
 }
 function maybeSuppressReport(e,issue,severity,confidence){
   const willing=reportWillingness(e,severity,confidence);
@@ -1026,7 +1028,15 @@ function maybeSuppressReport(e,issue,severity,confidence){
   const c=communicationState(e);
   c.reportsSuppressed++;
   updateCommunicationLearning(e,"suppress",severity>70?"high-risk":"low-risk",issue);
-  createEmployeeMessage({type:"suppressed-report",from:e,toIds:[],department:employeeTeam(e),subject:`Unsent concern: ${issue.type.replace(/-/g," ")}`,contentCode:issue.type,severity,urgency:issue.urgency||45,confidence,reliability:.25,issue,status:"suppressed",evidence:issue.evidence||[]});
+  const message=createEmployeeMessage({type:"suppressed-report",from:e,toIds:[],department:employeeTeam(e),subject:`Unsent concern: ${issue.type.replace(/-/g," ")}`,contentCode:issue.type,severity,urgency:issue.urgency||45,confidence,reliability:.25,issue,status:"suppressed",evidence:issue.evidence||[]});
+  if(message?.id&&typeof recordOrganizationalCultureEvidence==="function")recordOrganizationalCultureEvidence({
+    sourceEventId:message.id,
+    type:"suppressed-report",
+    dimensions:{psychologicalSafety:-.8,inclusiveness:-.25,accountability:-.2},
+    confidence,
+    intensity:severity>=75?4:2,
+    participantIds:[e.id]
+  });
   addMemory(e,"SUPPRESSED_REPORT",`I kept quiet about ${issue.type.replace(/-/g," ")}.`,"negative",5);
   return true;
 }
@@ -1043,7 +1053,31 @@ function maybeCreateHelpRequest(e,ctx){
   c.lastHelpRequestDay=company.day;c.helpRequests++;updateCommunicationLearning(e,"help","sent",ctx.work);
   const subject=blockers.length?`Help needed on ${ctx.work.title}`:`Peer review requested on ${ctx.work.title}`;
   const evidence=[workStatusLabel(ctx.work),`Reason: ${reason}`,`${Math.round(ctx.skillFit*100)} skill fit`];
-  createEmployeeMessage({type:"help-request",from:e,toIds:[target.id],department:ctx.team,subject,contentCode:ctx.work.type,severity:Math.max(ctx.deadlineRisk,ctx.blockerRisk,45),urgency:Math.max(ctx.deadlineRisk,ctx.blockerRisk),confidence:Math.round(70-ctx.uncertainty*.25),reliability:.76,workItem:ctx.work,evidence});
+  const message=createEmployeeMessage({type:"help-request",from:e,toIds:[target.id],department:ctx.team,subject,contentCode:ctx.work.type,severity:Math.max(ctx.deadlineRisk,ctx.blockerRisk,45),urgency:Math.max(ctx.deadlineRisk,ctx.blockerRisk),confidence:Math.round(70-ctx.uncertainty*.25),reliability:.76,workItem:ctx.work,evidence});
+  if(typeof recordSocialEncounter==="function"){
+    const employeeRoom=e.currentRoom||roomForZone?.(e.zone)||null;
+    const targetRoom=target.currentRoom||roomForZone?.(target.zone)||null;
+    recordSocialEncounter(e,target,{
+      type:"help_request",
+      gain:1.4,
+      sourceEventId:message.id,
+      roomId:employeeRoom&&employeeRoom===targetRoom?employeeRoom:null,
+      projectId:ctx.work.projectId||null,
+      cooldownMinutes:120,
+      actorId:e.id,
+      subjectId:target.id,
+      category:"help_request",
+      confidence:message.confidence,
+      context:{
+        workItemId:ctx.work.id,
+        workTitle:ctx.work.title,
+        projectId:ctx.work.projectId||null,
+        blocker:blockers[0]||null,
+        purpose:reason,
+        deadlineDay:ctx.work.deadlineDay
+      }
+    });
+  }
   addMemory(e,"HELP_REQUEST",`I asked ${target.name} for help on ${ctx.work.title}.`,"positive",5,target.name);
   addMemory(target,"HELP_REQUEST",`${e.name} asked me for help on ${ctx.work.title}.`,"neutral",4,e.name);
 }
@@ -1069,7 +1103,15 @@ function maybeCreateRiskReport(e){
   if(simulationRandom()>reportOdds)return;
   c.lastReportDay=company.day;c.reportsMade++;updateCommunicationLearning(e,"report","local",issue);
   const recipients=employees.filter(x=>x.active&&x.id!==e.id&&(employeeTeam(x)===employeeTeam(e)||issue.sourceDepartments?.includes(employeeTeam(x)))).map(x=>x.id).slice(0,4);
-  createEmployeeMessage({type:"risk-report",from:e,toIds:recipients,department:employeeTeam(e),subject:contentPick(v23Content.reportSubjects[issue.type]||[`Risk observed: ${issue.type.replace(/-/g," ")}`],severity),contentCode:issue.type,severity,urgency:issue.urgency||50,confidence,reliability:confidence/100,issue,evidence:issue.evidence||[]});
+  const message=createEmployeeMessage({type:"risk-report",from:e,toIds:recipients,department:employeeTeam(e),subject:contentPick(v23Content.reportSubjects[issue.type]||[`Risk observed: ${issue.type.replace(/-/g," ")}`],severity),contentCode:issue.type,severity,urgency:issue.urgency||50,confidence,reliability:confidence/100,issue,evidence:issue.evidence||[]});
+  if(message?.id&&typeof recordOrganizationalCultureEvidence==="function")recordOrganizationalCultureEvidence({
+    sourceEventId:message.id,
+    type:"risk-report-raised",
+    dimensions:{psychologicalSafety:.55,accountability:.5,adaptability:.2},
+    confidence,
+    intensity:severity>=75?4:2,
+    participantIds:[e.id,...recipients]
+  });
 }
 function maybeCreateOpportunityProposal(e,ctx){
   const c=communicationState(e);
@@ -1092,7 +1134,23 @@ function maybeShareRumor(e){
   const target=socialTarget(e);
   if(!target)return;
   c.rumorsShared=company.day;
-  createEmployeeMessage({type:"rumor",from:e,toIds:[target.id],department:employeeTeam(e),subject:`Rumor about ${contentPick(v25Content.rumors,e.id).replace(/-/g," ")}`,contentCode:concern.key,severity:concern.belief.estimate,urgency:35,confidence:concern.belief.confidence,reliability:.35,evidence:[`Belief estimate ${Math.round(concern.belief.estimate)}`,`Confidence ${Math.round(concern.belief.confidence)}`]});
+  const message=createEmployeeMessage({type:"rumor",from:e,toIds:[target.id],department:employeeTeam(e),subject:`Rumor about ${contentPick(v25Content.rumors,e.id).replace(/-/g," ")}`,contentCode:concern.key,severity:concern.belief.estimate,urgency:35,confidence:concern.belief.confidence,reliability:.35,evidence:[`Belief estimate ${Math.round(concern.belief.estimate)}`,`Confidence ${Math.round(concern.belief.confidence)}`]});
+  if(message?.id&&typeof recordSocialEncounter==="function"){
+    const employeeRoom=e.currentRoom||roomForZone?.(e.zone)||null,targetRoom=target.currentRoom||roomForZone?.(target.zone)||null;
+    recordSocialEncounter(e,target,{
+      type:"casual_conversation",
+      gain:.8,
+      sourceEventId:message.id,
+      roomId:employeeRoom&&employeeRoom===targetRoom?employeeRoom:null,
+      cooldownMinutes:180,
+      actorId:e.id,
+      subjectId:target.id,
+      privacy:"private",
+      category:"company_news",
+      confidence:concern.belief.confidence,
+      context:{newsTopic:`an uncertain concern about ${concern.key.replace(/-/g," ")}`,topic:concern.key}
+    });
+  }
   addMemory(e,"RUMOR",`I compared notes with ${target.name}.`,"neutral",3,target.name);
   addMemory(target,"RUMOR",`${e.name} shared uncertain information with me.`,"neutral",3,e.name);
 }

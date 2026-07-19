@@ -91,11 +91,15 @@ Shows what employees are doing right now. Employees may work, meet, test, collab
 
 Click an employee in the office to open their detail page. A faded employee is temporarily offsite or unavailable. Employees who resign or are terminated are removed from the live office rather than left as transparent copies.
 
+Short speech bubbles may appear when a real conversation occurs. They show a few grounded exchanges about current work, help, blockers, meetings, mentoring, recognition, conflict, repair, company news, or celebrations. Select a bubble to read the exchange more comfortably. Not every conversation is visible, and confidential conversations never appear.
+
 ## Employees
 
 Shows individual employee status, role, current action, thought, morale, stress, focus, relationships, memories, beliefs, and current work.
 
 Employees do not know everything. Their beliefs may be incomplete or wrong.
+
+Employee details can also show compact professional relationship, culture, group, leadership, and remembered-experience summaries when enough evidence exists. These are interpretations of behavior over time, not perfect truth.
 
 ## CEO Inbox
 
@@ -129,7 +133,7 @@ The Company area is organized into workspace tabs:
 
 | Tab | What It Is For |
 |---|---|
-| Reports | Current operating dashboard, metrics, departments, projects, workforce, and internal reports |
+| Reports | Current operating dashboard, metrics, departments, projects, workforce, People & Culture, and internal reports |
 | History | Company Story, Organizational Dynamics, Story Threads, Lessons, and Company History |
 | Weekly Report | Office Aquarium Weekly newspaper archive |
 
@@ -142,6 +146,17 @@ The Company View dropdown filters this screen:
 | Workforce | Workforce and Financial Pressure, hiring pipeline, staffing signals, recruiting, onboarding, retention, layoffs, and internal reports |
 | Story | Organizational Dynamics, Company Story, Story Threads, Lessons, and Company History |
 | All | Every company section |
+
+The People & Culture panel inside Reports has four views:
+
+| View | What It Shows |
+|---|---|
+| Culture | Supported company norms, direction of change, confidence, and warnings |
+| Groups | Informal groups that have formed from repeated meaningful interaction |
+| Network | Mentoring, conflict, and bridge relationships that connect the organization |
+| Leadership | Formal authority, earned credibility, coaching, fairness, conflict handling, and informal influence |
+
+These views summarize evidence the company has accumulated. They do not reveal every hidden thought or turn relationships into direct productivity bonuses.
 
 ## Paper
 
