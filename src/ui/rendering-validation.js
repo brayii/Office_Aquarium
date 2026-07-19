@@ -426,7 +426,7 @@ function render(){
     n.querySelector(".thought").textContent=e.thought;
     n.querySelector("small").textContent=`${e.name}: ${e.action}`;
   });
-  document.getElementById("applyDecision").disabled=company.cash<=0;
+  if(typeof updateDecisionActionButtonState==="function")updateDecisionActionButtonState();
   setTrack("manufacturing",health.labels.manufacturing,health.manufacturingHealth,"%");
   setTrack("shareholder","Investor Confidence",health.investorConfidence??health.shareholderConfidence);
   setTrack("cohesion","Team Cohesion",health.teamCohesion);

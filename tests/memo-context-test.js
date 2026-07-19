@@ -121,6 +121,39 @@ async function main() {
       company.decisionHistory.length = beforeHistory;
     }
     assert(surpriseSamples.some(v => v < 0), "Risky decisions should sometimes produce negative hidden execution surprises");
+
+    company.cash = 0;
+    company.pendingEvent = makeBoardValuationMemo("weakening", {
+      interpretation: "weakening",
+      boardPosition: "investor patience is weakening",
+      trend: -8.4,
+      investorSignal: 34,
+      fundamentals: 52,
+      quality: 48,
+      report: {
+        dominantConcern: "execution credibility",
+        dominantOpportunity: "clearer milestones",
+        evidence: [
+          "Investor confidence weakened over the last month",
+          "Board patience is narrowing",
+          "Execution credibility is mixed"
+        ]
+      }
+    });
+    company.pendingCommunication = null;
+    company.selected = 1;
+    renderDecisionEvent();
+    render();
+    const investorTitle = document.getElementById("eventTitle").innerText;
+    const investorButton = document.getElementById("applyDecision");
+    assert(investorTitle.includes("Investor Confidence and Market Perception Review"), "Regression should open the investor confidence memo");
+    assert(document.getElementById("decisionGrid").children.length === 3, "Investor confidence memo should render three CEO choices");
+    assert(!investorButton.disabled, "Record CEO Decision should stay enabled after selecting an investor confidence choice even when cash is zero");
+    const beforeInvestorDecisions = company.communications.length;
+    applyDecision();
+    assert(company.communications.length === beforeInvestorDecisions + 1, "Investor confidence decision should archive after recording");
+    assert(company.pendingEvent === null, "Investor confidence decision should clear the pending memo after recording");
+
     validationMode = false;
     return { ok: failures.length === 0, failures, memoPreview: memoText.slice(0, 700), choicePreview: choiceText.slice(0, 700), eventCopy, highSupplySpeed, highSupplyValidation, lowSupplySpeed, surpriseSamples: surpriseSamples.slice(0, 12) };
   });

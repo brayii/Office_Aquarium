@@ -1071,6 +1071,18 @@ function isInformationalExecutiveEvent(ev){
   if(eventHasDecisionChoices(ev))return false;
   return ev.informationalOnly===true;
 }
+function selectedDecisionChoice(ev){
+  if(!ev||isInformationalExecutiveEvent(ev))return null;
+  const choices=Array.isArray(ev.choices)?ev.choices:[];
+  const selected=Number.isInteger(company?.selected)?company.selected:0;
+  return choices[selected]||null;
+}
+function updateDecisionActionButtonState(){
+  const button=document.getElementById("applyDecision");
+  if(!button)return;
+  if(!company?.pendingEvent){button.disabled=true;return;}
+  button.disabled=isInformationalExecutiveEvent(company.pendingEvent)?false:!selectedDecisionChoice(company.pendingEvent);
+}
 function fileInformationalCommunication(){
   const ev=company.pendingEvent;
   if(!ev)return false;
@@ -2190,6 +2202,7 @@ function renderDecisionEvent(){
     document.getElementById("eventTitle").textContent=readingOld?(oldMessage?.title||"Old Message"):queuedCount?`${queuedCount} memo${queuedCount===1?"":"s"} queued`:"No urgent decisions";
     document.getElementById("eventCopy").textContent=readingOld?"Reviewing a past CEO communication and the choice you recorded.":queuedCount?"A memo or email is waiting in your inbox. Click a message when you want to review it.":"The company is operating on its own. A memo or email will appear when leadership is needed.";
     button.textContent="Record CEO Decision";
+    updateDecisionActionButtonState();
     memo.classList.add("hidden");grid.classList.add("hidden");button.classList.add("hidden");
     badge.textContent=readingOld?"Old message":queuedCount?"Queued":"Watching";
     badge.className=queuedCount?"inbox-badge alert":"inbox-badge quiet";
@@ -2207,6 +2220,7 @@ function renderDecisionEvent(){
   ensureExecutiveMessageModel(ev,comm);
   memo.innerHTML=`<article class="memo-card"><div class="memo-header"><div><div class="memo-type">${comm.type}</div><h3>${comm.subject}</h3></div><span class="memo-priority ${priorityClass}">${informational?"No reply needed":comm.priority}</span></div>${communicationHeaderHtml(comm,comm.structuredMessage)}${informational?informationalMemoNoticeHtml():""}<div class="memo-message">${comm.message}</div>${memoIntelligenceHtml(ev,comm)}<div class="memo-signature">${comm.signature.replace(/\n/g,"<br>")}</div></article>`;
   alert.innerHTML=informational?`<strong>${comm.type}: ${comm.subject}</strong>${comm.from} sent an informational update.`:`<strong>${comm.type}: ${comm.subject}</strong>${comm.from} requests a CEO decision${contextText?` for ${contextText}`:""}.`;alert.classList.toggle("hidden",informational);grid.innerHTML="";if(!informational)(ev.choices||[]).slice(0,3).forEach((d,i)=>{const b=document.createElement("button");b.className="decision"+(i===company.selected?" selected":"");b.innerHTML=renderDecisionChoiceHtml(d,ev);b.onclick=()=>{company.selected=i;renderDecisionEvent()};grid.appendChild(b);});
+  updateDecisionActionButtonState();
 }
 function eventCategory(ev){return ev.category||({cash:"finance",performance:"people",hiring:"people",burnout:"people",culture:"culture",milestone:"product",launch:"product","pilot-review":"product","market-shift":"market","supply-chain":"operations","shareholder-letter":"board"}[ev.id]||"opportunity");}
 function eventBaseWeight(ev){return Number(ev.baseWeight)||({performance:.75,cash:.8,hiring:1.25,burnout:1,culture:.95,"market-shift":1,milestone:1.1,launch:1.2,"pilot-review":1.2}[ev.id]||1);}
@@ -2383,7 +2397,7 @@ function maybeCreateDecisionEvent(){
   company.eventCooldown=rules.randomEventCooldownMinutes;
   if(!validationMode){renderDecisionEvent();}
 }
-function applyDecision(){if(!company.pendingEvent)return;if(isInformationalExecutiveEvent(company.pendingEvent))return fileInformationalCommunication();recordMetricEvent("ceoDecisions");const ev=prepareStrategicDecision(company.pendingEvent),d=ev.choices[company.selected],comm=company.pendingCommunication||eventCommunication(ev),archivedMemo=archiveCommunication(ev,d,comm);applyLeadershipFootprint(ev,d);const delayedOutcome=evaluateStrategicOutcome(ev,d),thread=createDecisionThread(ev,d,comm,delayedOutcome,archivedMemo);if(ev.storyId)addStoryBeat(ev.storyId,`CEO chose: ${d.title}.`,"decision");startPolicyTransition(d.directive,d.days||0,d.title);Object.entries(d.effect||{}).forEach(([k,v])=>{if(k==="valuation"){addValuationShock(v*.35,`Market reaction to CEO decision: ${d.title}`,ev.id,20);return;}if(k==="customers"){applyCustomerDelta(v*.35,d.title,ev.id);return;}const systemic=["board","trust","quality","integration"].includes(k);company[k]=(company[k]||0)+v*(systemic?.35:1);});adjustCulture(d.culture||{});employees.forEach(e=>{
+function applyDecision(){if(!company.pendingEvent)return;if(isInformationalExecutiveEvent(company.pendingEvent))return fileInformationalCommunication();const ev=prepareStrategicDecision(company.pendingEvent),d=selectedDecisionChoice(ev);if(!d){updateDecisionActionButtonState();return false;}recordMetricEvent("ceoDecisions");const comm=company.pendingCommunication||eventCommunication(ev),archivedMemo=archiveCommunication(ev,d,comm);applyLeadershipFootprint(ev,d);const delayedOutcome=evaluateStrategicOutcome(ev,d),thread=createDecisionThread(ev,d,comm,delayedOutcome,archivedMemo);if(ev.storyId)addStoryBeat(ev.storyId,`CEO chose: ${d.title}.`,"decision");startPolicyTransition(d.directive,d.days||0,d.title);Object.entries(d.effect||{}).forEach(([k,v])=>{if(k==="valuation"){addValuationShock(v*.35,`Market reaction to CEO decision: ${d.title}`,ev.id,20);return;}if(k==="customers"){applyCustomerDelta(v*.35,d.title,ev.id);return;}const systemic=["board","trust","quality","integration"].includes(k);company[k]=(company[k]||0)+v*(systemic?.35:1);});adjustCulture(d.culture||{});employees.forEach(e=>{
     if(d.directive==="cuts")addMemory(e,"CEO_CUTS","Leadership cut costs and increased pressure.","negative",14,"CEO");
     else if(d.directive==="people")addMemory(e,"CEO_SUPPORT","Leadership invested in employees.","positive",12,"CEO");
     else if(d.directive==="quality")addMemory(e,"CEO_QUALITY","Leadership protected product quality.","positive",9,"CEO");
