@@ -51,6 +51,37 @@ async function main() {
   await page.waitForTimeout(120);
   const projectViewVisible = await page.locator("#projectPortfolioWrap:not(.view-hidden)").count();
   const workforceViewHidden = await page.locator("#workforcePressure.view-hidden").count();
+  const boundedPanelLayout = await page.evaluate(() => {
+    document.querySelectorAll(".ceo-mail-list,.employee-list").forEach(list => {
+      const source = list.firstElementChild;
+      if (!source) return;
+      for (let i = 0; i < 18; i += 1) {
+        const clone = source.cloneNode(true);
+        clone.removeAttribute("onclick");
+        list.appendChild(clone);
+      }
+    });
+    if (typeof syncOfficeSidePanelHeight === "function") syncOfficeSidePanelHeight();
+    const officePanel = document.querySelector(".main-grid.living-first>.office-panel");
+    const inboxPanel = document.querySelector(".main-grid.living-first>.right-stack>section:nth-child(1)");
+    const peoplePanel = document.querySelector(".main-grid.living-first>.right-stack>section:nth-child(2)");
+    const employeeList = document.querySelector("#employeeList");
+    const inboxList = document.querySelector("#commInboxList");
+    const officeHeight = Math.round(officePanel?.getBoundingClientRect().height || 0);
+    const inboxHeight = Math.round(inboxPanel?.getBoundingClientRect().height || 0);
+    const peopleHeight = Math.round(peoplePanel?.getBoundingClientRect().height || 0);
+    return {
+      officeHeight,
+      inboxHeight,
+      peopleHeight,
+      employeeOverflow: getComputedStyle(employeeList).overflowY,
+      inboxOverflow: getComputedStyle(inboxList).overflowY,
+      employeeCanScroll: employeeList.scrollHeight > employeeList.clientHeight,
+      inboxCanScroll: inboxList.scrollHeight > inboxList.clientHeight,
+      inboxBounded: inboxHeight <= officeHeight + 2,
+      peopleBounded: peopleHeight <= officeHeight + 2
+    };
+  });
 
   const status = await page.evaluate(() => ({
     title: document.title,
@@ -66,6 +97,7 @@ async function main() {
   status.guideClosed = guideClosed;
   status.projectViewVisible = projectViewVisible;
   status.workforceViewHidden = workforceViewHidden;
+  status.boundedPanelLayout = boundedPanelLayout;
 
   await browser.close();
 
@@ -79,7 +111,11 @@ async function main() {
     status.guideOpened === 1 &&
     status.guideClosed === 1 &&
     status.projectViewVisible === 1 &&
-    status.workforceViewHidden === 1;
+    status.workforceViewHidden === 1 &&
+    status.boundedPanelLayout.inboxBounded &&
+    status.boundedPanelLayout.peopleBounded &&
+    status.boundedPanelLayout.employeeCanScroll &&
+    status.boundedPanelLayout.inboxCanScroll;
 
   console.log(JSON.stringify({ ok, status, errors: errors.slice(0, 8) }, null, 2));
   if (!ok) process.exit(1);

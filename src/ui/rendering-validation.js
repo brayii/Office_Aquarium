@@ -380,6 +380,14 @@ function setCompanyView(view){
   applyCompanyView();
   if(!validationMode)saveGame();
 }
+function syncOfficeSidePanelHeight(){
+  if(typeof document==="undefined")return;
+  const root=document.documentElement;
+  const officePanel=document.querySelector(".main-grid.living-first>.office-panel");
+  if(!root||!officePanel)return;
+  const height=Math.max(420,Math.round(officePanel.getBoundingClientRect().height||0));
+  root.style.setProperty("--office-panel-height",`${height}px`);
+}
 function render(){
   ensureBibleSystems?.();restoreCompactSections?.();
   updatePauseButton?.();
@@ -444,6 +452,7 @@ function render(){
   if(typeof renderSocialOrganizationPanel==="function")renderSocialOrganizationPanel();
   renderDeveloperTools();
   renderOrganizationalDynamics();renderWorkforcePressure();renderNewspapers();
+  syncOfficeSidePanelHeight();
   applyCompanyView();
 }
 function switchMobileTab(tab,scroll=true){

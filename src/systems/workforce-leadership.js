@@ -948,7 +948,8 @@ function hiringPipelineHtml(){
   const visible=rows.slice(0,8),extra=rows.slice(8);
   const card=r=>`<div class="briefing-card"><strong>${teamDisplayName(r.dept)} +${r.count} ${r.role}</strong><small>Status: ${r.status}<br>Situation: ${r.reason}${(r.evidence||[]).length?`<br>Evidence: ${(r.evidence||[]).slice(0,3).join("; ")}`:""}<br>Review confidence: ${qualitativeBand(r.confidence,{low:45,high:75,lowText:"early",midText:"credible",highText:"strong"})}</small></div>`;
   const cards=visible.map(card).join("");
-  const more=extra.length?`<details class="pipeline-more"><summary>${extra.length} more staffing item(s)</summary><div class="briefing-grid" style="margin-top:8px">${extra.map(card).join("")}</div></details>`:"";
+  const detailsOpen=company.uiOpenDetails?.["hiring-pipeline-more"]?" open":"";
+  const more=extra.length?`<details class="pipeline-more" data-persist-details="hiring-pipeline-more"${detailsOpen}><summary>${extra.length} more staffing item(s)</summary><div class="briefing-grid" style="margin-top:8px">${extra.map(card).join("")}</div></details>`:"";
   return `<br><br><strong>Hiring Pipeline</strong><div class="briefing-grid" style="margin-top:8px">${cards}</div>${more}`;
 }
 function staffingShortageSummary(){

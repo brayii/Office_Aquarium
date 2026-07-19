@@ -436,19 +436,29 @@
     .main-grid.living-first>.right-stack{display:contents}
     .main-grid.living-first>.right-stack>section:nth-child(1){grid-area:inbox}
     .main-grid.living-first>.right-stack>section:nth-child(2){grid-area:people}
+    .main-grid.living-first>.right-stack>section{
+      min-height:0;
+    }
     @media(min-width:1251px){
+      .main-grid.living-first>.right-stack>section{
+        max-height:var(--office-panel-height, 720px);
+        overflow:hidden;
+      }
       .main-grid.living-first>.right-stack>section:nth-child(2){
-        align-self:stretch;display:flex;flex-direction:column;min-height:100%
+        align-self:start;display:flex;flex-direction:column;height:var(--office-panel-height, 720px);min-height:0
       }
       .main-grid.living-first>.right-stack>section:nth-child(1){
-        align-self:stretch;display:flex;flex-direction:column;min-height:100%
+        align-self:start;display:flex;flex-direction:column;height:var(--office-panel-height, 720px);min-height:0
       }
       .main-grid.living-first>.right-stack>section:nth-child(1) #commInboxView,
       .main-grid.living-first>.right-stack>section:nth-child(1) #commArchiveView{
-        flex:1;min-height:0;display:flex;flex-direction:column
+        flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden
       }
       .main-grid.living-first>.right-stack>section:nth-child(1) #commInboxView.hidden,
       .main-grid.living-first>.right-stack>section:nth-child(1) #commArchiveView.hidden{display:none}
+      .main-grid.living-first>.right-stack>section:nth-child(1) #commInboxList{
+        flex:0 1 auto;max-height:min(260px,34vh);overflow:auto;padding-right:2px
+      }
       .main-grid.living-first>.right-stack>section:nth-child(1) .ceo-mail-scroll{
         flex:1;min-height:0;overflow:auto;padding-right:2px
       }
@@ -466,14 +476,18 @@
     }
     body.ceo-review-active .main-grid.living-first>.right-stack>section:nth-child(1),
     body.old-message-review-active .main-grid.living-first>.right-stack>section:nth-child(1){max-width:none}
+    body.ceo-review-active .main-grid.living-first>.right-stack>section:nth-child(1),
+    body.old-message-review-active .main-grid.living-first>.right-stack>section:nth-child(1){
+      height:auto;max-height:none;overflow:visible
+    }
     body.ceo-review-active .office,
     body.old-message-review-active .office{min-height:clamp(420px,50vh,620px)}
     body.ceo-review-active #commInboxView{
-      display:grid;grid-template-columns:1fr;gap:10px;align-items:start
+      display:grid;grid-template-columns:1fr;gap:10px;align-items:start;min-height:0;overflow:visible
     }
-    body.ceo-review-active #commInboxList{grid-column:1/-1}
+    body.ceo-review-active #commInboxList{grid-column:1/-1;max-height:none;overflow:visible}
     body.ceo-review-active #commInboxView .ceo-mail-scroll{
-      display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:12px;align-items:start;overflow:visible
+      min-height:0;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:12px;align-items:start;overflow:visible
     }
     body.ceo-review-active #eventCopy,
     body.ceo-review-active #memoContainer{grid-column:1}
@@ -482,12 +496,12 @@
     body.ceo-review-active #applyDecision{margin-top:0}
     body.ceo-review-active .decision-grid{align-content:start}
     body.old-message-review-active #commArchiveView{
-      display:grid!important;grid-template-columns:1fr;gap:10px;align-items:start;width:100%
+      display:grid!important;grid-template-columns:1fr;gap:10px;align-items:start;width:100%;min-height:0;overflow:visible
     }
     body.old-message-review-active #commArchiveView .ceo-mail-scroll{
-      display:grid;grid-template-columns:minmax(220px,.32fr) minmax(0,1fr);gap:12px;align-items:start;overflow:visible;width:100%
+      min-height:0;display:grid;grid-template-columns:minmax(220px,.32fr) minmax(0,1fr);gap:12px;align-items:start;overflow:visible;width:100%;padding-right:2px
     }
-    body.old-message-review-active #memoArchiveList{max-height:clamp(360px,52vh,620px);overflow:auto;padding-right:2px}
+    body.old-message-review-active #memoArchiveList{max-height:none;overflow:visible;padding-right:2px}
     body.old-message-review-active #memoArchiveDetail{margin-top:0}
     .panel,.glass{
       color:var(--text);border:1px solid var(--border);border-radius:16px;

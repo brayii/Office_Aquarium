@@ -26,6 +26,14 @@ function setWorkspaceTab(target){
   const wrapper=document.querySelector(".workspace-tabs");if(wrapper)wrapper.classList.add("active");
 }
 document.querySelectorAll("[data-workspace-tab]").forEach(button=>button.onclick=()=>setWorkspaceTab(button.dataset.workspaceTab));
+window.addEventListener("resize",()=>{if(typeof syncOfficeSidePanelHeight==="function")syncOfficeSidePanelHeight();});
+document.addEventListener("toggle",e=>{
+  const key=e.target?.dataset?.persistDetails;
+  if(!key||!company)return;
+  if(!!company.uiOpenDetails?.[key]===!!e.target.open)return;
+  company.uiOpenDetails={...(company.uiOpenDetails||{}),[key]:!!e.target.open};
+  if(!validationMode)saveGame();
+},true);
 document.addEventListener("click",e=>{if(e.target?.id==="closeEmployee")closeEmployeeModal();if(e.target?.id==="closeGuide")closeGuideModal();if(e.target?.id==="closeConversation")closeConversationModal();if(settingsMenu&&!settingsMenu.classList.contains("hidden")&&!settingsMenu.contains(e.target)&&e.target!==settingsButton)settingsMenu.classList.add("hidden");});
 document.getElementById("employeeModal").onclick=e=>{if(e.target.id==="employeeModal")closeEmployeeModal();};
 const guideModal=document.getElementById("guideModal");if(guideModal)guideModal.onclick=e=>{if(e.target.id==="guideModal")closeGuideModal();};

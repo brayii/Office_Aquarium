@@ -1559,6 +1559,7 @@ function showArchivedMemo(i){
   const archivedDebug=debugMode?`<div class="memo-audit">Archived memo debug: relevance ${audit.relevanceScore??"n/a"}%, evidence ${audit.evidenceCoverage??"n/a"}, chain ${audit.chainOfCommandValid?"valid":"unknown"}. ${(intel.evidence||m.impacts||[]).slice(0,6).join(" | ")}</div>`:"";
   document.getElementById("memoArchiveDetail").innerHTML=`<div class="memo-card"><div class="memo-header"><div><div class="memo-type">${m.type}</div><h3>${m.title}</h3></div><span class="memo-priority">${m.priority}</span></div><div class="memo-meta"><div><strong>From:</strong> ${m.from}, ${m.role}</div><div><strong>Date:</strong> ${m.date}</div><div><strong>To:</strong> CEO</div><div><strong>Status:</strong> ${m.deleted?"Deleted old message, recoverable":"Old message"}</div></div><div class="memo-message">${m.message}</div><div class="decision-result"><strong>Your recorded choice:</strong> ${m.decision}<br><small>${m.decisionDetail||""}</small></div>${m.laterOutcome?`<div class="memo-block"><h4>Later outcome</h4><ul class="impact-list"><li>${m.laterOutcome}</li><li>Forecast accuracy: ${m.forecastAccuracy||"not rated"}</li></ul></div>`:""}<div class="archive-actions"><button type="button" class="small-btn" onclick="setArchivedMemoDeleted(${i},${m.deleted?"false":"true"})">${m.deleted?"Restore to Saved Old Messages":"Delete from Old Messages"}</button></div>${archivedDebug}<div class="memo-signature">${String(m.signature||"").replace(/\n/g,"<br>")}</div></div>`;
   renderCommunicationArchive();
+  if(typeof syncOfficeSidePanelHeight==="function")syncOfficeSidePanelHeight();
   if(!validationMode)saveGame();
 }
 function openNextQueuedMemo(){
@@ -2225,6 +2226,7 @@ function renderDecisionEvent(){
     badge.textContent=readingOld?"Old message":queuedCount?"Queued":"Watching";
     badge.className=queuedCount?"inbox-badge alert":"inbox-badge quiet";
     alert.classList.add("hidden");
+    if(typeof syncOfficeSidePanelHeight==="function")syncOfficeSidePanelHeight();
     return;
   }
   const stale=validateMessageContext(company.pendingEvent);if(!stale.valid){const old=company.pendingEvent;recordHistory(`CEO memo superseded: ${old.title||old.id} (${stale.reason}).`,"communication",2);company.pendingEvent=convertSupersededMemoToUpdate(old,stale.reason);company.pendingCommunication=null;renderDecisionEvent();return;}
@@ -2239,6 +2241,7 @@ function renderDecisionEvent(){
   memo.innerHTML=`<article class="memo-card"><div class="memo-header"><div><div class="memo-type">${comm.type}</div><h3>${comm.subject}</h3></div><span class="memo-priority ${priorityClass}">${informational?"No reply needed":comm.priority}</span></div>${communicationHeaderHtml(comm,comm.structuredMessage)}${informational?informationalMemoNoticeHtml():""}<div class="memo-message">${comm.message}</div>${memoIntelligenceHtml(ev,comm)}<div class="memo-signature">${comm.signature.replace(/\n/g,"<br>")}</div></article>`;
   alert.innerHTML=informational?`<strong>${comm.type}: ${comm.subject}</strong>${comm.from} sent an informational update.`:`<strong>${comm.type}: ${comm.subject}</strong>${comm.from} requests a CEO decision${contextText?` for ${contextText}`:""}.`;alert.classList.toggle("hidden",informational);grid.innerHTML="";if(!informational)(ev.choices||[]).slice(0,3).forEach((d,i)=>{const b=document.createElement("button");b.className="decision"+(i===company.selected?" selected":"");b.innerHTML=renderDecisionChoiceHtml(d,ev);b.onclick=()=>{company.selected=i;renderDecisionEvent()};grid.appendChild(b);});
   updateDecisionActionButtonState();
+  if(typeof syncOfficeSidePanelHeight==="function")syncOfficeSidePanelHeight();
 }
 function eventCategory(ev){return ev.category||({cash:"finance",performance:"people",hiring:"people",burnout:"people",culture:"culture",milestone:"product",launch:"product","pilot-review":"product","market-shift":"market","supply-chain":"operations","shareholder-letter":"board"}[ev.id]||"opportunity");}
 function eventBaseWeight(ev){return Number(ev.baseWeight)||({performance:.75,cash:.8,hiring:1.25,burnout:1,culture:.95,"market-shift":1,milestone:1.1,launch:1.2,"pilot-review":1.2}[ev.id]||1);}
