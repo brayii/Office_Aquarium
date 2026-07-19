@@ -259,6 +259,13 @@ function reauditProjectRequirements(project){
     project.requirementScale={day:company.day,demandScale:Number(projectDemandScale(project).toFixed(2)),requiredFte:Number(activeDemand.toFixed(1)),reason:"project staffing demand scales with company size, portfolio load, scope, and commercial expectations"};
   }
   if(project.originType==="legacy"||/Legacy Flagship/i.test(project.title||"")){
+    const startupProfile=PORTFOLIO_DEMAND_RULES.legacyFlagship||{};
+    if(startupProfile.requiredHeadcount){
+      project.requiredHeadcount={...startupProfile.requiredHeadcount};
+      project.baseRequiredHeadcount={...startupProfile.requiredHeadcount};
+    }
+    if(Array.isArray(startupProfile.requiredDepartments))project.requiredDepartments=[...startupProfile.requiredDepartments];
+    if(Array.isArray(startupProfile.requiredRoles))project.requiredRoles=[...startupProfile.requiredRoles];
     const total=Object.values(project.requiredHeadcount).reduce((s,v)=>s+(Number(v)||0),0);
     const legacyMax=PORTFOLIO_DEMAND_RULES.maxLegacyProjectHeadcount;
     if(total>legacyMax){
@@ -550,7 +557,9 @@ function projectQualifiedAllocatedFte(project,dept){
     if(!e||roleDepartment(e.role)!==dept)return sum;
     const fit=typeof workSkillFit==="function"?workSkillFit(e,{requiredSkills}):1;
     const caps=roleProjectCapabilities(e.role),capability=Math.max(caps[dept]||0,caps[workType]||0,caps.integration||0);
-    const usable=clamp((Number(value)||0)*clamp((fit*.7+capability*.3-.48)/.52,0,1.05),0,Number(value)||0);
+    const rules=PORTFOLIO_DEMAND_RULES;
+    const usableFactor=clamp(fit*(rules.qualifiedFteSkillWeight??.55)+capability*(rules.qualifiedFteCapabilityWeight??.45),0,rules.qualifiedFteMax??1.05);
+    const usable=clamp((Number(value)||0)*usableFactor,0,Number(value)||0);
     return sum+usable;
   },0);
 }

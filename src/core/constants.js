@@ -572,7 +572,15 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     maxProjectHeadcount:12,
     maxLegacyProjectHeadcount:8,
     majorProjectDemandBonus:.35,
-    launchedDemandBonus:.25
+    launchedDemandBonus:.25,
+    qualifiedFteSkillWeight:.55,
+    qualifiedFteCapabilityWeight:.45,
+    qualifiedFteMax:1.05,
+    legacyFlagship:{
+      requiredHeadcount:{hardware:2.1,software:1.5,quality:.5,product:.75,finance:.75},
+      requiredRoles:["Hardware Engineer","Chip Architect","Industrial Designer","Software Engineer","Firmware Engineer","Software QA Engineer","Product Manager","Finance Analyst"],
+      requiredDepartments:["hardware","software","quality","product","finance"]
+    }
   },
   leadershipScale:{
     vpValuationThreshold:110,

@@ -92,8 +92,15 @@ async function main() {
     assert(project, "Legacy Flagship project should exist");
     ensureProjectAllocations();
     const coverage = derivedStaffingCoverage(project);
-    assert(coverage > 0, "Legacy project should have some staffing coverage from founding team");
+    const assignedRoles = Object.keys(project.staffAllocations || {})
+      .map(id => employees.find(e => e.id === Number(id)))
+      .filter(Boolean)
+      .map(e => e.role)
+      .sort();
+    assert(coverage >= 95, `Legacy project should be covered by founding team, got ${coverage.toFixed(1)}%`);
     assert(Object.values(project.requiredHeadcount || {}).reduce((s, v) => s + Number(v || 0), 0) <= 8, "Legacy project should be completable by founding team capacity");
+    assert(JSON.stringify(assignedRoles) === JSON.stringify(foundingRoles.slice().sort()), `Legacy project should assign the founding roles, got ${assignedRoles.join(", ")}`);
+    assert((company.portfolioHealth?.projectDrivenOpenRoles || 0) === 0, "Legacy project should not create project-driven open roles on day one");
 
     company.cash = 80;
     company.finance.runwayDays = 999;
