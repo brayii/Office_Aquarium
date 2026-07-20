@@ -36,7 +36,7 @@ function processDailyEmployeeLifecycle(){
       e.daysAtRisk=Math.max(0,e.daysAtRisk-1);
     }
     if(e.sickDays>0){
-      e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
+      e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(e.performance||{})};
       e.performance.absenceDays++;
       e.sickDays--;
       if(e.sickDays===0){
@@ -112,7 +112,7 @@ function processDailyManufacturingFulfillment(){
   if(fulfillment>=MANUFACTURING_RULES.fulfillmentThreshold)return;
   const shortfall=MANUFACTURING_RULES.fulfillmentThreshold-fulfillment;
   const penalty=company.dailyRevenue*shortfall*MANUFACTURING_RULES.revenuePenaltyRate;
-  company.cash=clamp(company.cash-penalty,0,999);
+  company.cash=clamp(company.cash-penalty,0,OFFICE_AQUARIUM_CONSTANTS.defaults.simulationValueCeiling);
   company.trust=clamp(company.trust-shortfall*MANUFACTURING_RULES.trustPenaltyScale,0,100);
   recordCustomerExperience?.("enterprise","delivery-delay",Math.round(58+(1-fulfillment)*24),"Manufacturing fulfillment delays affected customer delivery.","manufacturing",true);
   Object.values(company.customerSegments||{}).forEach(segment=>{

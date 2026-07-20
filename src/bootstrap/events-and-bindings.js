@@ -7,12 +7,38 @@ if(!eventLibrary.some(e=>e.id==="research-partnership"))eventLibrary.push({id:"r
 if(!eventLibrary.some(e=>e.id==="competitor-announcement"))eventLibrary.push({id:"competitor-announcement",repeatable:true,category:"market",baseWeight:1.05,cooldownDays:16,title:"Competitor product announcement",copy:"A competitor announced a product that overlaps with your roadmap. The board wants to know whether to respond visibly or stay disciplined.",trigger:()=>company.day>8&&company.market.competitorHeat>48,choices:[{title:"Accelerate the roadmap",detail:"Signal urgency, but raise execution risk.",effect:{board:4,customers:5,trust:-1},directive:"speed",days:8,people:{stress:6,morale:-2},culture:{riskTolerance:4,politics:1},opinion:{competence:2,fear:2}},{title:"Differentiate on quality",detail:"Use reliability as the response.",effect:{quality:6,trust:5,board:1,cash:-.4},directive:"quality",days:9,people:{stress:-1,morale:3},culture:{qualityDiscipline:5,communication:2},opinion:{trust:3,competence:2}},{title:"Publish a positioning note",detail:"Clarify the strategy without disrupting work.",effect:{customers:3,trust:3,board:2,cash:-.2},directive:"revenue",days:5,people:{stress:1,morale:1},culture:{communication:5},opinion:{fairness:1,competence:2}}]});
 if(!eventLibrary.some(e=>e.id==="patent-opportunity"))eventLibrary.push({id:"patent-opportunity",repeatable:true,category:"opportunity",baseWeight:.85,cooldownDays:24,title:"Patent opportunity",copy:"The team believes a recent technical approach may be patentable. Legal work would cost money but could strengthen company value.",trigger:()=>company.day>12&&(company.chip>42||company.software>48)&&company.cash>4,choices:[{title:"File the patent",detail:"Spend cash for defensibility and valuation.",effect:{cash:-.9,valuation:3.5,board:2,quality:1},directive:"quality",days:5,people:{stress:1,morale:2},culture:{innovation:3},opinion:{competence:2}},{title:"Document and wait",detail:"Preserve the option with less expense.",effect:{cash:-.2,valuation:1,board:0},directive:null,days:0,people:{stress:0,morale:1},culture:{qualityDiscipline:1},opinion:{fairness:1}},{title:"Skip legal work",detail:"Keep execution moving and spend nothing.",effect:{integration:2,board:-1},directive:"speed",days:4,people:{stress:1,morale:-1},culture:{riskTolerance:2},opinion:{support:-1}}]});
 if(!eventLibrary.some(e=>e.id==="employee-initiative"))eventLibrary.push({id:"employee-initiative",repeatable:true,category:"people",baseWeight:1,cooldownDays:18,title:"Employee proposes a new initiative",copy:"A high-performing employee wants to lead a focused internal initiative that could improve the product or the organization.",trigger:()=>company.day>7&&employees.some(e=>e.active&&e.achievements>0&&e.morale>58),choices:[{title:"Sponsor the initiative",detail:"Give the employee room to lead.",effect:{cash:-.5,integration:3,quality:2},directive:"people",days:8,people:{stress:-1,morale:5},culture:{innovation:4,support:3},opinion:{support:4,trust:2}},{title:"Ask for a smaller proposal",detail:"Encourage leadership without disrupting delivery.",effect:{integration:1,quality:1},directive:"quality",days:5,people:{stress:0,morale:2},culture:{communication:3},opinion:{fairness:2,competence:1}},{title:"Decline for focus",detail:"Avoid distraction but dampen initiative.",effect:{board:1},directive:"revenue",days:4,people:{stress:1,morale:-3},culture:{innovation:-2,politics:1},opinion:{support:-3,trust:-1}}]});
+
+const accessibleDialogFocusOrigins=new Map();
+function accessibleDialogControls(modal){
+  return [...modal.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[href],[tabindex]:not([tabindex="-1"])')]
+    .filter(element=>element.getClientRects().length>0);
+}
+function openAccessibleDialog(id,focusId=null){
+  const modal=document.getElementById(id);
+  if(!modal)return false;
+  if(modal.classList.contains("hidden"))accessibleDialogFocusOrigins.set(id,document.activeElement);
+  modal.classList.remove("hidden");
+  const target=(focusId&&document.getElementById(focusId))||accessibleDialogControls(modal)[0]||modal;
+  if(!target.hasAttribute("tabindex")&&target===modal)target.tabIndex=-1;
+  setTimeout(()=>target.focus({preventScroll:true}),0);
+  return true;
+}
+function closeAccessibleDialog(id){
+  const modal=document.getElementById(id);
+  if(!modal||modal.classList.contains("hidden"))return false;
+  modal.classList.add("hidden");
+  const returnTarget=accessibleDialogFocusOrigins.get(id);
+  accessibleDialogFocusOrigins.delete(id);
+  if(returnTarget?.isConnected)setTimeout(()=>returnTarget.focus(),0);
+  return true;
+}
 document.querySelectorAll(".speed-btn").forEach(b=>b.onclick=()=>{company.speed=Number(b.dataset.speed);document.querySelectorAll(".speed-btn").forEach(x=>x.classList.toggle("active",x===b));});document.getElementById("pauseBtn").onclick=()=>{company.paused=!company.paused;if(!company.paused)company.lastSimulationError=null;updatePauseButton();};document.getElementById("soundMode").onchange=e=>applySoundMode(e.target.value);document.querySelectorAll(".market-range-btn").forEach(b=>b.onclick=()=>setMarketRangeView(b.dataset.marketRange));document.getElementById("applyDecision").onclick=applyDecision;document.getElementById("commInboxTab").onclick=()=>setCommunicationView("inbox");document.getElementById("commArchiveTab").onclick=()=>setCommunicationView("archive");document.getElementById("resetBtn").onclick=requestReset;document.getElementById("restartAfterLoss").onclick=requestReset;document.getElementById("continueCompany").onclick=()=>{if(loadGame())enterSimulation();else{officeSystems.ui.startup();setTimeout(()=>{if(company)setCommunicationView(company.communicationView||"inbox")},0);}};document.getElementById("newCompany").onclick=startNewCompany;document.getElementById("cancelReset").onclick=cancelResetPrompt;document.getElementById("confirmReset").onclick=startNewCompany;const balanceProjectionBtn=document.getElementById("balanceProjectionBtn");if(balanceProjectionBtn)balanceProjectionBtn.onclick=runBalanceProjectionFromUi;const balanceMatrixBtn=document.getElementById("balanceMatrixBtn");if(balanceMatrixBtn)balanceMatrixBtn.onclick=runBalanceMatrixFromUi;const aiDebugToggle=document.getElementById("aiDebugToggle");if(aiDebugToggle)aiDebugToggle.onclick=()=>{debugMode=!debugMode;aiDebugToggle.classList.toggle("active",debugMode);if(selectedEmployeeId!==null)officeSystems.ui.showEmployee(selectedEmployeeId);};
-function closeEmployeeModal(){document.getElementById("employeeModal")?.classList.add("hidden");}
-function closeGuideModal(){if(typeof closeSimulationHandbook==="function")closeSimulationHandbook();else document.getElementById("guideModal")?.classList.add("hidden");}
+function closeEmployeeModal(){closeAccessibleDialog("employeeModal");}
+function closeGuideModal(){if(typeof closeSimulationHandbook==="function")closeSimulationHandbook();else document.getElementById("guideModal")?.classList.add("hidden");returnFromStartupHandbook?.();}
 function closeConversationModal(){if(typeof closeSocialConversationDetails==="function")closeSocialConversationDetails();else document.getElementById("conversationModal")?.classList.add("hidden");}
 const closeEmployeeButton=document.getElementById("closeEmployee");if(closeEmployeeButton)closeEmployeeButton.onclick=closeEmployeeModal;
 const guideButton=document.getElementById("guideBtn");if(guideButton)guideButton.onclick=()=>{document.getElementById("settingsMenu")?.classList.add("hidden");if(typeof openSimulationHandbook==="function")openSimulationHandbook();else document.getElementById("guideModal")?.classList.remove("hidden");};
+const startupGuideButton=document.getElementById("startupGuideBtn");if(startupGuideButton)startupGuideButton.onclick=openStartupHandbook;
 const closeGuideButton=document.getElementById("closeGuide");if(closeGuideButton)closeGuideButton.onclick=closeGuideModal;
 const closeConversationButton=document.getElementById("closeConversation");if(closeConversationButton)closeConversationButton.onclick=closeConversationModal;
 const settingsButton=document.getElementById("settingsBtn"),settingsMenu=document.getElementById("settingsMenu");
@@ -20,6 +46,14 @@ if(settingsButton&&settingsMenu)settingsButton.onclick=e=>{e.stopPropagation();s
 const archiveActiveFilter=document.getElementById("archiveActiveFilter");if(archiveActiveFilter)archiveActiveFilter.onclick=()=>setCommunicationArchiveMode("saved");
 const archiveDeletedFilter=document.getElementById("archiveDeletedFilter");if(archiveDeletedFilter)archiveDeletedFilter.onclick=()=>setCommunicationArchiveMode("deleted");
 const companyViewSelect=document.getElementById("companyViewSelect");if(companyViewSelect)companyViewSelect.onchange=e=>setCompanyView(e.target.value);
+const restoreBackupButton=document.getElementById("restoreBackup");if(restoreBackupButton)restoreBackupButton.onclick=restoreBackupCompany;
+const exportCurrentSaveButton=document.getElementById("exportCurrentSave");if(exportCurrentSaveButton)exportCurrentSaveButton.onclick=()=>exportSaveSlot("current");
+const exportBackupSaveButton=document.getElementById("exportBackupSave");if(exportBackupSaveButton)exportBackupSaveButton.onclick=()=>exportSaveSlot("backup");
+const dismissSaveRecoveryButton=document.getElementById("dismissSaveRecovery");if(dismissSaveRecoveryButton)dismissSaveRecoveryButton.onclick=dismissSaveRecovery;
+const runtimeRestoreBackupButton=document.getElementById("runtimeRestoreBackup");if(runtimeRestoreBackupButton)runtimeRestoreBackupButton.onclick=restoreBackupAfterRuntimeError;
+const exportDiagnosticsButton=document.getElementById("exportDiagnostics");if(exportDiagnosticsButton)exportDiagnosticsButton.onclick=exportRuntimeDiagnostics;
+const returnToTitleButton=document.getElementById("returnToTitle");if(returnToTitleButton)returnToTitleButton.onclick=returnToTitle;
+const restartAfterRuntimeErrorButton=document.getElementById("restartAfterRuntimeError");if(restartAfterRuntimeErrorButton)restartAfterRuntimeErrorButton.onclick=()=>{document.getElementById("runtimeErrorOverlay")?.classList.add("hidden");requestReset();};
 function setWorkspaceTab(target){
   document.querySelectorAll("[data-workspace-tab]").forEach(tab=>tab.classList.toggle("active",tab.dataset.workspaceTab===target));
   document.querySelectorAll("[data-workspace-panel]").forEach(panel=>panel.classList.toggle("workspace-panel-hidden",panel.dataset.workspacePanel!==target));
@@ -38,5 +72,22 @@ document.addEventListener("click",e=>{if(e.target?.id==="closeEmployee")closeEmp
 document.getElementById("employeeModal").onclick=e=>{if(e.target.id==="employeeModal")closeEmployeeModal();};
 const guideModal=document.getElementById("guideModal");if(guideModal)guideModal.onclick=e=>{if(e.target.id==="guideModal")closeGuideModal();};
 const conversationModal=document.getElementById("conversationModal");if(conversationModal)conversationModal.onclick=e=>{if(e.target.id==="conversationModal")closeConversationModal();};
+document.addEventListener("keydown",event=>{
+  const modal=["runtimeErrorOverlay","conversationModal","employeeModal"].map(id=>document.getElementById(id)).find(candidate=>candidate&&!candidate.classList.contains("hidden"));
+  if(!modal)return;
+  if(event.key==="Escape"){
+    event.preventDefault();
+    if(modal.id==="runtimeErrorOverlay"){document.getElementById("runtimeErrorTitle")?.focus();return;}
+    if(modal.id==="conversationModal")closeConversationModal();else closeEmployeeModal();
+    return;
+  }
+  if(event.key!=="Tab")return;
+  const controls=accessibleDialogControls(modal);
+  if(!controls.length){event.preventDefault();modal.focus();return;}
+  const first=controls[0],last=controls[controls.length-1];
+  const initialFocus=modal.querySelector('[tabindex="-1"]');
+  if(event.shiftKey&&(document.activeElement===first||document.activeElement===initialFocus)){event.preventDefault();last.focus();}
+  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+});
 document.querySelectorAll(".section-toggle[data-collapse-target]").forEach(b=>b.onclick=()=>toggleCompactSection(b));document.querySelectorAll(".mobile-tabs button").forEach(b=>b.onclick=()=>officeSystems.ui.switchTab(b.dataset.tab));officeSystems.ui.startup();
 officeSystems.ui.switchTab("office",false);

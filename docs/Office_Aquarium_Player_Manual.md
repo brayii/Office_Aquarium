@@ -1,9 +1,11 @@
 # Office Aquarium
-## Player Manual - Save Version 40
+## Player Manual - Save Version 41
 
 Office Aquarium is an autonomous technology-company simulation. You are the CEO of a company building hardware and software. Employees control themselves; your job is to watch the organization, understand what is happening, respond to important communications, and keep the company healthy enough to survive and grow.
 
-This manual describes the current save version 40 build. The game remains a standalone offline application and does not require an API key or online service.
+This manual describes Office Aquarium Public Beta 0.9 and the current save
+version 41 build. The game remains a standalone offline application and does
+not require an API key or online service.
 
 The current build uses a main `Office_Aquarium.html` file plus ordered JavaScript files under `src/`. Keep the folder structure together, including `assets/audio` for optional sound, when moving the game to another PC or mobile device.
 
@@ -1118,7 +1120,8 @@ Typical recovery priorities:
 
 # 27. Saving and Loading
 
-The game saves automatically in the browser on the current device.
+The game saves automatically in the browser on the current device. It keeps a
+current save and a separately validated last-known-good backup.
 
 Saved data includes:
 
@@ -1140,13 +1143,23 @@ Important:
 - private/incognito browsing may not preserve data
 - restarting the company overwrites the local save
 
+If the current save is damaged, missing while a backup exists, cannot migrate,
+or cannot be written because storage is unavailable or full, the title screen
+opens a recovery view. It may offer Restore Backup, Export Current Save, Export
+Backup, Start New Company, or Cancel. A damaged save is never silently treated
+as a brand-new company.
+
+If a simulation stage fails, the office pauses, stops the current speed batch,
+attempts an emergency save, and shows a plain-language recovery notice. Normal
+players do not see raw stack traces.
+
 ---
 
 # 28. Mobile Play
 
-On mobile, use the sticky tab bar.
-
-Tabs may scroll horizontally on very small screens.
+On mobile, use the sticky five-button tab bar. Office, Employees, CEO Inbox,
+Company, and Paper remain visible without horizontal scrolling at supported
+mobile widths.
 
 Recommended mobile workflow:
 
@@ -1284,7 +1297,8 @@ Possible causes:
 
 ## Mobile layout feels crowded
 
-Scroll the top tab bar horizontally and open one section at a time.
+Open one primary tab at a time. All five destinations remain visible; dense
+content inside a destination scrolls vertically.
 
 ## I cannot hear sound
 

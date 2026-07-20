@@ -13,7 +13,48 @@ function collectDailyMetrics(){
   const unresolvedQualityMistakes=active.reduce((s,e)=>s+(e.performance?.qualityMistakes||0),0);
   qualityTelemetry.averageDaysToResolve=Number((unresolvedQualityMistakes/Math.max(.1,qualityTelemetry.mistakesResolved||0)).toFixed(2));
   const derived=recordOperatingHealthSnapshot();
-  const snapshot={day:company.day,cash:Number(company.cash.toFixed(2)),phase:company.phase,activeEmployees:active.length,morale:Math.round(derived.morale??morale),stress:Math.round(stress),quality:Math.round(company.quality),integration:Math.round(company.integration),customers:Math.round(company.customers),grossRevenueDaily:Number((f.grossRevenueDaily||company.dailyRevenue||0).toFixed(3)),payrollDaily:Number((f.payrollDaily||0).toFixed(3)),manufacturingDaily:Number((f.manufacturingDaily||0).toFixed(3)),supportDaily:Number((f.supportDaily||0).toFixed(3)),growthOverhead:Number((f.growthOverhead||0).toFixed(3)),totalDailyCost:Number((f.totalDailyCost||0).toFixed(3)),qualityMistakes:Math.round(unresolvedQualityMistakes),qualityTelemetry,messages5d:msgs.length,routes,actionDiversity:actionDiversityScore(counters.actions),learningSpread:learningSpread(),learningMagnitude:averageLearningMagnitude(),memoDiversity:uniqueCategories.size,repeatedMemoRate,survivalRisk:Math.round(clamp(company.companyRiskComponents?.total??35,0,100)),netCashFlow:Number((f.netCashFlowDaily||0).toFixed(3)),runwayDays:runwayDaysOrUnknown(f),boardStrikes:company.boardGovernance?.strikes||0,unpaidPayrollDays:company.unpaidPayrollDays||0,investorConfidence:derived.investorConfidence,operatingHealth:{hardwareHealth:derived.hardwareHealth,softwareHealth:derived.softwareHealth,manufacturingHealth:derived.manufacturingHealth,customerSentiment:derived.customerSentiment,investorConfidence:derived.investorConfidence,shareholderConfidence:derived.shareholderConfidence,teamCohesion:derived.teamCohesion,trust:derived.trust,portfolioHealth:derived.portfolioHealth,financeHealth:derived.financeHealth},counters:{...counters,actions:{...counters.actions},qualityTelemetry:{...qualityTelemetry}}};
+  const projects=typeof activeProjects==="function"?activeProjects():[];
+  const openWork=(company.workItems||[]).filter(work=>work.status==="open"&&Number(work.progress||0)<100);
+  const snapshot={
+    day:company.day,
+    cash:Number(company.cash.toFixed(2)),
+    phase:company.phase,
+    activeEmployees:active.length,
+    morale:Math.round(derived.morale??morale),
+    stress:Math.round(stress),
+    quality:Math.round(company.quality),
+    integration:Math.round(company.integration),
+    trust:Math.round(derived.trust??company.trust??0),
+    board:Math.round(company.board??0),
+    investorConfidence:Math.round(derived.investorConfidence??company.shareholders?.confidence??0),
+    shareholderPressure:Math.round(company.shareholders?.pressure??0),
+    customers:Math.round(company.customers),
+    activeProjects:projects.length,
+    blockedWork:openWork.filter(work=>(work.blockedBy||[]).length).length,
+    backlog:openWork.length,
+    grossRevenueDaily:Number((f.grossRevenueDaily||company.dailyRevenue||0).toFixed(3)),
+    payrollDaily:Number((f.payrollDaily||0).toFixed(3)),
+    manufacturingDaily:Number((f.manufacturingDaily||0).toFixed(3)),
+    supportDaily:Number((f.supportDaily||0).toFixed(3)),
+    growthOverhead:Number((f.growthOverhead||0).toFixed(3)),
+    totalDailyCost:Number((f.totalDailyCost||0).toFixed(3)),
+    qualityMistakes:Math.round(unresolvedQualityMistakes),
+    qualityTelemetry,
+    messages5d:msgs.length,
+    routes,
+    actionDiversity:actionDiversityScore(counters.actions),
+    learningSpread:learningSpread(),
+    learningMagnitude:averageLearningMagnitude(),
+    memoDiversity:uniqueCategories.size,
+    repeatedMemoRate,
+    survivalRisk:Math.round(clamp(company.companyRiskComponents?.total??35,0,100)),
+    netCashFlow:Number((f.netCashFlowDaily||0).toFixed(3)),
+    runwayDays:runwayDaysOrUnknown(f),
+    boardStrikes:company.boardGovernance?.strikes||0,
+    unpaidPayrollDays:company.unpaidPayrollDays||0,
+    operatingHealth:{hardwareHealth:derived.hardwareHealth,softwareHealth:derived.softwareHealth,manufacturingHealth:derived.manufacturingHealth,customerSentiment:derived.customerSentiment,investorConfidence:derived.investorConfidence,shareholderConfidence:derived.shareholderConfidence,teamCohesion:derived.teamCohesion,trust:derived.trust,portfolioHealth:derived.portfolioHealth,financeHealth:derived.financeHealth},
+    counters:{...counters,actions:{...counters.actions},qualityTelemetry:{...qualityTelemetry}}
+  };
   const flags=[];
   if(snapshot.stress>70)flags.push("stress-high");
   if(snapshot.repeatedMemoRate>50&&recentMemos.length>=3)flags.push("memo-repetition");
@@ -22,7 +63,14 @@ function collectDailyMetrics(){
   if(company.day>30&&(snapshot.qualityMistakes>32||qualityTelemetry.mistakesCreated/Math.max(1,company.day)>1.8))flags.push("quality-rework-high");
   if(snapshot.actionDiversity<38&&company.day>10)flags.push("low-action-diversity");
   snapshot.flags=flags;
-  company.simulationMetrics.daily=[...(company.simulationMetrics.daily||[]).filter(d=>d.day!==company.day),snapshot].slice(-320);
+  if(currentSimulationContext?.isIsolatedValidation){
+    currentSimulationContext.validationDaily=Array.isArray(currentSimulationContext.validationDaily)?currentSimulationContext.validationDaily:[];
+    currentSimulationContext.validationDaily=[
+      ...currentSimulationContext.validationDaily.filter(item=>item.day!==snapshot.day),
+      cloneForValidation(snapshot)
+    ].sort((left,right)=>left.day-right.day);
+  }
+  company.simulationMetrics.daily=[...(company.simulationMetrics.daily||[]).filter(d=>d.day!==company.day),snapshot].slice(-OFFICE_AQUARIUM_CONSTANTS.telemetry.persistedDailySnapshots);
   company.simulationMetrics.lastBalance=snapshot;
   if(flags.length&&company.day%5===0)recordWeeklyEvent(`Simulation balance watch: ${flags.join(", ")}.`,"metrics",2);
 }
@@ -34,16 +82,42 @@ function seededRandom(seedText){
 function seedToRandomState(seedText){
   let h=2166136261>>>0;
   for(let i=0;i<String(seedText).length;i++){h^=String(seedText).charCodeAt(i);h=Math.imul(h,16777619);}
-  return h>>>0||2463534242;
+  return h>>>0||OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState;
 }
-function summarizeProjection(seed,days,daily,finalCompany,finalEmployees){
+function summarizeProjection(seed,days,daily,finalCompany,finalEmployees,metadata={}){
   const last=daily[daily.length-1]||{},avg=key=>Math.round(daily.reduce((s,d)=>s+(d[key]||0),0)/Math.max(1,daily.length));
   const flags=[...new Set(daily.flatMap(d=>d.flags||[]))];
   const counters=last.counters||{};
   const qualityTelemetry={mistakesCreated:0,mistakesResolved:0,defectsReopened:0,verificationFailures:0,rushedWorkMistakes:0,stressRelatedMistakes:0,lowFocusMistakes:0,weakCultureMistakes:0,manufacturingDefects:0,reworkActions:0,averageDaysToResolve:0,...(last.qualityTelemetry||counters.qualityTelemetry||{})};
   const launched=daily.filter(d=>d.phase==="launched"||d.phase==="pilot");
+  const financialTrajectory=daily.filter((entry,index)=>index===0||index===daily.length-1||entry.day%OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth===0).map(entry=>({
+    day:entry.day,
+    cash:entry.cash,
+    customers:entry.customers,
+    grossRevenueDaily:entry.grossRevenueDaily,
+    payrollDaily:entry.payrollDaily,
+    manufacturingDaily:entry.manufacturingDaily,
+    supportDaily:entry.supportDaily,
+    growthOverhead:entry.growthOverhead,
+    totalDailyCost:entry.totalDailyCost,
+    netCashFlow:entry.netCashFlow,
+    runwayDays:entry.runwayDays,
+    activeEmployees:entry.activeEmployees,
+    board:entry.board,
+    trust:entry.trust,
+    investorConfidence:entry.investorConfidence,
+    shareholderPressure:entry.shareholderPressure,
+    survivalRisk:entry.survivalRisk,
+    activeProjects:entry.activeProjects,
+    blockedWork:entry.blockedWork,
+    backlog:entry.backlog,
+    quality:entry.quality,
+    integration:entry.integration,
+    phase:entry.phase
+  }));
   const avgNum=(list,key)=>Number((list.reduce((s,d)=>s+(Number(d[key])||0),0)/Math.max(1,list.length)).toFixed(3));
-  return {seed,daysRun:daily.length,endedEarly:daily.length<days,finalDay:last.day??0,phase:finalCompany.phase,cash:Number(finalCompany.cash.toFixed(2)),activeEmployees:finalEmployees.filter(e=>e.active).length,avgStress:avg("stress"),avgMorale:avg("morale"),avgSurvivalRisk:avg("survivalRisk"),finalStress:last.stress||0,finalMorale:last.morale||0,finalSurvivalRisk:last.survivalRisk||0,actionDiversity:last.actionDiversity||0,learningSpread:last.learningSpread||0,learningMagnitude:last.learningMagnitude||0,messages5d:last.messages5d||0,memoRepeat:last.repeatedMemoRate||0,avgNetCashFlow:avgNum(daily,"netCashFlow"),postLaunchNetCashFlow:avgNum(launched,"netCashFlow"),finalRunwayDays:finiteNumberOr(last.runwayDays,OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay),finalTotalDailyCost:last.totalDailyCost||0,finalGrossRevenueDaily:last.grossRevenueDaily||0,qualityMistakes:Math.round(counters.qualityMistakes||0),unresolvedQualityMistakes:last.qualityMistakes||0,qualityTelemetry,sickness:Math.round(counters.sickness||0),resignations:Math.round(counters.resignations||0),firings:Math.round(counters.firings||0),coaching:Math.round(counters.coaching||0),ceoDecisions:Math.round(counters.ceoDecisions||0),executiveMemos:Math.round(counters.executiveMemos||0),queuedEscalations:Math.round(counters.queuedEscalations||0),flags};
+  const startDay=Number(metadata.startDay)||0,finalDay=Number(finalCompany.day)||0;
+  return {seed,strategy:metadata.strategy||OFFICE_AQUARIUM_CONSTANTS.validation.defaultStrategy,daysRun:Math.max(0,finalDay-startDay),endedEarly:finalDay<(metadata.targetDay??startDay+days),finalDay,phase:finalCompany.phase,cash:Number(finalCompany.cash.toFixed(2)),activeEmployees:finalEmployees.filter(e=>e.active).length,avgStress:avg("stress"),avgMorale:avg("morale"),avgSurvivalRisk:avg("survivalRisk"),finalStress:last.stress||0,finalMorale:last.morale||0,finalSurvivalRisk:last.survivalRisk||0,finalBoard:last.board||0,finalTrust:last.trust||0,finalInvestorConfidence:last.investorConfidence||0,finalShareholderPressure:last.shareholderPressure||0,actionDiversity:last.actionDiversity||0,learningSpread:last.learningSpread||0,learningMagnitude:last.learningMagnitude||0,messages5d:last.messages5d||0,memoRepeat:last.repeatedMemoRate||0,avgNetCashFlow:avgNum(daily,"netCashFlow"),postLaunchNetCashFlow:avgNum(launched,"netCashFlow"),finalRunwayDays:finiteNumberOr(last.runwayDays,OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay),finalTotalDailyCost:last.totalDailyCost||0,finalGrossRevenueDaily:last.grossRevenueDaily||0,financialTrajectory,qualityMistakes:Math.round(counters.qualityMistakes||0),unresolvedQualityMistakes:last.qualityMistakes||0,qualityTelemetry,sickness:Math.round(counters.sickness||0),resignations:Math.round(counters.resignations||0),firings:Math.round(counters.firings||0),hiringCount:Math.round(counters.hires||0),coaching:Math.round(counters.coaching||0),ceoDecisions:Math.round(counters.ceoDecisions||0),executiveMemos:Math.round(counters.executiveMemos||0),queuedEscalations:Math.round(counters.queuedEscalations||0),flags};
 }
 function createRuntimeIdService(start=1){
   let nextId=Math.max(1,Number(start)||1);
@@ -88,10 +162,13 @@ function initializeIsolatedEmployees(){
   const shuffled=traits.map(x=>[...x]).sort(()=>simulationRandom()-.5);
   employees.forEach((e,i)=>{e.traits=shuffled[i];e.energy=clamp(e.energy+rand(-8,8),55,95);e.morale=clamp(e.morale+rand(-8,8),52,90);e.focus=clamp(e.focus+rand(-8,8),45,92);});
 }
-function createIsolatedValidationContext({seed,scenario="fresh-company",saveSnapshot=null}={}){
+function createIsolatedValidationContext({seed,scenario="fresh-company",saveSnapshot=null,strategy=OFFICE_AQUARIUM_CONSTANTS.validation.defaultStrategy}={}){
   const repository=new InMemorySaveRepository();
   const runtimeIds=createRuntimeIdService(1);
   const context=new SimulationContext({company:createFreshCompanyState(seed||"isolated-validation"),employees:[],rng:createSeededRng(seed||"isolated-validation"),runtimeIds,repository,timer:new ManualSimulationTimer(),eventBus:new IsolatedEventBus(),services:createIsolatedServices(),mode:"isolated-validation"});
+  context.strategy=OFFICE_AQUARIUM_CONSTANTS.validation.strategies.includes(strategy)?strategy:OFFICE_AQUARIUM_CONSTANTS.validation.defaultStrategy;
+  context.validationDecisionLog=[];
+  context.validationDaily=[];
   withSimulationContext(context,()=>{
     if(saveSnapshot?.company){
       company={...createFreshCompanyState(seed||"snapshot"),...cloneForValidation(saveSnapshot.company),randomState:seedToRandomState(seed||"snapshot"),nextRuntimeId:1};
@@ -124,24 +201,90 @@ function simulateMinutesInContext(context,minutes=5){
     return {day:company.day,minute:company.minute,gameOver:company.gameOver,error:company.lastSimulationError||null};
   });
 }
-function runProjectionInContext(context,{days=120,seed="isolated-validation",failureHook=null}={}){
+function validationTickBudget(days,startMinute=OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute){
+  const step=OFFICE_AQUARIUM_CONSTANTS.time.simulationStepMinutes;
+  const firstDayTicks=Math.max(0,Math.ceil((OFFICE_AQUARIUM_CONSTANTS.time.workdayEndMinute-startMinute)/step));
+  const fullDayTicks=Math.ceil((OFFICE_AQUARIUM_CONSTANTS.time.workdayEndMinute-OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute)/step);
+  const requested=Math.max(0,Math.floor(days));
+  const exact=requested?firstDayTicks+Math.max(0,requested-1)*fullDayTicks:0;
+  return Math.max(1,Math.ceil(exact*OFFICE_AQUARIUM_CONSTANTS.validation.tickBudgetMultiplier)+2);
+}
+function diagnoseValidationFailure(finalCompany,finalEmployees){
+  const code=String(finalCompany.failureCode||"").toLowerCase(),finance=finalCompany.finance||{};
+  if(/cash|insolv|financial|payroll/.test(code)||Number(finalCompany.cash)<=0)return "insolvency";
+  if(/board|ceo|leadership|investor|reputation/.test(code))return "board-or-reputation";
+  if(/staff|workforce|hiring/.test(code))return "chronic-understaffing";
+  if(/project|product|quality|operational|manufactur/.test(code))return "project-or-operational-collapse";
+  if((finalEmployees||[]).filter(e=>e.active).length<4)return "workforce-collapse";
+  if(Number(finance.runwayDays)<20)return "financial-pressure";
+  return finalCompany.gameOver?"unclassified-gameplay-failure":"none";
+}
+function runProjectionInContext(context,{days=120,seed="isolated-validation",failureHook=null,maxTicks=null}={}){
   assertIsolatedValidationEnvironment(context);
   return withSimulationContext(context,()=>{
-    const targetDays=company.day+days;
-    while(company.day<targetDays&&!company.gameOver&&!company.lastSimulationError){
-      if(typeof failureHook==="function")failureHook({day:company.day,minute:company.minute,company,employees});
+    const startDay=company.day,targetDay=startDay+Math.max(0,Math.floor(days));
+    const tickBudget=Number.isFinite(maxTicks)?Math.max(0,Math.floor(maxTicks)):validationTickBudget(days,company.minute);
+    let totalTicks=0;
+    while(company.day<targetDay&&!company.gameOver&&!company.lastSimulationError&&totalTicks<tickBudget){
+      try{
+        if(typeof failureHook==="function")failureHook({day:company.day,minute:company.minute,company,employees,totalTicks,targetDay});
+      }catch(error){recordSimulationError(error,"validation-hook");}
+      if(company.lastSimulationError)break;
       simulateMinute(false);
+      totalTicks++;
     }
     collectDailyMetrics();
-    const report=summarizeProjection(seed,days,company.simulationMetrics?.daily||[],company,employees);
-    report.survival=!report.endedEarly&&!company.gameOver&&company.cash>0;
+    const statuses=OFFICE_AQUARIUM_CONSTANTS.validation.statuses;
+    const resultStatus=company.lastSimulationError?statuses.systemError:company.gameOver?statuses.companyFailed:company.day>=targetDay?statuses.completed:statuses.timedOut;
+    const report=summarizeProjection(seed,days,context.validationDaily.length?context.validationDaily:company.simulationMetrics?.daily||[],company,employees,{startDay,targetDay,strategy:context.strategy});
+    report.result=resultStatus;
+    report.targetDay=targetDay;
+    report.totalTicks=totalTicks;
+    report.tickBudget=tickBudget;
+    report.reachedTarget=company.day>=targetDay;
+    report.systemErrorFree=!(company.systemErrors||[]).length&&!company.lastSimulationError;
+    report.contractPassed=resultStatus===statuses.completed||resultStatus===statuses.companyFailed;
+    report.survival=resultStatus===statuses.completed&&company.cash>0;
     report.ceoRemoval=company.failureType==="ceo-fired";
     report.companyFailure=company.failureType==="company-failure";
+    report.failureOwner=company.failureOwner||null;
+    report.failureCode=company.failureCode||null;
+    report.failureCause=diagnoseValidationFailure(company,employees);
     report.crisisCount=(company.history||[]).filter(h=>String(h.type||"").includes("crisis")||String(h.text||"").toLowerCase().includes("crisis")).length;
-    report.projectCompletion=(company.projectArchive||[]).length;
+    report.projectCompletion=(company.projectArchive||[]).filter(project=>project.status==="completed").length;
+    report.projectArchiveCount=(company.projectArchive||[]).length;
     report.customerChurn=company.customerTelemetry?.churned||0;
     report.investorConfidence=derivedOperatingHealth?.().investorConfidence??company.shareholders?.confidence??0;
     report.companyRisk=company.companyRiskComponents?.total??0;
+    const openWork=(company.workItems||[]).filter(work=>work.status==="open");
+    const validationProjects=typeof activeProjects==="function"?activeProjects():[];
+    report.finalBlockedWork=openWork.filter(work=>(work.blockedBy||[]).length).length;
+    report.finalBacklog=openWork.length;
+    report.activeProjectCount=validationProjects.length;
+    report.atRiskProjectCount=validationProjects.filter(project=>project.status==="at risk"||Number(project.performance?.riskTrend??project.visibleRisk??0)>=70).length;
+    report.projectDiagnostics=validationProjects.map(project=>({
+      id:project.id,
+      title:project.title,
+      status:project.status,
+      progress:Number(Number(project.progress||0).toFixed(1)),
+      completedWorkItems:Number(project.completedWorkItemCount)||0,
+      plannedWorkItems:typeof projectPlannedWorkItemCount==="function"?projectPlannedWorkItemCount(project):null,
+      blockers:Number(project.performance?.blockerCount)||0,
+      backlog:Number(project.performance?.backlogCount)||0,
+      staffingCoverage:Number(project.performance?.staffingCoverage)||0,
+      scheduleVariance:Number(project.performance?.scheduleVariance)||0,
+      risk:Number(project.performance?.riskTrend??project.visibleRisk??0)
+    }));
+    report.crisisDiagnostic=company.crisis?cloneForValidation({
+      type:company.crisis.type,
+      startedDay:company.crisis.startedDay,
+      deadlineDay:company.crisis.deadlineDay,
+      progress:company.crisis.currentProgress,
+      signals:company.crisis.visibleSignals||[],
+      recoveryCriteria:company.crisis.recoveryCriteria||[]
+    }):null;
+    report.decisionLog=cloneForValidation(context.validationDecisionLog||[]);
+    report.saveAnalysis=saveRepository.analyze(company,employees);
     report.deterministicHash=typeof hashAuthoritativeState==="function"?hashAuthoritativeState(company,employees):stateHash();
     report.storageWrites=context.repository.writeCount;
     context.report=report;
@@ -154,9 +297,11 @@ function runBalanceProjection(contextOrDays=120,options={}){
   const hasContext=contextOrDays instanceof SimulationContext;
   const days=hasContext?(options.days||120):contextOrDays;
   const seed=options.seed||`isolated-seed-${days}`;
-  const context=hasContext?contextOrDays:createIsolatedValidationContext({seed});
+  const strategy=options.strategy||OFFICE_AQUARIUM_CONSTANTS.validation.defaultStrategy;
+  const context=hasContext?contextOrDays:createIsolatedValidationContext({seed,strategy});
+  context.strategy=OFFICE_AQUARIUM_CONSTANTS.validation.strategies.includes(strategy)?strategy:context.strategy;
   assertIsolatedValidationEnvironment(context);
-  return runProjectionInContext(context,{days,seed,failureHook:options.failureHook});
+  return runProjectionInContext(context,{days,seed,failureHook:options.failureHook,maxTicks:options.maxTicks});
 }
 function runDeterministicContinuationCheck(seed="determinism-isolated",midDays=50,totalDays=100){
   const context=createIsolatedValidationContext({seed});
@@ -177,25 +322,42 @@ function summarizeProjectionMatrix(reports){
   const avg=key=>Math.round(reports.reduce((s,r)=>s+(Number(r[key])||0),0)/Math.max(1,reports.length));
   const percentile=(values,p)=>{const list=values.map(Number).filter(Number.isFinite).sort((a,b)=>a-b);if(!list.length)return 0;return Number(list[Math.min(list.length-1,Math.max(0,Math.floor((list.length-1)*p)))].toFixed(2));};
   const median=values=>percentile(values,.5);
-  const survival=reports.filter(r=>!r.endedEarly&&r.cash>0&&r.activeEmployees>=4).length;
+  const survival=reports.filter(r=>r.survival).length;
+  const failures=reports.filter(r=>r.result===OFFICE_AQUARIUM_CONSTANTS.validation.statuses.companyFailed);
   const flags=[...new Set(reports.flatMap(r=>r.flags||[]))];
   const minCash=Math.min(...reports.map(r=>Number(r.cash)||0));
   const maxStress=Math.max(...reports.map(r=>Number(r.finalStress)||0));
   const endedEarly=reports.filter(r=>r.endedEarly).length;
   const avgQ=key=>Number((reports.reduce((s,r)=>s+(Number(r.qualityTelemetry?.[key])||0),0)/Math.max(1,reports.length)).toFixed(1));
   const qualityTelemetry={mistakesCreated:avgQ("mistakesCreated"),mistakesResolved:avgQ("mistakesResolved"),defectsReopened:avgQ("defectsReopened"),verificationFailures:avgQ("verificationFailures"),rushedWorkMistakes:avgQ("rushedWorkMistakes"),stressRelatedMistakes:avgQ("stressRelatedMistakes"),lowFocusMistakes:avgQ("lowFocusMistakes"),weakCultureMistakes:avgQ("weakCultureMistakes"),manufacturingDefects:avgQ("manufacturingDefects"),reworkActions:avgQ("reworkActions"),averageDaysToResolve:avgQ("averageDaysToResolve")};
-  return {runs:reports.length,survivalRate:Math.round(survival/Math.max(1,reports.length)*100),endedEarly,minCash,maxStress,medianFinalCash:median(reports.map(r=>r.cash)),cashP10:percentile(reports.map(r=>r.cash),.1),cashP90:percentile(reports.map(r=>r.cash),.9),medianNetCashFlow:median(reports.map(r=>r.avgNetCashFlow)),medianPostLaunchNetCashFlow:median(reports.map(r=>r.postLaunchNetCashFlow)),avgStress:avg("avgStress"),avgMorale:avg("avgMorale"),avgSurvivalRisk:avg("avgSurvivalRisk"),avgActionDiversity:avg("actionDiversity"),avgLearningSpread:avg("learningSpread"),avgMemoRepeat:avg("memoRepeat"),avgCeoDecisions:avg("ceoDecisions"),avgEscalations:avg("queuedEscalations"),avgMistakes:avg("qualityMistakes"),avgUnresolvedMistakes:avg("unresolvedQualityMistakes"),qualityTelemetry,avgSickness:avg("sickness"),avgTurnover:Math.round(reports.reduce((s,r)=>s+(r.resignations||0)+(r.firings||0),0)/Math.max(1,reports.length)),flags};
+  return {runs:reports.length,survivalRate:Math.round(survival/Math.max(1,reports.length)*100),endedEarly,medianFailureDay:failures.length?median(failures.map(r=>r.finalDay)):null,failureCauses:failures.reduce((out,r)=>(out[r.failureCause]=(out[r.failureCause]||0)+1,out),{}),systemErrors:reports.filter(r=>!r.systemErrorFree).length,timeouts:reports.filter(r=>r.result===OFFICE_AQUARIUM_CONSTANTS.validation.statuses.timedOut).length,minCash,maxStress,medianFinalCash:median(reports.map(r=>r.cash)),cashP10:percentile(reports.map(r=>r.cash),.1),cashP90:percentile(reports.map(r=>r.cash),.9),medianNetCashFlow:median(reports.map(r=>r.avgNetCashFlow)),medianPostLaunchNetCashFlow:median(reports.map(r=>r.postLaunchNetCashFlow)),medianHeadcount:median(reports.map(r=>r.activeEmployees)),avgProjectCompletions:Number((reports.reduce((sum,r)=>sum+(Number(r.projectCompletion)||0),0)/Math.max(1,reports.length)).toFixed(1)),avgHiringCount:Number((reports.reduce((sum,r)=>sum+(Number(r.hiringCount)||0),0)/Math.max(1,reports.length)).toFixed(1)),medianSaveCharacters:median(reports.map(r=>r.saveAnalysis?.serializedCharacters||0)),maxSaveCharacters:Math.max(0,...reports.map(r=>Number(r.saveAnalysis?.serializedCharacters)||0)),avgStress:avg("avgStress"),avgMorale:avg("avgMorale"),avgSurvivalRisk:avg("avgSurvivalRisk"),avgActionDiversity:avg("actionDiversity"),avgLearningSpread:avg("learningSpread"),avgMemoRepeat:avg("memoRepeat"),avgCeoDecisions:avg("ceoDecisions"),avgEscalations:avg("queuedEscalations"),avgMistakes:avg("qualityMistakes"),avgUnresolvedMistakes:avg("unresolvedQualityMistakes"),qualityTelemetry,avgSickness:avg("sickness"),avgTurnover:Math.round(reports.reduce((s,r)=>s+(r.resignations||0)+(r.firings||0),0)/Math.max(1,reports.length)),flags};
 }
-function runBalanceMatrix(seedCount=8,days=120){
+function runBalanceMatrix(seedCount=8,days=120,strategy=OFFICE_AQUARIUM_CONSTANTS.validation.defaultStrategy){
   const baseSeed=`isolated-matrix-${seedCount}-${days}`;
   const reports=[];
   for(let i=0;i<seedCount;i++){
     const seed=`${baseSeed}-${i+1}`;
-    const context=createIsolatedValidationContext({seed});
-    reports.push(runBalanceProjection(context,{days,seed}));
+    const context=createIsolatedValidationContext({seed,strategy});
+    reports.push(runBalanceProjection(context,{days,seed,strategy}));
   }
-  lastValidationReport={...summarizeProjectionMatrix(reports),matrix:true,seed:baseSeed,daysRun:days,reports};
+  lastValidationReport={...summarizeProjectionMatrix(reports),matrix:true,seed:baseSeed,strategy,daysRun:days,reports};
   return lastValidationReport;
+}
+function runReleaseStrategyMatrix({seedCount=OFFICE_AQUARIUM_CONSTANTS.validation.developmentSeedsPerStrategy,days=OFFICE_AQUARIUM_CONSTANTS.validation.firstYearHorizonDays,strategies=OFFICE_AQUARIUM_CONSTANTS.validation.strategies.slice(0,3),seedPrefix="release-hardening"}={}){
+  const reports=[];
+  strategies.forEach(strategy=>{
+    for(let i=0;i<seedCount;i++){
+      const seed=`${seedPrefix}-${strategy}-${i+1}`;
+      const context=createIsolatedValidationContext({seed,strategy});
+      reports.push(runBalanceProjection(context,{days,seed,strategy}));
+    }
+  });
+  const byStrategy={};
+  strategies.forEach(strategy=>{
+    const strategyReports=reports.filter(report=>report.strategy===strategy);
+    byStrategy[strategy]={...summarizeProjectionMatrix(strategyReports),statusCounts:strategyReports.reduce((out,report)=>(out[report.result]=(out[report.result]||0)+1,out),{}),failureCauses:strategyReports.reduce((out,report)=>(out[report.failureCause]=(out[report.failureCause]||0)+1,out),{})};
+  });
+  return {seedCount,days,strategies,reports,byStrategy,systemErrors:reports.filter(report=>!report.systemErrorFree).length,timeouts:reports.filter(report=>report.result===OFFICE_AQUARIUM_CONSTANTS.validation.statuses.timedOut).length,falsePasses:reports.filter(report=>report.result===OFFICE_AQUARIUM_CONSTANTS.validation.statuses.timedOut&&report.contractPassed).length};
 }
 function runBalanceMatrixFromUi(){
   const btn=document.getElementById("balanceMatrixBtn");
@@ -212,7 +374,7 @@ function validationReportHtml(){
   const q=r.qualityTelemetry||{};
   const qualityLine=`Quality: created ${Number(q.mistakesCreated||0).toFixed(1)}, resolved ${Number(q.mistakesResolved||0).toFixed(1)}, verification ${Number(q.verificationFailures||0).toFixed(1)}, rushed ${Number(q.rushedWorkMistakes||0).toFixed(1)}, stress ${Number(q.stressRelatedMistakes||0).toFixed(1)}, low focus ${Number(q.lowFocusMistakes||0).toFixed(1)}, manufacturing ${Number(q.manufacturingDefects||0).toFixed(1)}`;
   if(r.matrix)return `Matrix ${r.runs} runs - ${r.daysRun} days<br>Survival ${r.survivalRate}%<br>Median cash $${r.medianFinalCash}M (p10 $${r.cashP10}M / p90 $${r.cashP90}M), median net flow $${Number(r.medianNetCashFlow||0).toFixed(3)}M/day<br>Median post-launch net flow $${Number(r.medianPostLaunchNetCashFlow||0).toFixed(3)}M/day<br>Avg stress ${r.avgStress}, morale ${r.avgMorale}, survival risk ${r.avgSurvivalRisk}<br>Action diversity ${r.avgActionDiversity}, learning spread ${r.avgLearningSpread}<br>CEO decisions ${r.avgCeoDecisions}, escalations ${r.avgEscalations}, memo repeat ${r.avgMemoRepeat}%<br>Min cash ${r.minCash}M, max final stress ${r.maxStress}, early ends ${r.endedEarly}<br>Mistakes created ${r.avgMistakes}, unresolved ${r.avgUnresolvedMistakes}, sickness ${r.avgSickness}, turnover ${r.avgTurnover}<br>${qualityLine}${r.flags.length?`<br>Flags: ${r.flags.join(", ")}`:""}`;
-  return `Seed ${r.seed}<br>${r.daysRun} projected days${r.endedEarly?"; ended early":""}<br>Final: ${r.phase}, $${r.cash}M, ${r.activeEmployees} active employees<br>Avg net flow $${Number(r.avgNetCashFlow||0).toFixed(3)}M/day, post-launch $${Number(r.postLaunchNetCashFlow||0).toFixed(3)}M/day, runway ${r.finalRunwayDays>=999?"positive":r.finalRunwayDays+" days"}<br>Final revenue $${Number(r.finalGrossRevenueDaily||0).toFixed(3)}M/day, cost $${Number(r.finalTotalDailyCost||0).toFixed(3)}M/day<br>Avg stress ${r.avgStress}, avg morale ${r.avgMorale}, avg survival risk ${r.avgSurvivalRisk}<br>Action diversity ${r.actionDiversity}, learning spread ${r.learningSpread}, learning magnitude ${r.learningMagnitude}<br>Memos ${r.executiveMemos}, CEO decisions ${r.ceoDecisions}, escalations ${r.queuedEscalations}, repeat ${r.memoRepeat}%<br>Quality created ${r.qualityMistakes}, unresolved ${r.unresolvedQualityMistakes}, sickness ${r.sickness}, resignations ${r.resignations}, firings ${r.firings}, coaching ${r.coaching}<br>${qualityLine}${r.flags.length?`<br>Flags: ${r.flags.join(", ")}`:""}`;
+  return `Seed ${r.seed}<br>${r.daysRun} projected days${r.endedEarly?"; ended early":""}<br>Final: ${r.phase}, $${r.cash}M, ${r.activeEmployees} active employees<br>Avg net flow $${Number(r.avgNetCashFlow||0).toFixed(3)}M/day, post-launch $${Number(r.postLaunchNetCashFlow||0).toFixed(3)}M/day, runway ${r.finalRunwayDays>=OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay?"positive":r.finalRunwayDays+" days"}<br>Final revenue $${Number(r.finalGrossRevenueDaily||0).toFixed(3)}M/day, cost $${Number(r.finalTotalDailyCost||0).toFixed(3)}M/day<br>Avg stress ${r.avgStress}, avg morale ${r.avgMorale}, avg survival risk ${r.avgSurvivalRisk}<br>Action diversity ${r.actionDiversity}, learning spread ${r.learningSpread}, learning magnitude ${r.learningMagnitude}<br>Memos ${r.executiveMemos}, CEO decisions ${r.ceoDecisions}, escalations ${r.queuedEscalations}, repeat ${r.memoRepeat}%<br>Quality created ${r.qualityMistakes}, unresolved ${r.unresolvedQualityMistakes}, sickness ${r.sickness}, resignations ${r.resignations}, firings ${r.firings}, coaching ${r.coaching}<br>${qualityLine}${r.flags.length?`<br>Flags: ${r.flags.join(", ")}`:""}`;
 }
 function runBalanceProjectionFromUi(){
   const btn=document.getElementById("balanceProjectionBtn");
@@ -250,8 +412,13 @@ function metricsSummaryHtml(){
   if(!m)return "No metrics collected yet.";
   const h=derivedOperatingHealth(),trace=Object.entries(h.trace||{}).map(([k,v])=>`${k}: ${fmtHealth(v.value)} from ${(v.contributors||[]).map(c=>`${c.name} ${c.value}w${c.weight}`).join("; ")||"no contributors"}`).join("<br>");
   const snapshot=buildExecutiveIntelligenceSnapshot(),snap=`Executive Intelligence Snapshot<br>Top risks: ${(snapshot.topRisks||[]).slice(0,2).map(x=>x.title).join("; ")||"none"}<br>Top opportunities: ${(snapshot.topOpportunities||[]).slice(0,2).map(x=>x.title).join("; ")||"none"}<br>Department beliefs: ${(snapshot.departmentBeliefs||[]).slice(0,2).map(x=>x.title).join("; ")||"none"}<br>Suppression findings: ${(snapshot.suppressedReportFindings||[]).map(x=>`${x.count} filtered / ${x.severeCount} severe`).join("; ")||"none"}<br>Trend priorities: ${(snapshot.majorTrends||[]).slice(0,2).map(x=>x.title).join("; ")||"none"}<br>Source IDs: ${(snapshot.sourceIds||[]).slice(0,8).join(", ")||"none"}`;
-  const runwayLabel=m.runwayDays>=999?"positive":`${m.runwayDays} ${m.runwayDays===1?"day":"days"}`;
+  const runwayLabel=m.runwayDays>=OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay?"positive":`${m.runwayDays} ${m.runwayDays===1?"day":"days"}`;
   return `Day ${m.day}<br>Stress ${m.stress}, morale ${m.morale}, survival risk ${m.survivalRisk}<br>Net cash flow $${Number(m.netCashFlow||0).toFixed(3)}M/day, runway ${runwayLabel}<br>Revenue $${Number(m.grossRevenueDaily||0).toFixed(3)}M, cost $${Number(m.totalDailyCost||0).toFixed(3)}M, payroll $${Number(m.payrollDaily||0).toFixed(3)}M<br>Operating health: portfolio ${fmtHealth(h.portfolioHealth)}, finance ${fmtHealth(h.financeHealth)}, manufacturing ${fmtHealth(h.manufacturingHealth)}, customer ${fmtHealth(h.customerSentiment)}<br>Trace<br>${trace}<br>${snap}<br>Messages 5d ${m.messages5d}: local ${m.routes.local}, info ${m.routes.info}, CEO ${m.routes.queued+m.routes.resolved}, suppressed ${m.routes.suppressed}<br>Action diversity ${m.actionDiversity}, learning spread ${m.learningSpread}, learning magnitude ${m.learningMagnitude}<br>Memo repeat ${m.repeatedMemoRate}%${m.flags?.length?`<br>Flags: ${m.flags.join(", ")}`:""}`;
+}
+function saveSizeAnalysisHtml(){
+  const analysis=saveRepository.analyze(company,employees);
+  const largest=analysis.companySections.slice(0,12).map(section=>`${section.key}: ${section.characters.toLocaleString()} characters`).join("<br>");
+  return `Stored size ${analysis.serializedCharacters.toLocaleString()} characters (${analysis.budgetUsePercent}% of supported budget)<br>Uncompressed authoritative state ${analysis.rawCharacters.toLocaleString()} characters<br>Status ${analysis.sizeStatus}; repeated-string entries ${analysis.dictionaryEntries}; employees ${analysis.employees.count}<br><br><strong>Largest authoritative sections before compression</strong><br>${largest||"No company sections found."}`;
 }
 function avgStress(){
   const active=employees.filter(e=>e.active);
@@ -312,6 +479,7 @@ function developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo){
     <details class="debug-section"><summary>Hidden-State Observations</summary><div class="debug-section-content">${observationDebug}</div></details>
     <details class="debug-section"><summary>Market, Board, and Valuation</summary><div class="debug-section-content">${marketValuationDebugHtml()}</div></details>
     <details class="debug-section"><summary>Operating Health Trace</summary><div class="debug-section-content">${metricsSummaryHtml()}</div></details>
+    <details class="debug-section"><summary>Save Size Analysis</summary><div class="debug-section-content">${saveSizeAnalysisHtml()}</div></details>
     <details class="debug-section"><summary>Release Validation</summary><div class="debug-section-content">${release}</div></details>
     <details class="debug-section"><summary>Balance Testing</summary><div class="debug-section-content">${validationReportHtml()}<br><br>${playtestChecklistHtml()}</div></details>
     <details class="debug-section"><summary>Executive Intelligence Snapshot</summary><div class="debug-section-content">Risks ${(snapshot.topRisks||[]).length}; opportunities ${(snapshot.topOpportunities||[]).length}; department beliefs ${(snapshot.departmentBeliefs||[]).length}; strategic signals ${(snapshot.strategicSignals||[]).length}.</div></details>
@@ -328,14 +496,45 @@ function employeePersonalityDebugHtml(e){
   const events=(e.recentEmotionalEvents||[]).slice(0,6).map(ev=>`Day ${ev.day}: ${ev.reasonCode} morale ${Number(ev.moraleDelta||0).toFixed(2)}, stress ${Number(ev.stressDelta||0).toFixed(2)}`).join("<br>")||"No emotional events yet";
   return `Personality Seed ${e.personalitySeed}<br>Archetypes ${(e.personalityArchetypes||[]).join(", ")||"none"}<br><br><strong>Personality Dimensions</strong><br>${dimensions}<br><br><strong>Emotional Baselines</strong><br>Morale baseline ${Number(profile.moraleBaseline??0).toFixed(1)}; Stress baseline ${Number(profile.stressBaseline??0).toFixed(1)}<br>Recovery rates morale ${Number(profile.moraleRecoveryRate??0).toFixed(3)}, stress ${Number(profile.stressRecoveryRate??0).toFixed(3)}<br>Last drift morale ${Number(home.moraleDrift??0).toFixed(3)}, stress ${Number(home.stressDrift??0).toFixed(3)}<br><br><strong>Emotional Drivers</strong><br>${drivers}<br><br><strong>Last Reaction</strong><br>Morale Delta ${Number(last.moraleDelta||0).toFixed(2)}; Stress Delta ${Number(last.stressDelta||0).toFixed(2)}; Reason Code ${last.reasonCode||"none"}<br><br><strong>Daily Caps</strong><br>Morale +${Number(totals.moraleGain||0).toFixed(2)}/${limits.maxDailyMoraleGain}, Morale -${Number(totals.moraleLoss||0).toFixed(2)}/${limits.maxDailyMoraleLoss}<br>Stress +${Number(totals.stressGain||0).toFixed(2)}/${limits.maxDailyStressGain}, Stress -${Number(totals.stressLoss||0).toFixed(2)}/${limits.maxDailyStressLoss}<br><br><strong>Cooldowns</strong><br>${cooldowns}<br><br><strong>Recent Emotional Events</strong><br>${events}`;
 }
+function employeeGoalLabel(key){
+  return {
+    achievement:"Achievement",
+    belonging:"Belonging",
+    mastery:"Technical mastery",
+    influence:"Influence",
+    stability:"Stability",
+    innovation:"Innovation",
+    leadership:"Leadership",
+    recognition:"Recognition",
+    quality:"Quality",
+    collaboration:"Collaboration"
+  }[key]||String(key||"Goal").replace(/([A-Z])/g," $1").replace(/^./,character=>character.toUpperCase());
+}
+function employeeBeliefLabel(key){
+  return OFFICE_AQUARIUM_CONSTANTS.playerLanguage.beliefLabels[key]
+    ||String(key||"Company outlook").replace(/([A-Z])/g," $1").replace(/^./,character=>character.toUpperCase());
+}
+function beliefConfidenceCopy(confidence){
+  const bands=OFFICE_AQUARIUM_CONSTANTS.playerLanguage.confidenceBands;
+  return confidence>=75?bands.high:confidence>=45?bands.moderate:bands.low;
+}
+function employeeMilestonesHtml(e){
+  const history=(e.careerHistory||[])
+    .filter(item=>/hired|founding|promot|onboard|lead|award|recogn|mentor|complete/i.test(String(item)))
+    .slice(-3)
+    .reverse();
+  if(Number(e.achievements)>0)history.unshift(`${e.achievements} recent contribution${e.achievements===1?"":"s"} recognized`);
+  return history.length?history.join("<br>"):"Building a record with the company";
+}
 function showEmployee(id){
   const e=employees.find(x=>x.id===id);
+  if(!e)return;
   ensureEmployeePersonality?.(e);
   document.getElementById("aiDebugToggle")?.classList.toggle("active",debugMode);
   document.getElementById("detailName").textContent=e.name;
-  document.getElementById("detailRole").textContent=`${e.role} - ${(e.personalityArchetypes||[]).slice(0,2).join(" - ")||e.traits.join(" - ")}`;
+  document.getElementById("detailRole").textContent=`${e.role} - ${(e.personalityArchetypes||[]).slice(0,2).join(", ")||e.traits.join(", ")}`;
   const best=employees.filter(x=>x.id!==e.id&&x.active).sort((a,b)=>getRelationshipView(e,b).familiarity-getRelationshipView(e,a).familiarity)[0];
-  const topGoals=Object.entries(e.goals||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k}: ${Math.round(v*100)}`).join("<br>");
+  const topGoals=Object.entries(e.goals||{}).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${employeeGoalLabel(k)}: ${Math.round(v*100)}`).join("<br>");
   const scoreLines=Object.entries(e.decisionTrace?.scores||{}).slice(0,5).map(([k,v])=>`${k}: ${Math.round(v)}`).join("<br>");
   const memories=(e.memories||[]).slice(0,4).map(m=>`<li>${m.text} <small>(strength ${Math.round(m.strength)})</small></li>`).join("")||"<li>No strong memories yet.</li>";
   const social=best?getRelationshipView(e,best):null;selectedEmployeeId=id;const ceo=e.opinionOfCEO||{},cooldowns=Object.entries(e.cooldowns||{}).filter(([,v])=>v>0).map(([k,v])=>`${k}: ${Math.round(v)}`).join("<br>")||"None";const strongestMemory=(e.memories||[]).slice().sort((a,b)=>b.strength-a.strength)[0];const socialProfile=typeof employeeSocialProfileHtml==="function"?employeeSocialProfileHtml(e):"";const debugHtml=debugMode?developerValidationHtml(e,scoreLines,cooldowns,strongestMemory,ceo):"";
@@ -347,20 +546,21 @@ function showEmployee(id){
       <div><strong>Focus</strong><br>${Math.round(e.focus)}</div>
       <div><strong>Morale</strong><br>${Math.round(e.morale)}</div>
       <div><strong>Stress</strong><br>${Math.round(e.stress)}</div>
-      <div><strong>Personality</strong><br>${personalityDescription?.(e)||"Balanced worker"}<br><small>${(e.personalityArchetypes||[]).slice(0,3).join(" - ")}</small></div>
+      <div><strong>Personality</strong><br>${personalityDescription?.(e)||"Tends to take a balanced approach at work."}<br><small>${(e.personalityArchetypes||[]).slice(0,3).join(", ")}</small></div>
       <div><strong>Coworker Familiarity</strong><br>${familiaritySummaryForEmployee?.(e)||"Still getting to know the team"}</div>
       <div><strong>Top goals</strong><br>${topGoals}</div>
       <div><strong>Most familiar coworker</strong><br>${best?.name||"None"}${social?`<br>${social.familiarity>=60?"Knows well":social.familiarity>=SOCIAL_RULES.familiarityKnownThreshold?"Developing familiarity":"Still getting acquainted"}`:""}</div>
       <div><strong>Why this action?</strong><br>${e.thought||`Currently ${e.action}.`}</div>
-      <div><strong>Milestones</strong><br>${e.achievements}</div>
+      <div><strong>Milestones</strong><br>${employeeMilestonesHtml(e)}</div>
       <div><strong>CEO Opinion</strong><br>Trust ${Math.round(ceo.trust||0)}, Fairness ${Math.round(ceo.fairness||0)}, Support ${Math.round(ceo.support||0)}, Fear ${Math.round(ceo.fear||0)}</div>
       <div><strong>Current Work</strong><br>${activeWorkForEmployee(e)?.title||"No assigned work"}</div>
-      <div><strong>Beliefs</strong><br>${Object.entries(e.beliefs||{}).slice(0,3).map(([k,v])=>`${k}: ${v.estimate}% / ${v.confidence}%`).join("<br>")||"No strong beliefs yet"}</div>
+      <div><strong>Company outlook</strong><br>${Object.entries(e.beliefs||{}).slice(0,3).map(([k,v])=>`${employeeBeliefLabel(k)}: ${Math.round(v.estimate||0)}%.<br><small>${beliefConfidenceCopy(Number(v.confidence)||0)}.</small>`).join("<br>")||"No strong view has formed yet."}</div>
       <div><strong>Recent Messages</strong><br>${(e.knownMessages||[]).slice(0,3).map(m=>m.subject).join("<br>")||"No recent messages"}</div>
     </div>
     <h3>Recent memories</h3>
     <ul>${memories}</ul>${socialProfile}${debugHtml}`;
-  document.getElementById("employeeModal").classList.remove("hidden");
+  if(typeof openAccessibleDialog==="function")openAccessibleDialog("employeeModal","detailName");
+  else document.getElementById("employeeModal").classList.remove("hidden");
 }
 function normalizeCompanyView(view){
   return ["overview","projects","workforce","story","all"].includes(view)?view:"all";
@@ -418,14 +618,15 @@ function render(){
   document.getElementById("customersBar").style.width=clamp(company.customers/customerGoal*100,0,100)+"%";
   document.getElementById("revenueText").textContent=`$${company.dailyRevenue.toFixed(2)}M`;
   document.getElementById("revenueBar").style.width=clamp(company.dailyRevenue*250,0,100)+"%";
-  document.getElementById("officeHeadline").textContent="The company is running.";
+  const runtimeFailed=!!(company.lastSimulationError||company.runtimeFailure);
+  document.getElementById("officeHeadline").textContent=runtimeFailed?"Simulation paused for recovery.":"The company is running.";
   document.getElementById("log").innerHTML=company.log.slice(-10).reverse().map(x=>`<li>${x}</li>`).join("");
   const cb=document.getElementById("crisisBox");
   if(company.crisis){
     cb.classList.remove("hidden");
     document.getElementById("crisisText").textContent=typeof crisisPlayerMessage==="function"?crisisPlayerMessage(company.crisis):String(company.crisis);
   }else cb.classList.add("hidden");
-  document.getElementById("employeeList").innerHTML=[...employees.filter(e=>e.active),...employees.filter(e=>!e.active)].map(e=>`<div class="employee-card clickable" onclick="showEmployee(${e.id})"><div class="employee-head"><strong>${e.name} - ${e.role}</strong><span>${e.active?e.action:"Resigned"}</span></div><div class="mini-bars"><div class="mini">Morale ${Math.round(e.morale)}<div class="bar"><span style="width:${e.morale}%"></span></div></div><div class="mini">Stress ${Math.round(e.stress)}<div class="bar stress"><span style="width:${e.stress}%"></span></div></div></div></div>`).join("");
+  document.getElementById("employeeList").innerHTML=[...employees.filter(e=>e.active),...employees.filter(e=>!e.active)].map(e=>`<button type="button" class="employee-card clickable" onclick="showEmployee(${e.id})" aria-label="Open ${e.name}'s employee profile"><div class="employee-head"><strong>${e.name} - ${e.role}</strong><span>${e.active?e.action:"Resigned"}</span></div><div class="mini-bars"><div class="mini">Morale ${Math.round(e.morale)}<div class="bar"><span style="width:${e.morale}%"></span></div></div><div class="mini">Stress ${Math.round(e.stress)}<div class="bar stress"><span style="width:${e.stress}%"></span></div></div></div></button>`).join("");
   employees.forEach(e=>{
     const n=document.getElementById(`agent-${e.id}`);
     if(!e.active){if(n)n.remove();return;}
@@ -437,6 +638,8 @@ function render(){
     n.querySelector("small").textContent=`${e.name}: ${e.action}`;
   });
   if(typeof renderVisibleConversations==="function")renderVisibleConversations();
+  renderSaveRecoveryNotice?.();
+  if(runtimeFailed&&!validationMode)showRuntimeFailure?.(company.lastSimulationError||company.runtimeFailure);
   if(typeof updateDecisionActionButtonState==="function")updateDecisionActionButtonState();
   setTrack("manufacturing",health.labels.manufacturing,health.manufacturingHealth,"%");
   setTrack("shareholder","Investor Confidence",health.investorConfidence??health.shareholderConfidence);
@@ -467,7 +670,7 @@ function switchMobileTab(tab,scroll=true){
     if(tab==="newspaper"&&typeof setWorkspaceTab==="function")setWorkspaceTab("news");
   }
   if(tab==="inbox"&&company)setCommunicationView("inbox");
-  if(scroll&&window.matchMedia("(max-width:720px)").matches)window.scrollTo({top:0,behavior:"smooth"});
+  if(scroll&&window.matchMedia("(max-width:850px)").matches)window.scrollTo({top:0,behavior:"smooth"});
 }
 function toggleCompactSection(button){
   const id=button?.dataset?.collapseTarget,target=id?document.getElementById(id):null;
@@ -519,7 +722,8 @@ class UserInterfaceSystem{
 
 class ValidationToolsSystem{
   balanceRun(days=120,seed=`isolated-balance-${days}`){return runBalanceProjection(days,{seed});}
-  balanceMatrix(seedCount=8,days=120){return runBalanceMatrix(seedCount,days);}
+  balanceMatrix(seedCount=8,days=120,strategy=OFFICE_AQUARIUM_CONSTANTS.validation.defaultStrategy){return runBalanceMatrix(seedCount,days,strategy);}
+  releaseMatrix(options={}){return runReleaseStrategyMatrix(options);}
   deterministicContinuation(seed="determinism-isolated",midDays=50,totalDays=100){return runDeterministicContinuationCheck(seed,midDays,totalDays);}
   reportHtml(){return validationReportHtml();}
 }

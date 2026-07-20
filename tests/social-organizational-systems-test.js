@@ -192,13 +192,17 @@ async function main() {
     deriveInformalGroups();
     assert(!company.informalGroups.some(item => item.status === "active" && item.memberIds.includes(leader.id) && item.memberIds.includes(groupB1.id)), "Persistent source-backed conflict should be able to split a previously merged group");
 
-    const groupBeforeWeakening = socialClone(company.informalGroups.find(item => item.status === "active" && item.memberIds.includes(leader.id) && item.memberIds.includes(teammate.id)) || group);
-    company.socialRelationships[makeRelationshipKey(leader.id, teammate.id)].experienceSummary = {};
-    company.day += SOCIAL_GROUP_RULES.updateIntervalDays;
-    deriveInformalGroups();
-    const weakening = company.informalGroups.find(item => item.id === groupBeforeWeakening.id);
-    assert(!weakening || weakening.status === "weakening", "A group should weaken before it dissolves when evidence stops");
-    if (weakening) assert(weakening.stability < groupBeforeWeakening.stability, "A weakening group should lose stability gradually");
+    const groupBeforeWeakeningCandidate = company.informalGroups.find(item => item.status === "active" && item.memberIds.includes(leader.id) && item.memberIds.includes(teammate.id)) || group;
+    assert(Boolean(groupBeforeWeakeningCandidate), "The established group should still exist before the weakening test");
+    if (groupBeforeWeakeningCandidate) {
+      const groupBeforeWeakening = socialClone(groupBeforeWeakeningCandidate);
+      company.socialRelationships[makeRelationshipKey(leader.id, teammate.id)].experienceSummary = {};
+      company.day += SOCIAL_GROUP_RULES.updateIntervalDays;
+      deriveInformalGroups();
+      const weakening = company.informalGroups.find(item => item.id === groupBeforeWeakening.id);
+      assert(!weakening || weakening.status === "weakening", "A group should weaken before it dissolves when evidence stops");
+      if (weakening) assert(weakening.stability < groupBeforeWeakening.stability, "A weakening group should lose stability gradually");
+    }
 
     const socialStateBeforeUi = JSON.stringify({
       memory: company.socialMemoryStore,

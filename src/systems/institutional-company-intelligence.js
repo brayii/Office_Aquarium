@@ -155,7 +155,7 @@ function communicationOutcomeScore(episode){
   },0)/Math.max(1,items.length);
 }
 function calculateEpisodeAttributionQuality(ep,current=learningCurrentState()){
-  const age=company.day-(ep.createdDay||company.day);
+  const age=company.day-(ep.createdDay??company.day);
   let score=35;
   if(ep.sourceId||ep.decisionId||ep.messageId)score+=14;
   if(ep.projectId)score+=14;
@@ -256,7 +256,7 @@ function evaluateLearningEpisode(ep,reviewDay=company.day){
     const state=reviewIndex>=2&&attributionQuality>=75&&abs>=2.2?"validated":reviewIndex>=2&&attributionQuality>=60?"provisional":attributionQuality>=40?"hypothesis":"hypothesis";
     if(attributionQuality>=40){
       const key=`${ep.subtype||learningEpisodeSubtype(ep.domain,ep.strategy,ep.choiceTitle)}-${ep.projectId||ep.department||"company"}`.toLowerCase().replace(/[^a-z0-9.]+/g,"-").slice(0,82);
-      const age=company.day-(ep.createdDay||company.day);
+      const age=company.day-(ep.createdDay??company.day);
       createOrReinforceLesson({key,title:`${ep.domain==="communication"?"Communication":"Decision"} learning: ${ep.choiceTitle||ep.decisionTitle||ep.strategy||"company action"}`,department:ep.department||"company",vector:lessonVectorForEpisode(ep,positive),outcome,confidence,evidence:`${state} review after ${age} ${age===1?"day":"days"}: ${outcome}${ep.failureCause?"; cause "+ep.failureCause:""}`,importance:ep.domain==="decision"?4:3,state,episodeKey:`episode-${ep.id}`,independenceGroup:ep.sourceId||ep.decisionId||ep.messageId||`episode-${ep.id}`,attributionQuality,reviewWindow:reviewIndex===1?"medium":"long"});
     }
   }
@@ -275,7 +275,7 @@ function evaluateCommunicationOutcomeRecords(){
   ensureBibleSystems();
   company.communicationOutcomes=Array.isArray(company.communicationOutcomes)?company.communicationOutcomes:[];
   company.communicationOutcomes.forEach(o=>{
-    if(o.reviewedDay||company.day-(o.day||0)<7)return;
+    if(o.reviewedDay!==undefined&&o.reviewedDay!==null||company.day-(o.day??0)<7)return;
     const links=o.links||{};
     const matchingIssues=(company.issueRecords||[]).filter(i=>(links.issueId&&i.id===links.issueId)||(String(i.type||"")===String(o.issueType||"")&&links.projectId&&i.projectId===links.projectId&&Math.abs((i.createdDay||0)-(o.day||0))<=10));
     const linkedWork=links.workItemId?(company.workItems||[]).find(w=>w.id===links.workItemId):null;
@@ -357,7 +357,7 @@ function ensureInstitutionalLearning(){
     company.learningAudit=runV32InstitutionalLearningAudit();
     company.learningAuditDay=company.day;
   }
-  company.lastLessonReviewDay=Number.isFinite(company.lastLessonReviewDay)?company.lastLessonReviewDay:-999;
+  company.lastLessonReviewDay=Number.isFinite(company.lastLessonReviewDay)?company.lastLessonReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
   (employees||[]).forEach(e=>{
     e.learnedLessons=normalizeLessonVector(e.learnedLessons||{});
     lessonAcceptanceFor(e);
@@ -511,13 +511,13 @@ function createOrReinforceLesson({key,title,department="company",vector={},outco
   const dept=company.departmentLearning[department]||company.departmentLearning.company,stateWeight=lessonStateWeight(lesson);
   for(const [k,v] of Object.entries(lesson.vector))dept[k]=clamp((dept[k]||0)+v*.16*stateWeight,-10,10);
   employees.filter(e=>e.active).forEach(e=>applyInstitutionalLessonToEmployee(e,lesson,existing?0.55:1));
-  if(!existing||lesson.state==="validated"&&company.day-(lesson.lastHistoryDay||-999)>90){recordHistory(`Institutional lesson: ${lesson.title}`,"learning",Math.max(3,importance));lesson.lastHistoryDay=company.day;}
+  if(!existing||lesson.state==="validated"&&company.day-(lesson.lastHistoryDay||OFFICE_AQUARIUM_CONSTANTS.time.neverDay)>90){recordHistory(`Institutional lesson: ${lesson.title}`,"learning",Math.max(3,importance));lesson.lastHistoryDay=company.day;}
   return lesson;
 }
 function createPatternLearningEpisode({key,title,department="company",domain="institutional",evidence="",expectedChannels=null,importance=3}={}){
   ensureBibleSystems();
   const sourceId=`pattern-${key}`;
-  const existing=(company.learningEpisodes||[]).find(ep=>ep.sourceId===sourceId&&ep.status!=="resolved"&&company.day-(ep.createdDay||0)<95);
+  const existing=(company.learningEpisodes||[]).find(ep=>ep.sourceId===sourceId&&ep.status!=="resolved"&&company.day-(ep.createdDay??0)<95);
   if(existing)return existing;
   return createLearningEpisode({
     domain,
@@ -684,7 +684,7 @@ function ensureBibleSystems(){
   ensureSocialAISystems?.();
   company.communicationOutcomes=Array.isArray(company.communicationOutcomes)?company.communicationOutcomes:[];
   company.investorRelationsForecasts=Array.isArray(company.investorRelationsForecasts)?company.investorRelationsForecasts:[];
-  company.lastInvestorUpdateDay=Number.isFinite(company.lastInvestorUpdateDay)?company.lastInvestorUpdateDay:-999;
+  company.lastInvestorUpdateDay=Number.isFinite(company.lastInvestorUpdateDay)?company.lastInvestorUpdateDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
   company.delayedDecisionEffects=Array.isArray(company.delayedDecisionEffects)?company.delayedDecisionEffects:[];
   company.decisionHistory=Array.isArray(company.decisionHistory)?company.decisionHistory:[];
   company.decisionThreads=Array.isArray(company.decisionThreads)?company.decisionThreads:[];
@@ -704,7 +704,7 @@ company.nextWorkItemId=Number(company.nextWorkItemId)||1;
 company.nextIssueId=Number(company.nextIssueId)||1;
 company.nextStoryId=Number(company.nextStoryId)||1;
 company.storyChains=Array.isArray(company.storyChains)?company.storyChains:[];
-company.playtest={sessions:0,notes:[],lastChecklistDay:-999,...(company.playtest||{})};
+company.playtest={sessions:0,notes:[],lastChecklistDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(company.playtest||{})};
   company.culture={innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25,...(company.culture||{})};
   company.market={aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45,lastSnapshot:"Offline baseline",...(company.market||{})};
   company.manufacturing={readiness:18,yield:52,capacity:20,supplyRisk:company.market.supplyPressure||32,...(company.manufacturing||{})};
@@ -716,11 +716,11 @@ ensureCustomerMarketSystems?.();
   company.backgroundEvents=Array.isArray(company.backgroundEvents)?company.backgroundEvents:[];
   company.executiveObservations=Array.isArray(company.executiveObservations)?company.executiveObservations:[];
   company.nextBackgroundEventId=Math.max(1,Number(company.nextBackgroundEventId)||1);
-  company.lastFrictionUpdateDay=Number.isFinite(company.lastFrictionUpdateDay)?company.lastFrictionUpdateDay:-999;
-  company.lastRiskPillarUpdateDay=Number.isFinite(company.lastRiskPillarUpdateDay)?company.lastRiskPillarUpdateDay:-999;
+  company.lastFrictionUpdateDay=Number.isFinite(company.lastFrictionUpdateDay)?company.lastFrictionUpdateDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+  company.lastRiskPillarUpdateDay=Number.isFinite(company.lastRiskPillarUpdateDay)?company.lastRiskPillarUpdateDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
   company.localFrictionResponses=Array.isArray(company.localFrictionResponses)?company.localFrictionResponses:[];
   company.managerDetections=Array.isArray(company.managerDetections)?company.managerDetections:[];
-  company.inboxFlow={day:company.day||0,openedToday:0,lastOpenedDay:-999,...(company.inboxFlow||{})};
+  company.inboxFlow={day:company.day||0,openedToday:0,lastOpenedDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(company.inboxFlow||{})};
   company.teams={
     hardware:{cohesion:58,pressure:35,output:0},software:{cohesion:58,pressure:32,output:0},
     quality:{cohesion:58,pressure:34,output:0},product:{cohesion:56,pressure:30,output:0},finance:{cohesion:60,pressure:24,output:0},
@@ -868,24 +868,83 @@ function recordCompletedWorkConversationOpportunity(work){
   if(result)work.completionConversationRecorded=true;
   return result;
 }
+function compactWorkItemHistory(workItems=[]){
+  const source=Array.isArray(workItems)?workItems:[];
+  const openWork=source.filter(work=>work.status!=="closed");
+  const recentClosedWork=source
+    .filter(work=>work.status==="closed"&&company.day-(work.closedDay??company.day)<OFFICE_AQUARIUM_CONSTANTS.projectDevelopment.recentClosedWorkItemRetentionDays);
+  const closedCapacity=Math.max(0,OFFICE_AQUARIUM_CONSTANTS.projectDevelopment.totalWorkItemLimit-openWork.length);
+  return [...openWork,...recentClosedWork.slice(-closedCapacity)];
+}
 function maintainWorkItems(){
   ensureBibleSystems();
-  company.workItems=Array.isArray(company.workItems)?company.workItems:[];
-  company.workItems=company.workItems.filter(w=>w.status!=="closed"||company.day-(w.closedDay||company.day)<5).slice(-36);
+  company.workItems=compactWorkItemHistory(company.workItems);
   activeProjects?.().forEach(project=>{
-    for(const dept of project.requiredDepartments||[]){
-      const open=company.workItems.filter(w=>w.status==="open"&&w.projectId===project.id&&w.assignedTeam===dept);
-      const target=project.status==="pilot"||project.status==="prototype"?1:Math.min(2,Math.max(1,Math.ceil((project.scope||1))));
-      while(open.length<target&&company.workItems.length<52){const item=createProjectWorkItem(project,dept);company.workItems.push(item);open.push(item);}
+    if(project.status==="paused")return;
+    const departments=(project.requiredDepartments||[]).filter(Boolean);
+    const open=company.workItems.filter(w=>w.status==="open"&&w.projectId===project.id);
+    const target=typeof projectBacklogTarget==="function"
+      ?projectBacklogTarget(project)
+      :Math.max(1,departments.length);
+    while(open.length<target&&departments.length&&company.workItems.length<OFFICE_AQUARIUM_CONSTANTS.projectDevelopment.totalWorkItemLimit){
+      const counts=departments.map(dept=>({
+        dept,
+        count:open.filter(item=>item.assignedTeam===dept).length
+      })).sort((left,right)=>left.count-right.count||departments.indexOf(left.dept)-departments.indexOf(right.dept));
+      const item=createProjectWorkItem(project,counts[0].dept);
+      company.workItems.push(item);
+      open.push(item);
     }
   });
   for(const team of ["hardware","software","quality","product","finance"]){
     const open=company.workItems.filter(w=>w.status==="open"&&w.assignedTeam===team);
     const target=team==="product"?2:3;
     let attempts=0;
-    while(open.length<target&&company.workItems.length<52&&attempts<target+2){attempts++;const pressure=desiredWorkPressure(team);const type=company.teams?.[team]?.currentPriority||workItemTypeForTeam(team);const item=createWorkItem(team,type,pressure);company.workItems.push(item);open.push(item);}
+    while(open.length<target&&company.workItems.length<OFFICE_AQUARIUM_CONSTANTS.projectDevelopment.totalWorkItemLimit&&attempts<target+2){attempts++;const pressure=desiredWorkPressure(team);const type=company.teams?.[team]?.currentPriority||workItemTypeForTeam(team);const item=createWorkItem(team,type,pressure);company.workItems.push(item);open.push(item);}
   }
-  company.workItems.forEach(w=>{if(w.status!=="open")return;w.blockedBy=Array.isArray(w.blockedBy)?w.blockedBy:[];w.collaborators=Array.isArray(w.collaborators)?w.collaborators:[];assignWorkOwner(w);const deadlineSoon=w.deadlineDay-company.day<4;w.qualityRisk=clamp(w.qualityRisk+(deadlineSoon?1.5:.2)+(w.progress<35 ? .25 : 0)-(company.culture.qualityDiscipline-50)*.01,0,100);const stalled=company.day-(w.createdDay??company.day)>2&&w.progress<18;const blockerChance=(w.qualityRisk>72 ? .07 : 0)+(deadlineSoon ? .025 : 0)+(stalled ? .025 : 0);if(!w.blockedBy.length&&simulationRandom()<blockerChance){const blocker=contentPick(v23Content.blockers,w.priority);w.blockedBy.push(blocker);addStoryBeat(w.storyId,`${w.title} became blocked by ${blocker}.`,"blocker");recordWeeklyEvent(`${w.assignedTeam} work blocked: ${w.title}.`,"work",2);}w.stage=workStage(w);if(w.progress>=100){w.status="closed";w.closedDay=company.day;w.stage="Complete";addStoryBeat(w.storyId,`${w.title} was completed by the ${w.assignedTeam} team.`,"completed");recordWeeklyEvent(`${w.title} closed by the ${w.assignedTeam} team.`,"work",2);recordCompletedWorkConversationOpportunity(w);}});
+  company.workItems.forEach(w=>{
+    if(w.status!=="open")return;
+    w.blockedBy=Array.isArray(w.blockedBy)?w.blockedBy:[];
+    w.collaborators=Array.isArray(w.collaborators)?w.collaborators:[];
+    assignWorkOwner(w);
+    const projectOwned=Boolean(w.projectId);
+    const deadlineDelta=(w.deadlineDay??company.day)-company.day;
+    const deadlineSoon=deadlineDelta>=0&&deadlineDelta<4;
+    const overdue=deadlineDelta<0;
+    const qualityDrift=projectOwned
+      ?(deadlineSoon?.45:overdue?.2:.08)+(w.progress<35?.1:0)
+      :(deadlineSoon?1.5:.2)+(w.progress<35?.25:0);
+    w.qualityRisk=clamp(w.qualityRisk+qualityDrift-(company.culture.qualityDiscipline-50)*.01,0,100);
+    // Project Portfolio owns project blocker creation so the generic work loop cannot double-count it.
+    if(!projectOwned){
+      const stalled=company.day-(w.createdDay??company.day)>2&&w.progress<18;
+      const blockerChance=(w.qualityRisk>72?.07:0)+(deadlineSoon?.025:0)+(stalled?.025:0);
+      if(!w.blockedBy.length&&simulationRandom()<blockerChance){
+        const blocker=contentPick(v23Content.blockers,w.priority);
+        w.blockedBy.push(blocker);
+        addStoryBeat(w.storyId,`${w.title} became blocked by ${blocker}.`,"blocker");
+        recordWeeklyEvent(`${w.assignedTeam} work blocked: ${w.title}.`,"work",2);
+      }
+    }
+    w.stage=workStage(w);
+    if(w.progress>=100){
+      w.status="closed";
+      w.closedDay=company.day;
+      w.stage="Complete";
+      if(w.projectId&&!w.projectCompletionRecorded){
+        const project=(company.projects||[]).find(candidate=>candidate.id===w.projectId);
+        if(project){
+          project.completedWorkItemCount=clamp((Number(project.completedWorkItemCount)||0)+1,0,OFFICE_AQUARIUM_CONSTANTS.projectDevelopment.completionTelemetryLimit);
+          project.lastWorkItemCompletedDay=company.day;
+          w.projectCompletionRecorded=true;
+          recordProjectLedger(w.projectId,"work-item-completion","completed-work",1,`${w.title} completed`);
+        }
+      }
+      addStoryBeat(w.storyId,`${w.title} was completed by the ${w.assignedTeam} team.`,"completed");
+      recordWeeklyEvent(`${w.title} closed by the ${w.assignedTeam} team.`,"work",2);
+      recordCompletedWorkConversationOpportunity(w);
+    }
+  });
 }
 function updateEmployeeWorkContribution(e,output){
   if(!company?.workItems)return;
@@ -1000,7 +1059,7 @@ function updateIssueRecords(){
   company.issueRecords=company.issueRecords.slice(0,60);
 }
 function communicationState(e){
-  e.communication={reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:-999,lastHelpRequestDay:-999,rumorsShared:0,...(e.communication||{})};
+  e.communication={reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,lastHelpRequestDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,rumorsShared:0,...(e.communication||{})};
   e.knownMessages=Array.isArray(e.knownMessages)?e.knownMessages:[];
   return e.communication;
 }
@@ -1353,13 +1412,30 @@ function updateInformationalSenderCredibility(msg,comm){
   recordSenderCredibilityHistory(comm.from,dept,"informational memo evidence quality",cred);
 }
 function archiveInformationalEscalation(msg){
+  if(!canQueueInformationalEscalation(msg))return false;
   const comm=communicationForEscalatedMessage(msg,"executive-info");
   reviewSuppressionAccountability(msg);
-  queueInformationalCommunication(comm,{id:`info-${msg.id}`,category:"internal",sourceMessageId:msg.id,storyId:msg.storyId,title:msg.subject,copy:comm.message});
+  const queued=queueInformationalCommunication(comm,{id:`info-${msg.id}`,category:"internal",sourceMessageId:msg.id,storyId:msg.storyId,title:msg.subject,copy:comm.message});
+  if(!queued)return false;
   msg.status="queued-executive-info";
+  company.lastInformationalEscalationDay=company.day;
+  company.messageFingerprints[informationalEscalationFingerprint(msg)]={day:company.day,status:"queued"};
   updateInformationalSenderCredibility(msg,comm);
   updateCommunicationLearning(employees.find(e=>e.id===msg.fromId),"report","executive-info",msg);
   recordHistory(`Executive information queued: ${msg.subject}.`,"communication",2);
+  return true;
+}
+function informationalEscalationFingerprint(msg){
+  const subject=String(msg?.contentCode||msg?.subject||msg?.type||"update").toLowerCase().replace(/\d+/g,"#").replace(/[^a-z#]+/g,"-").replace(/^-|-$/g,"");
+  return `internal-info:${String(msg?.department||"company").toLowerCase()}:${subject}`;
+}
+function canQueueInformationalEscalation(msg){
+  const rules=OFFICE_AQUARIUM_CONSTANTS.executiveInbox;
+  const lastDay=company.lastInformationalEscalationDay??OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+  if(company.day-lastDay<rules.informationalMinimumGapDays)return false;
+  if(company.pendingEvent?.informationalOnly||(company.escalationQueue||[]).some(ev=>ev.informationalOnly))return false;
+  const lastFingerprint=company.messageFingerprints?.[informationalEscalationFingerprint(msg)]?.day;
+  return !Number.isFinite(Number(lastFingerprint))||company.day-Number(lastFingerprint)>=rules.informationalRepeatWindowDays;
 }
 function repairQueuedEscalationState(){
   const queued=new Set((company.escalationQueue||[]).map(ev=>ev.sourceMessageId).filter(Boolean));
@@ -1377,8 +1453,25 @@ function processInternalEscalations(){
   for(const item of candidates){
     const route=routeForEscalationScore(item.score);
     if(route==="local"){recordMetricEvent("localIssues");continue;}
-    if(route==="executive-info"&&infoCount<1&&company.day>0){archiveInformationalEscalation(item.msg);seen.add(item.msg.id);infoCount++;}
-    else if(route==="ceo-decision"&&decisionCount<1&&canQueueExecutiveDecision?.(item)){reviewSuppressionAccountability(item.msg);item.msg.status="queued-for-ceo";updateCommunicationLearning(employees.find(e=>e.id===item.msg.fromId),"report","ceo-decision",item.msg);recordMetricEvent("queuedEscalations");company.escalationQueue.push(makeEscalatedEvent(item.msg));seen.add(item.msg.id);decisionCount++;}
+    if(route==="executive-info"&&infoCount<1&&company.day>0){
+      const queuedInfo=archiveInformationalEscalation(item.msg);
+      if(!queuedInfo)item.msg.status="executive-info";
+      seen.add(item.msg.id);
+      if(queuedInfo)infoCount++;
+    }
+    else if(route==="ceo-decision"&&decisionCount<1&&canQueueExecutiveDecision?.(item)){
+      reviewSuppressionAccountability(item.msg);
+      item.msg.status="queued-for-ceo";
+      updateCommunicationLearning(employees.find(e=>e.id===item.msg.fromId),"report","ceo-decision",item.msg);
+      recordMetricEvent("queuedEscalations");
+      company.escalationQueue.push(makeEscalatedEvent(item.msg));
+      const fingerprint=`${item.msg.department||"company"}|${item.msg.contentCode||item.msg.type||item.msg.subject||"decision"}`.toLowerCase();
+      company.lastDecisionEscalationDay=company.day;
+      company.decisionEscalationFingerprints=company.decisionEscalationFingerprints||{};
+      company.decisionEscalationFingerprints[fingerprint]=company.day;
+      seen.add(item.msg.id);
+      decisionCount++;
+    }
   }
   company.escalatedMessageIds=[...seen].slice(-160);
   company.escalationQueue=(company.escalationQueue||[]).slice(0,3);

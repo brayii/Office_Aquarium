@@ -104,6 +104,9 @@ async function main() {
     company.recruitingPipeline = [{ id: "old-contractor-state", role: "Finance Analyst", department: "finance", status: "contractor", stage: "contractor", day: company.day - 4, dueDay: company.day - 1 }];
     ensureWorkforceEconomySystems();
     assert(company.recruitingPipeline[0].status === "searching" && company.recruitingPipeline[0].contractorCoverage, "Old contractor coverage should resume recruiting instead of killing the search");
+    company.recruitingPipeline[0].contractorCoverageUntil = company.day - 1;
+    calculateLivingFinance();
+    assert(!company.recruitingPipeline[0].contractorCoverage && company.finance.contractorDaily === 0, "Temporary contractor cost should expire with its coverage window");
     company.recruitingPipeline = [{ id: "accepted-without-hire", role: "Product Manager", department: "product", status: "accepted", stage: "offer", day: company.day - 6, filledDay: company.day - 5, dueDay: company.day - 5 }];
     ensureWorkforceEconomySystems();
     assert(company.recruitingPipeline[0].status === "searching" && company.recruitingPipeline[0].repairedMissingHire, "Accepted record without a matching hire should be repaired back to active search");
@@ -185,6 +188,7 @@ async function main() {
 
     // A blocked or recently requested top department must not starve every other valid hiring request.
     company.day = 20;
+    company.lastHiringRequestMemoDay = OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
     company.escalationQueue = [{ id: "hiring-request-hardware-existing", title: "Hiring request: Electrical Engineer" }];
     company.pendingEvent = null;
     company.hiringRequests = [{ day: company.day, department: "hardware", role: "Electrical Engineer", status: "queued", score: 100, confidence: 90 }];

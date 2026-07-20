@@ -7,7 +7,7 @@ function updatePortfolioHealth(){
   const missingFte=active.reduce((s,p)=>s+Object.entries(p.requiredHeadcount||{}).reduce((a,[dept,need])=>a+Math.max(0,(Number(need)||0)-projectAllocatedFte(p,dept)),0),0)+(company.projectCapacity?.totalOverload||0);
   active.forEach(p=>primaryCounts[p.proposingDepartment]=(primaryCounts[p.proposingDepartment]||0)+1);
   const maxConcentration=Math.max(0,...Object.values(primaryCounts));
-  company.portfolioHealth={activeProjects:active.length,proposedProjects:proposed.length,atRiskProjects:atRisk.length,pausedProjects:paused.length,totalProjectSpendDaily:Number(spend.toFixed(3)),committedProjectBudget:Number(active.reduce((s,p)=>s+(p.budgetApproved||0),0).toFixed(2)),staffingDemand:demand,projectDrivenOpenRoles:Math.ceil(missingFte),averageScheduleVariance:Math.round(active.reduce((s,p)=>s+(p.performance?.scheduleVariance||0),0)/Math.max(1,active.length)),averageBudgetVariance:Math.round(active.reduce((s,p)=>s+(p.performance?.budgetVariance||0),0)/Math.max(1,active.length)),concentrationRisk:Math.round(maxConcentration/Math.max(1,active.length)*100),nextProjectReview:Math.min(999,...active.map(p=>Math.max(0,(p.nextReviewDay||company.day+30)-company.day)))};
+  company.portfolioHealth={activeProjects:active.length,proposedProjects:proposed.length,atRiskProjects:atRisk.length,pausedProjects:paused.length,totalProjectSpendDaily:Number(spend.toFixed(3)),committedProjectBudget:Number(active.reduce((s,p)=>s+(p.budgetApproved||0),0).toFixed(2)),staffingDemand:demand,projectDrivenOpenRoles:Math.ceil(missingFte),averageScheduleVariance:Math.round(active.reduce((s,p)=>s+(p.performance?.scheduleVariance||0),0)/Math.max(1,active.length)),averageBudgetVariance:Math.round(active.reduce((s,p)=>s+(p.performance?.budgetVariance||0),0)/Math.max(1,active.length)),concentrationRisk:Math.round(maxConcentration/Math.max(1,active.length)*100),nextProjectReview:Math.min(OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,...active.map(p=>Math.max(0,(p.nextReviewDay??company.day+OFFICE_AQUARIUM_CONSTANTS.time.daysPerMonth)-company.day)))};
 }
 function derivedStaffingCoverage(project){
   const req=Object.entries(project.requiredHeadcount||{}).filter(([,n])=>Number(n)>0);
@@ -262,7 +262,8 @@ function recordOperatingHealthSnapshot(){
 }
 function maybeQueueBoardPortfolioConcern(){
   ensureProjectPortfolio();updatePortfolioHealth();
-  if(company.day<30||company.day%17!==0||openRequestExists("portfolio-board","review"))return;
+  const governance=OFFICE_AQUARIUM_CONSTANTS.portfolioGovernance;
+  if(company.day<governance.boardConcernStartDay||company.day%governance.boardConcernCadenceDays!==0||openRequestExists("portfolio-board","review"))return;
   const h=company.portfolioHealth,concerns=[];
   if(h.activeProjects>5)concerns.push("too many active projects");
   if(h.activeProjects<1&&company.phase!=="prototype")concerns.push("weak project pipeline");
@@ -465,7 +466,7 @@ function applyProjectDecision(decision){
 function queueProjectProposalIfNeeded(){
   ensureProjectPortfolio();
   if(company.eventCooldown>0||company.pendingEvent)return;
-  const p=company.projectProposals.find(x=>x.status==="proposal"&&company.day-(x.lastMemoDay||-999)>18);
+  const p=company.projectProposals.find(x=>x.status==="proposal"&&company.day-(x.lastMemoDay||OFFICE_AQUARIUM_CONSTANTS.time.neverDay)>OFFICE_AQUARIUM_CONSTANTS.portfolioGovernance.proposalReminderDays);
   if(p){
     const ev=makeProjectProposalEvent(p);
     if(!openRequestExists("project-proposal",p.id)&&queuePortfolioMemoOnce(ev)){p.lastMemoDay=company.day;}
@@ -473,10 +474,11 @@ function queueProjectProposalIfNeeded(){
 }
 function maybeQueueProjectReview(){
   ensureProjectPortfolio();
-  if(company.day%7!==0)return;
-  const p=activeProjects().find(x=>company.day>=(x.nextReviewDay||999)&&!openRequestExists("project-review",x.id));
+  const governance=OFFICE_AQUARIUM_CONSTANTS.portfolioGovernance;
+  if(company.day%governance.projectReviewCadenceDays!==0)return;
+  const p=activeProjects().find(x=>company.day>=(x.nextReviewDay||OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay)&&!openRequestExists("project-review",x.id));
   if(!p)return;
-  p.nextReviewDay=company.day+30;
+  p.nextReviewDay=company.day+governance.projectReviewIntervalDays;
   const risk=p.performance?.riskTrend??p.visibleRisk??50;
   queuePortfolioMemoOnce(makeProjectControlEvent(p,risk>75?"reduce":"review"));
 }
@@ -627,7 +629,7 @@ function utility(e){
   for(const action of ["work","lab","break","socialize","collaborate","meeting","complain","home"]){
     if(scores[action]!==undefined)scores[action]+=contextualPreference(e,action,ctx)*4;
   }
-  if(!availableCollaborator(e))scores.collaborate=-999;
+  if(!availableCollaborator(e))scores.collaborate=OFFICE_AQUARIUM_CONSTANTS.defaults.impossibleUtilityScore;
 
   for(const [action,time] of Object.entries(e.cooldowns||{})){
     if(time>0&&scores[action]!==undefined)scores[action]-=35;
@@ -682,14 +684,14 @@ function adjustLearningTrait(e,key,delta,min=-5,max=10){
   learning[key]=clamp((learning[key]||0)+delta,min,max);
 }
 function actionSnapshot(e,action){
-  const p={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
+  const p={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(e.performance||{})};
   const ctx=workContext(e);
   return {action,contextKey:learningContextKey(e,ctx),workItemId:ctx.work?.id||null,workType:ctx.work?.type||null,workProgress:ctx.work?.progress??null,blockers:ctx.work?.blockedBy?.length??0,startedDay:company.day,startedMinute:company.minute,stress:e.stress,trust:company.trust,integration:company.integration,quality:company.quality,taskProgress:e.taskProgress??0,qualityMistakes:p.qualityMistakes??0};
 }
 function updateActionLearning(e,context){
   if(!context)return;
   const learning=learningState(e);
-  e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
+  e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(e.performance||{})};
   const action=context.action,ctxKey=context.contextKey||learningContextKey(e);
   const outputGain=(e.taskProgress??0)-(context.taskProgress??0);
   const integrationGain=company.integration-(context.integration??company.integration);
@@ -747,7 +749,7 @@ function qualityMistakeSocialPartner(e,workItem){
   return [...candidates.values()].sort((a,b)=>b.weight-a.weight||a.employee.id-b.employee.id)[0]?.employee||null;
 }
 function recordQualityMistake(e,reason,severity=1){
-  e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
+  e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(e.performance||{})};
   e.performance.qualityMistakes=clamp((e.performance.qualityMistakes||0)+severity,0,10);
   recordMetricEvent("qualityMistakes","count",severity);
   recordQualityTelemetry(reason,severity);
@@ -871,7 +873,7 @@ function applyCollaborationOutcome(e){
   }
   const socialRules=OFFICE_AQUARIUM_CONSTANTS.social.projectExperience;
   const teamPressure=Number(company.teams?.[item.assignedTeam]?.pressure)||0;
-  const deadlinePressure=company.day>=Number(item.deadlineDay||company.day+socialRules.collaborationDeadlineLeadDays)-socialRules.collaborationDeadlineLeadDays;
+  const deadlinePressure=company.day>=Number(item.deadlineDay??company.day+socialRules.collaborationDeadlineLeadDays)-socialRules.collaborationDeadlineLeadDays;
   if(deadlinePressure||teamPressure>=socialRules.collaborationTeamPressure||(item.blockedBy||[]).length){
     const episode=Math.floor(company.day/socialRules.cooldownDays);
     recordSharedExperience?.(e,partner,{
@@ -1018,7 +1020,7 @@ function chooseAction(e){
   }else if(a==="complain"){
     const room=roomForAction(e,a,ctx);moveToZone(e,zoneForRoom(room));e.action="venting";e.thought=thoughtFor("complain",e,ctx);e.actionMinutes=rand(20,45);e.cooldowns.complain=100;
   }else{
-    e.offsite=true;e.action="at home";e.thought=thoughtFor("home",e,ctx);e.actionMinutes=999;
+      e.offsite=true;e.action="at home";e.thought=thoughtFor("home",e,ctx);e.actionMinutes=OFFICE_AQUARIUM_CONSTANTS.time.indefiniteActionMinutes;
   }
   const chosenRoom=roomForZone(e.zone);
   if(chosenRoom){e.currentRoom=chosenRoom;e.roomSelectionReason=`${a} selected ${chosenRoom} from role, work, and activity context.`;e.roomEffect=roomEffectFor(e,a,chosenRoom);}
@@ -1103,7 +1105,7 @@ function roleThought(e){return({
   "Vice President":"The company needs strategic clarity before it scales."
 })[canonicalRole(e.role)];}
 function roleOutput(e,output){
-  e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
+  e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(e.performance||{})};
   const team=company.teams?.[employeeTeam?.(e)]||{cohesion:55};
   const skill=e.skills||baseSkillsForRole(e.role);
   const skillBoost=(Math.max(...Object.values(skill))-55)*.003;
@@ -1150,9 +1152,37 @@ function defaultEmploymentForRole(role){
   return {...employmentBaselineForRole(role,annualSalary),severanceWeeks:rand(rules.severanceWeeksMin,rules.severanceWeeksMax)};
 }
 function dailyEmploymentCost(e){
-  const emp=e.employment||employmentBaselineForRole(e.role),salary=Number(emp.annualSalary)||.15;
+  const rules=OFFICE_AQUARIUM_CONSTANTS.employment;
+  const baseline=employmentBaselineForRole(e.role);
+  const emp={...baseline,...(e.employment||{})};
+  const salary=Number(emp.annualSalary)||baseline.annualSalary;
   const daysPerYear=OFFICE_AQUARIUM_CONSTANTS.time.daysPerYear;
-  return salary/daysPerYear+salary*(emp.benefitsRate??.24)/daysPerYear+salary*(emp.payrollTaxRate??.08)/daysPerYear+(emp.equipmentAnnual??.018)/daysPerYear+(emp.trainingAnnual??.012)/daysPerYear+(emp.officeAnnual??.016)/daysPerYear+(emp.insuranceAnnual??.009)/daysPerYear;
+  return salary/daysPerYear+
+    salary*(emp.benefitsRate??rules.benefitsRate)/daysPerYear+
+    salary*(emp.payrollTaxRate??rules.payrollTaxRate)/daysPerYear+
+    (emp.equipmentAnnual??rules.equipmentAnnual)/daysPerYear+
+    (emp.trainingAnnual??rules.trainingAnnual)/daysPerYear+
+    (emp.officeAnnual??rules.officeAnnual)/daysPerYear+
+    (emp.insuranceAnnual??rules.insuranceAnnual)/daysPerYear;
+}
+function estimatedAnnualEmploymentCostForRole(role){
+  const band=salaryBandForRole(role);
+  const low=Number(band?.[0])||0;
+  const high=Number(band?.[1])||low;
+  const annualSalary=(low+high)/2;
+  return dailyEmploymentCost({role,employment:employmentBaselineForRole(role,annualSalary)})*OFFICE_AQUARIUM_CONSTANTS.time.daysPerYear;
+}
+function estimatedMarginalEmployeeDailyCost(role,headcount=null){
+  const economy=OFFICE_AQUARIUM_CONSTANTS.economy;
+  const currentHeadcount=Number.isFinite(Number(headcount))
+    ?Number(headcount)
+    :employees.filter(e=>e.active).length;
+  const direct=estimatedAnnualEmploymentCostForRole(role)/OFFICE_AQUARIUM_CONSTANTS.time.daysPerYear;
+  const facilities=economy.facilitiesPerEmployeeDaily*(Number(company.costEfficiency)||1);
+  const coordination=currentHeadcount>=economy.growthBaselineHeadcount
+    ?economy.growthOverheadPerEmployeeDaily
+    :0;
+  return direct+facilities+coordination;
 }
 function activeTechnicalEmployees(){
   return employees.filter(e=>e.active&&["hardware","software","quality"].includes(roleDepartment(e.role))).length;

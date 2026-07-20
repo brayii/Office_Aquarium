@@ -6,7 +6,7 @@ function seededUnitFromText(text){
 function defaultWorldState(){return{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,regulatoryPressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50};}
 function deterministicBoardProfile(){
   const orientations=["Growth-Oriented","Conservative","Execution-Focused","Market-Driven","Employee-Conscious","Capital-Efficient"];
-  const seed=`${company.randomState||2463534242}-${company.day||0}-board-profile`,r=i=>seededUnitFromText(seed+"-"+i),orientation=orientations[Math.floor(r(0)*orientations.length)];
+  const seed=`${company.randomState??OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState}-${company.day??0}-board-profile`,r=i=>seededUnitFromText(seed+"-"+i),orientation=orientations[Math.floor(r(0)*orientations.length)];
   const base={orientation,growthBias:45+r(1)*25,cashBias:45+r(2)*25,valuationBias:45+r(3)*25,executionBias:45+r(4)*25,employeeBias:35+r(5)*30,patience:42+r(6)*28};
   if(orientation==="Growth-Oriented"){base.growthBias+=15;base.valuationBias+=8;base.patience-=4;}
   if(orientation==="Conservative"){base.cashBias+=16;base.patience+=8;base.growthBias-=8;}
@@ -29,10 +29,10 @@ function ensureMarketValuationSystems(){
   company.valuationHistory=Array.isArray(company.valuationHistory)?company.valuationHistory:[];
   company.valuationShocks=Array.isArray(company.valuationShocks)?company.valuationShocks:[];
   company.boardMarketLessons=company.boardMarketLessons&&typeof company.boardMarketLessons==="object"?company.boardMarketLessons:{};
-  company.lastValuationReviewDay=Number.isFinite(company.lastValuationReviewDay)?company.lastValuationReviewDay:-999;
-  company.lastValuationMemoDay=Number.isFinite(company.lastValuationMemoDay)?company.lastValuationMemoDay:-999;
-  company.lastFundraisingMemoDay=Number.isFinite(company.lastFundraisingMemoDay)?company.lastFundraisingMemoDay:-999;
-  company.lastValuationStoryDay=Number.isFinite(company.lastValuationStoryDay)?company.lastValuationStoryDay:-999;
+  company.lastValuationReviewDay=Number.isFinite(company.lastValuationReviewDay)?company.lastValuationReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+  company.lastValuationMemoDay=Number.isFinite(company.lastValuationMemoDay)?company.lastValuationMemoDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+  company.lastFundraisingMemoDay=Number.isFinite(company.lastFundraisingMemoDay)?company.lastFundraisingMemoDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+  company.lastValuationStoryDay=Number.isFinite(company.lastValuationStoryDay)?company.lastValuationStoryDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
   company.lastBoardValuationState=company.lastBoardValuationState||null;
   const rangeAliases={daily:"1d",weekly:"1w",monthly:"1m",quarterly:"3m",yearly:"1y"};
   company.marketRangeView=rangeAliases[company.marketRangeView]||company.marketRangeView;
@@ -46,9 +46,9 @@ function ensureMarketValuationSystems(){
   company.investorSentiment={confidence:seededInvestorConfidence,patience:50,growthExpectation:50,executionConcern:0,dilutionConcern:0,volatilityConcern:0,valuationConcern:0,recentQuestions:[],dominantConcern:null,dominantOpportunity:null,lastUpdatedDay:company.day,...(company.investorSentiment||{})};
   company.investorRelationsReport=company.investorRelationsReport&&typeof company.investorRelationsReport==="object"?company.investorRelationsReport:null;
   company.investorRelationsLearning={trendPredictionAccuracy:0,concernDiagnosisAccuracy:0,fundraisingTimingAccuracy:0,volatilityInterpretationAccuracy:0,narrativeAccuracy:0,overreactionBias:0,concernDetection:0,volatilityInterpretation:0,fundraisingTiming:0,...(company.investorRelationsLearning||{})};
-  company.lastInvestorRelationsReportDay=Number.isFinite(company.lastInvestorRelationsReportDay)?company.lastInvestorRelationsReportDay:-999;
-  company.lastInvestorBoardMemoDay=Number.isFinite(company.lastInvestorBoardMemoDay)?company.lastInvestorBoardMemoDay:-999;
-  [...(company.projects||[]),...(company.projectProposals||[]),...(company.projectArchive||[])].forEach(p=>{p.marketVisibility=p.marketVisibility||((p.status==="proposal"||p.originType==="internal")?"private":(company.day-(p.createdDay||company.day)>45?"rumored":"private"));});
+  company.lastInvestorRelationsReportDay=Number.isFinite(company.lastInvestorRelationsReportDay)?company.lastInvestorRelationsReportDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+  company.lastInvestorBoardMemoDay=Number.isFinite(company.lastInvestorBoardMemoDay)?company.lastInvestorBoardMemoDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+  [...(company.projects||[]),...(company.projectProposals||[]),...(company.projectArchive||[])].forEach(p=>{p.marketVisibility=p.marketVisibility||((p.status==="proposal"||p.originType==="internal")?"private":(company.day-(p.createdDay??company.day)>45?"rumored":"private"));});
 }
 function findValuationHistoryAtOrBefore(targetDay){
   ensureMarketValuationSystems();
@@ -163,13 +163,22 @@ function updateInvestorReaction(force=false){
   ensureMarketValuationSystems();
   if(!force&&company.lastInvestorUpdateDay===company.day)return company.investorSentiment;
   company.lastInvestorUpdateDay=company.day;
-  const prev=Number(company.investorSentiment?.confidence??company.shareholders?.confidence??50),target=derivedInvestorConfidence(company.portfolioHealth?.portfolioHealth??null),volatility=valuationVolatility(60),trend=valuationChange(30),projects=publicProjectSignal(),noise=rand(-1.8,1.8);
+  const reaction=OFFICE_AQUARIUM_CONSTANTS.investorRelations.reaction;
+  const prev=Number(company.investorSentiment?.confidence??company.shareholders?.confidence??50),target=derivedInvestorConfidence(company.portfolioHealth?.portfolioHealth??null),volatility=valuationVolatility(60),trend=valuationChange(30),projects=publicProjectSignal(),noise=rand(reaction.dailyNoiseMinimum,reaction.dailyNoiseMaximum);
   const executionConcern=clamp((company.portfolioHealth?.atRiskProjects||0)*12+(company.portfolioHealth?.averageScheduleVariance||0)*.55+projects.failures*10+(company.companyRiskComponents?.total>70?8:0),0,100);
   const dilutionConcern=clamp((company.investorOwnership||0)*.45+(company.boardControlPressure||0)*.40,0,100);
   const volatilityConcern=clamp(volatility*5+Math.max(0,-trend)*.45,0,100);
   const valuationConcern=clamp((company.valuationQuality<45?55-company.valuationQuality:0)+(trend>10&&company.valuationQuality<55?12:0),0,100);
   const growthExpectation=clamp((company.investorAppetite||50)*.42+(company.marketSentiment||50)*.24+Math.max(0,trend)*.55+projects.opportunities*3,0,100);
-  const confidence=clamp(prev*.72+target*.25+noise+Math.max(0,trend)*.03-Math.max(0,-trend)*.05,0,100);
+  const confidence=clamp(
+    prev*reaction.previousConfidenceWeight+
+    target*reaction.derivedConfidenceWeight+
+    noise+
+    Math.max(0,trend)*reaction.positiveTrendWeight-
+    Math.max(0,-trend)*reaction.negativeTrendWeight,
+    0,
+    100
+  );
   const concerns=[["execution",executionConcern],["dilution",dilutionConcern],["volatility",volatilityConcern],["valuation support",valuationConcern]].sort((a,b)=>b[1]-a[1]);
   const opportunities=[["funding window",company.investorAppetite||50],["customer proof",clamp((company.customers||0)*.4+(company.customerSentiment||50)*.5,0,100)],["visible project momentum",clamp(projects.opportunities*18+Math.max(0,trend),0,100)]].sort((a,b)=>b[1]-a[1]);
   company.investorSentiment={...(company.investorSentiment||{}),confidence,patience:clamp((company.investorSentiment?.patience??50)+(confidence-55)*.025-(company.crisis?1:0)-volatilityConcern*.006,0,100),growthExpectation,executionConcern,dilutionConcern,volatilityConcern,valuationConcern,dominantConcern:concerns[0][1]>38?concerns[0][0]:null,dominantOpportunity:opportunities[0][1]>58?opportunities[0][0]:null,lastUpdatedDay:company.day};
@@ -199,7 +208,7 @@ function applyInvestorEffect(effect={}){
 function investorConfidenceBand(v=company.investorSentiment?.confidence??50){return v>=72?"Strong":v>=56?"Moderate":v>=40?"Fragile":"Weak";}
 function updateInvestorRelationsReport(force=false){
   ensureMarketValuationSystems();
-  if(!force&&company.day-(company.lastInvestorRelationsReportDay||-999)<7)return company.investorRelationsReport;
+  if(!force&&company.day-(company.lastInvestorRelationsReportDay||OFFICE_AQUARIUM_CONSTANTS.time.neverDay)<7)return company.investorRelationsReport;
   const v30=valuationDisplayChange(30),v7=valuationDisplayChange(7),s=company.investorSentiment||{},trend=v30.change>4?"improving":v30.change<-4?"weakening":"stable";
   const evidence=[`Investor confidence ${Math.round(s.confidence??0)} (${investorConfidenceBand(s.confidence)})`,`30-day valuation ${formatPercentDelta(v30.change)} over ${valuationRangeText(30,v30.days)}`,`Valuation quality ${valuationQualityLabel()} and market confidence ${Math.round(company.marketConfidence||0)}`];
   if(s.dominantConcern)evidence.push(`Dominant concern: ${s.dominantConcern}`);
@@ -215,8 +224,8 @@ function updateInvestorRelationsReport(force=false){
 function evaluateInvestorRelationsForecasts(){
   ensureMarketValuationSystems();
   (company.investorRelationsForecasts||[]).forEach(f=>{
-    if(f.status!=="pending"||company.day<(f.reviewDay||f.forecastDay||0))return;
-    const actual=valuationDisplayChange(Math.max(1,company.day-(f.reportDay||company.day))).change;
+    if(f.status!=="pending"||company.day<(f.reviewDay??f.forecastDay??0))return;
+    const actual=valuationDisplayChange(Math.max(1,company.day-(f.reportDay??company.day))).change;
     const expected=Number(f.expectedThirtyDayChange)||0;
     const accuracy=clamp(100-Math.abs(actual-expected)*6,0,100);
     const actualConcern=company.investorSentiment?.dominantConcern||null,concernHit=(!f.predictedConcern&&!actualConcern)||f.predictedConcern===actualConcern;
@@ -337,7 +346,7 @@ function updateDailyValuationCore(force=false){
   const target=clamp(base*portfolioMultiplier*customerMultiplier*revenueMultiplier*executionMultiplier*marketMultiplier*leadershipMultiplier*riskMultiplier*qualityMultiplier*shockMultiplier,5,500);
   const noisePct=rand(-.004,.004),shock=shockPct;
   company.marketNoiseState=Number((noisePct*(company.valuation||target)).toFixed(4));
-  company.valuation=clamp((company.valuation||target)*.96+target*.04+company.marketNoiseState,1,999);
+  company.valuation=clamp((company.valuation||target)*.96+target*.04+company.marketNoiseState,1,OFFICE_AQUARIUM_CONSTANTS.defaults.simulationValueCeiling);
   company.valuationDrivers={...company.valuationDrivers,valuationTarget:Number(target.toFixed(2)),dailyNoise:Number(company.marketNoiseState.toFixed(3)),activeShock:Number(shock.toFixed(3)),shockMultiplier:Number(shockMultiplier.toFixed(3)),multipliers:{portfolio:portfolioMultiplier,customer:customerMultiplier,revenue:revenueMultiplier,execution:executionMultiplier,market:marketMultiplier,leadership:leadershipMultiplier,risk:riskMultiplier,quality:qualityMultiplier,shock:shockMultiplier}};
   company.valuationHistory=company.valuationHistory.filter(point=>point.day!==company.day);
   company.valuationHistory.push({day:company.day,valuation:Number(company.valuation.toFixed(2)),dailyRevenue:Number((company.dailyRevenue||0).toFixed(4)),customers:Math.round(company.customers||0),marketSentiment:Math.round(company.marketSentiment),marketConfidence:Math.round(company.marketConfidence),valuationQuality:Math.round(company.valuationQuality),fundamentalsScore:Math.round(fundamentals),leadershipReputation:Math.round(company.leadershipReputation)});
@@ -354,7 +363,7 @@ function updateDailyValuation(){
 function maybeRecordValuationStory(){
   ensureMarketValuationSystems();
   const move=valuationChange(30);
-  if(company.day<30||Math.abs(move)<8||company.day-(company.lastValuationStoryDay||-999)<20)return;
+  if(company.day<30||Math.abs(move)<8||company.day-(company.lastValuationStoryDay??OFFICE_AQUARIUM_CONSTANTS.time.neverDay)<20)return;
   company.lastValuationStoryDay=company.day;
   const quality=valuationQualityLabel().toLowerCase(),direction=move>0?"rose":"fell";
   const text=`Outside confidence shifted: valuation ${direction} ${Math.abs(move).toFixed(1)}% over 30 days with ${quality} support.`;
@@ -432,16 +441,17 @@ function makeBoardValuationMemo(kind,view){
 function maybeQueueBoardValuationMemo(){
   ensureMarketValuationSystems();
   if(company.pendingEvent||!Array.isArray(company.escalationQueue))return;
-  const view=boardValuationView(),daysSince=company.day-(company.lastValuationMemoDay||-999),fundDays=company.day-(company.lastFundraisingMemoDay||-999);
+  const cadence=OFFICE_AQUARIUM_CONSTANTS.investorRelations.memoCadence;
+  const view=boardValuationView(),daysSince=company.day-(company.lastValuationMemoDay??OFFICE_AQUARIUM_CONSTANTS.time.neverDay),fundDays=company.day-(company.lastFundraisingMemoDay??OFFICE_AQUARIUM_CONSTANTS.time.neverDay);
   let kind=null,urgent=false,triggerReason=null;
-  if(view.interpretation==="overheated"&&daysSince>10){kind="overheated";urgent=true;triggerReason="valuation rose faster than durable support";}
-  else if(view.interpretation==="weakening"&&daysSince>10&&((view.report?.confidenceTrend==="weakening")||view.investorSignal<44)){kind="weakening";urgent=true;triggerReason="investor confidence weakened materially";}
-  else if(view.interpretation==="funding-window"&&view.trend>7&&fundDays>45&&company.investorAppetite>62){kind="improving";triggerReason="investor appetite and valuation support created a funding window";}
-  else if(view.interpretation==="mispriced"&&daysSince>30){kind="mispricing";triggerReason="valuation fell despite stronger operating evidence";}
+  if(view.interpretation==="overheated"&&daysSince>=cadence.urgentMinimumGapDays){kind="overheated";urgent=true;triggerReason="valuation rose faster than durable support";}
+  else if(view.interpretation==="weakening"&&daysSince>=cadence.urgentMinimumGapDays&&((view.report?.confidenceTrend==="weakening")||view.investorSignal<44)){kind="weakening";urgent=true;triggerReason="investor confidence weakened materially";}
+  else if(view.interpretation==="funding-window"&&view.trend>7&&fundDays>=cadence.fundraisingMinimumGapDays&&company.investorAppetite>62){kind="improving";triggerReason="investor appetite and valuation support created a funding window";}
+  else if(view.interpretation==="mispriced"&&daysSince>=cadence.routineMinimumGapDays){kind="mispricing";triggerReason="valuation fell despite stronger operating evidence";}
   if(!kind)return;
-  if(!urgent&&daysSince<35)return;
+  if(!urgent&&daysSince<cadence.routineMinimumGapDays)return;
   const ev=makeBoardValuationMemo(kind,view);
-  if(ev.choices.some(c=>c.fundraising)&&fundDays<45)return;
+  if(ev.choices.some(c=>c.fundraising)&&fundDays<cadence.fundraisingMinimumGapDays)return;
   company.escalationQueue.push(ev);
   company.lastValuationMemoDay=company.day;
   company.lastBoardValuationState={...(company.lastBoardValuationState||{}),memoTriggerReason:triggerReason};
@@ -450,7 +460,7 @@ function maybeQueueBoardValuationMemo(){
 function applyFundraisingDecision(offer){
   if(!offer)return;
   ensureMarketValuationSystems();
-  company.cash=clamp(company.cash+(offer.amount||0),0,999);
+  company.cash=clamp(company.cash+(offer.amount||0),0,OFFICE_AQUARIUM_CONSTANTS.defaults.simulationValueCeiling);
   company.founderOwnership=clamp((company.founderOwnership||100)-(offer.dilutionPercent||0),0,100);
   company.investorOwnership=clamp(100-company.founderOwnership,0,100);
   company.boardControlPressure=clamp((company.boardControlPressure||0)+(offer.boardSeatRisk||0)*.18+(offer.expectationIncrease||0)*.12,0,100);

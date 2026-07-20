@@ -67,7 +67,7 @@ async function main() {
       company.finance = { ...(company.finance || {}), netCashFlowDaily: -0.02, runwayDays: 300 };
       company.shareholders = { ...(company.shareholders || {}), confidence: 55, pressure: 25 };
       company.manufacturing = { ...(company.manufacturing || {}), readiness: 70, yield: 70, capacity: 70, supplyRisk: 30 };
-      company.boardGovernance = { ...(company.boardGovernance || {}), strikes: 0, lastStrikeDay: -999, pipActive: false };
+      company.boardGovernance = { ...(company.boardGovernance || {}), strikes: 0, lastStrikeDay: OFFICE_AQUARIUM_CONSTANTS.time.neverDay, pipActive: false };
       company.organizationalMomentum = { ...(company.organizationalMomentum || {}), execution: 0, burnout: 0 };
       company.workItems = [];
       company.projectArchive = [
@@ -104,6 +104,25 @@ async function main() {
     evaluateFailure();
     assert(company.gameOver && company.failureOwner === "ceo-fired" && company.failureCode === "CEO_PIP_FAILURE", `PIP failure should remove CEO with CEO_PIP_FAILURE, got ${company.failureOwner}/${company.failureCode}`);
 
+    fresh();
+    company.escalationQueue = [];
+    company.pendingEvent = null;
+    company.board = 31;
+    const priorValidationMode = validationMode;
+    validationMode = false;
+    maybeIssueOrEvaluatePip();
+    const governanceReference = company.boardGovernance;
+    const firstPipMemoCount = company.escalationQueue.filter(event => String(event.id).startsWith("board-pip-")).length;
+    for (let day = 1; day <= 10; day += 1) {
+      company.day = day;
+      maybeIssueOrEvaluatePip();
+    }
+    validationMode = priorValidationMode;
+    const finalPipMemoCount = company.escalationQueue.filter(event => String(event.id).startsWith("board-pip-")).length;
+    assert(company.boardGovernance === governanceReference, "Workforce normalization should preserve the active Board-governance object");
+    assert(company.boardGovernance.pipActive, "A newly issued CEO PIP should remain active until its deadline");
+    assert(firstPipMemoCount === 1 && finalPipMemoCount === 1, `An active CEO PIP should create one Board letter, got ${firstPipMemoCount} initially and ${finalPipMemoCount} after ten days`);
+
     const reachabilitySetups = {
       financial: () => { company.cash = -0.5; company.finance.netCashFlowDaily = -0.3; company.finance.runwayDays = 0; },
       leadership: () => { company.board = 5; company.shareholders.pressure = 90; },
@@ -112,7 +131,17 @@ async function main() {
       reputation: () => { company.trust = 5; company.customerSentiment = 10; },
       product: () => { company.quality = 20; company.integration = 35; company.projects = [{ id: "risk", status: "execution", performance: { riskTrend: 90 } }]; },
       staffing: () => { employees.forEach((e, i) => { e.active = i < 3; }); employees[0].role = "Chip Architect"; company.openRoles = ["Firmware Engineer", "Verification Engineer"]; },
-      operational: () => { company.workItems = Array.from({ length: 5 }, (_, i) => ({ id: `w${i}`, progress: 50, blockedBy: ["dependency"] })); company.organizationalMomentum.execution = -30; employees.forEach(e => e.stress = 70); },
+      operational: () => {
+        company.workItems = Array.from({ length: 9 }, (_, i) => ({
+          id: `w${i}`,
+          projectId: i < 5 ? "project-a" : "project-b",
+          assignedTeam: i % 2 ? "software" : "hardware",
+          progress: 50,
+          blockedBy: ["dependency"]
+        }));
+        company.organizationalMomentum.execution = -35;
+        employees.forEach(e => e.stress = 70);
+      },
       manufacturing: () => { company.phase = "launched"; company.manufacturing.supplyRisk = 96; company.manufacturing.readiness = 25; }
     };
     for (const [type, setup] of Object.entries(reachabilitySetups)) {
@@ -123,6 +152,61 @@ async function main() {
       assert(Array.isArray(candidate?.visibleSignals) && candidate.visibleSignals.length > 0, `${type}: expected visible signals`);
       assert(Array.isArray(candidate?.recoveryCriteria) && candidate.recoveryCriteria.length > 0, `${type}: expected recovery criteria`);
     }
+
+    fresh();
+    company.shareholders.confidence = 0;
+    company.shareholders.pressure = 90;
+    assert(typedCrisisCandidate()?.type === "investor-confidence", "A legitimate zero investor-confidence value must open the investor crisis path");
+
+    fresh();
+    reachabilitySetups.operational();
+    const blockedBeforeIntervention = company.workItems.filter(item => item.blockedBy?.length).length;
+    startCrisis(makeCrisisCandidate("operational", ["multiple projects are blocked"], 90));
+    const crisisMemos = company.escalationQueue.filter(event => event.id === `crisis-recovery-${company.crisis.id}`);
+    assert(crisisMemos.length === 1, `A crisis should queue exactly one recovery memo, got ${crisisMemos.length}`);
+    assert(crisisMemos[0]?.choices?.length === 3, "A crisis recovery memo should provide exactly three executive choices");
+    assert(crisisMemos[0]?.choices?.every(choice => choice.crisisIntervention?.type === "operational"), "Every crisis choice should act on the active crisis type");
+    applyCrisisIntervention(crisisMemos[0].choices[0].crisisIntervention);
+    const blockedAfterIntervention = company.workItems.filter(item => item.blockedBy?.length).length;
+    assert(blockedAfterIntervention < blockedBeforeIntervention, "The blocker-clearing recovery choice should improve authoritative blocker state");
+
+    fresh();
+    company.workItems = Array.from({ length: 5 }, (_, i) => ({
+      id: `transient-${i}`,
+      projectId: "single-project",
+      assignedTeam: "hardware",
+      progress: 50,
+      blockedBy: ["dependency"]
+    }));
+    company.organizationalMomentum.execution = -12;
+    assert(typedCrisisCandidate()?.type !== "operational", "one-project blocker spike must not open an immediate company operational crisis");
+
+    fresh();
+    company.cash = 4;
+    company.finance.netCashFlowDaily = -0.10;
+    company.finance.runwayDays = 40;
+    company.market.capitalClimate = 45;
+    company.crisisRiskDays.financial = OFFICE_AQUARIUM_CONSTANTS.crisisBalance.sustainedRiskDays - 1;
+    updateCrisisRiskSystem();
+    assert(!company.crisis, "A sustained financial warning below the severe typed-crisis threshold must not open a fatal crisis");
+
+    fresh();
+    company.cash = 4;
+    company.finance.netCashFlowDaily = -0.30;
+    company.finance.runwayDays = 20;
+    company.market.capitalClimate = 45;
+    company.crisisRiskDays.financial = OFFICE_AQUARIUM_CONSTANTS.crisisBalance.sustainedRiskDays - 1;
+    updateCrisisRiskSystem();
+    assert(company.crisis?.type === "financial", `A sustained severe financial condition should open a financial crisis, got ${company.crisis?.type || "none"}`);
+    const financialOpeningProgress = crisisRecoveryProgress("financial");
+    evaluateFailure();
+    assert(company.crisis?.type === "financial", "A newly opened financial crisis must not clear before conditions improve");
+    company.cash += OFFICE_AQUARIUM_CONSTANTS.crisisBalance.recoveryImprovement.financialCashGain + 1;
+    company.finance.runwayDays += OFFICE_AQUARIUM_CONSTANTS.crisisBalance.recoveryImprovement.financialRunwayGainDays + 1;
+    const financialImprovedProgress = crisisRecoveryProgress("financial");
+    assert(financialImprovedProgress > financialOpeningProgress, "Material cash and runway improvement should advance financial crisis recovery");
+    evaluateFailure();
+    assert(!company.crisis, `A materially improved financial crisis should clear, progress ${financialImprovedProgress}`);
 
     const timeoutCodes = {
       financial: ["company-failure", "COMPANY_CASH_CRISIS_TIMEOUT"],

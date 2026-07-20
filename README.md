@@ -1,6 +1,12 @@
-# Office Aquarium
+# Office Aquarium Public Beta 0.9
 
-Office Aquarium is a standalone offline organization simulation. Open `Office_Aquarium.html` in a browser to play, or build the packaged web and Windows desktop releases from this folder.
+Office Aquarium is a standalone offline organization simulation. You lead as CEO
+while employees choose their own work, communicate, learn, and escalate strategic
+decisions. Open `Office_Aquarium.html` in a browser to play from the source tree,
+or build the clean web and Windows release packages described below.
+
+No account, network connection, API key, analytics service, or telemetry service is
+required. Saves stay on the device unless the player exports one.
 
 ## Project Layout
 
@@ -12,7 +18,7 @@ Office Aquarium is a standalone offline organization simulation. Open `Office_Aq
 - `src/facades/` - OOP system facades used by newer code
 - `src/bootstrap/` - browser event bindings and startup wiring
 - `assets/audio/` - optional music and message-alert audio files
-- `docs/` - product bible, master spec, architecture notes, and player manual
+- `docs/` - product bible, master spec, architecture notes, player guide, and release evidence
 - `tests/` - browser and simulation regression tests
 - `dist/` - generated web and desktop frontend packages; safe to delete and rebuild
 - `src-tauri/` - Tauri Windows desktop wrapper and generated release build output
@@ -85,7 +91,34 @@ The suite checks:
 - executive memo context and weekly newspaper clarity
 - absence of recorded simulation errors during the regression run
 
-GitHub Actions also runs these checks on push and pull request through `.github/workflows/ci.yml`.
+GitHub Actions runs the complete `npm test` suite, a clean extracted-web launch
+smoke, and a locked Rust check on every push and pull request through
+`.github/workflows/ci.yml`.
+
+Two slower workflows are intentionally separate:
+
+- `.github/workflows/long-run.yml` runs the deterministic first-year strategy
+  matrix on a schedule or by manual request and uploads Markdown and JSON evidence.
+- `.github/workflows/release.yml` requires a 20-seed-per-strategy Day-365 gate,
+  reruns the complete suite, builds and launch-smokes the web package, builds and
+  inspects the Windows package, and attempts a clean install/launch/uninstall smoke.
+
+Useful release-hardening checks:
+
+```powershell
+npm run verify:release-metadata
+npm run test:long-run-contract
+npm run test:save-recovery
+npm run test:runtime-recovery
+npm run test:release-ui
+npm run test:package-web
+```
+
+Run a local first-year matrix and write its reports to `dist\reports\`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\run-long-run-matrix.ps1 -SeedCount 20 -HorizonDays 365 -WriteReports
+```
 
 Useful targeted checks:
 
@@ -195,7 +228,8 @@ powershell -ExecutionPolicy Bypass -File tools\package-itch-web.ps1
 The script creates:
 
 ```text
-dist\Office_Aquarium_itch_web.zip
+dist\Office_Aquarium_Public_Beta_0.9_itch_web.zip
+dist\Office_Aquarium_Public_Beta_0.9_itch_web.zip.sha256
 ```
 
 Upload that ZIP to itch.io as an HTML game. The package renames `Office_Aquarium.html` to `index.html` inside the ZIP, which is what itch.io expects for browser-playable games.
@@ -205,6 +239,16 @@ The staged web package is also available at:
 ```text
 dist\itch-web\
 ```
+
+Build and launch-smoke the exact extracted ZIP:
+
+```powershell
+npm run test:package-web
+```
+
+The package contains only runtime source, audio assets, the player guide, release
+notes, license, third-party notices, and SHA-256 manifests. Tests, private plans,
+work logs, repository metadata, and developer archives are excluded.
 
 ### Desktop Binary
 
@@ -228,25 +272,43 @@ Run the desktop app in development mode:
 npm run tauri:dev
 ```
 
-Build a Windows installer:
+Build a raw Windows executable and NSIS installer:
 
 ```powershell
-npm run tauri:build
+npm run test:package-windows
 ```
 
-The build creates a raw desktop executable at:
+Clean, versioned release artifacts are copied to:
+
+```text
+dist\windows\Office_Aquarium_0.9.0_windows_x64.exe
+dist\windows\Office Aquarium_0.9.0_x64-setup.exe
+dist\windows\release-manifest.json
+dist\windows\SHA256SUMS.txt
+```
+
+The Tauri build output remains available at:
 
 ```text
 src-tauri\target\release\office-aquarium.exe
+src-tauri\target\release\bundle\nsis\Office Aquarium_0.9.0_x64-setup.exe
 ```
 
-It also creates a Windows installer at:
+If the build fails while downloading NSIS, rerun it with network access available.
+The release packager deletes stale NSIS bundles before building, verifies the
+version, and rejects old installer names.
 
-```text
-src-tauri\target\release\bundle\nsis\Office Aquarium_0.40.0_x64-setup.exe
+On a Windows environment that permits newly built unsigned applications, run the
+clean installation smoke:
+
+```powershell
+npm run test:windows-launch
 ```
 
-If the build fails while downloading NSIS, rerun the build with network access available. The app executable may still compile successfully even if installer bundling fails.
+That check silently installs to a temporary folder, launches the installed
+application for eight seconds, closes it, and runs the uninstaller. A managed
+environment may block an unsigned beta binary with `Access is denied`; that is a
+failed launch certification, not a reason to mark the check as passed.
 
 The desktop wrapper uses the same offline game files as the browser version. `Office_Aquarium.html` remains the main source file.
 
@@ -255,10 +317,12 @@ The desktop wrapper uses the same offline game files as the browser version. `Of
 After a successful clean build, the main release files are:
 
 ```text
-dist\Office_Aquarium_itch_web.zip
+dist\Office_Aquarium_Public_Beta_0.9_itch_web.zip
+dist\Office_Aquarium_Public_Beta_0.9_itch_web.zip.sha256
 dist\desktop\
-src-tauri\target\release\office-aquarium.exe
-src-tauri\target\release\bundle\nsis\Office Aquarium_0.40.0_x64-setup.exe
+dist\windows\Office_Aquarium_0.9.0_windows_x64.exe
+dist\windows\Office Aquarium_0.9.0_x64-setup.exe
+dist\windows\SHA256SUMS.txt
 ```
 
 Use the ZIP for itch.io web upload. Use the NSIS setup EXE for a Windows desktop release.

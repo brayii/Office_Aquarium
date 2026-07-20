@@ -157,6 +157,7 @@ async function main() {
     }
 
     assert(hiredIds.length === roles.length, `Only ${hiredIds.length} of ${roles.length} roles completed the full hiring path`);
+    assert(company.simulationMetrics?.counters?.hires === roles.length, `Hiring telemetry recorded ${company.simulationMetrics?.counters?.hires || 0} of ${roles.length} completed hires`);
     roles.forEach(role => assert(employees.some(employee => employee.active && canonicalRole(employee.role) === role), `${role} is absent after the all-role hiring run`));
 
     // Two separately approved positions for the same role must produce two

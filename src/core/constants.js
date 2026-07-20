@@ -15,18 +15,64 @@ function deepFreezeConstants(value){
 }
 
 globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
+  release:{
+    applicationVersion:"0.9.0",
+    displayVersion:"Public Beta 0.9",
+    channel:"public-beta",
+    offline:true,
+    telemetry:false,
+    webArchiveName:"Office_Aquarium_Public_Beta_0.9_itch_web.zip",
+    saveExportExtension:"oasave"
+  },
   storage:{
     saveKey:"office-aquarium-living-office-v3",
-    saveVersion:40,
+    saveVersion:41,
+    backupKeySuffix:"-last-known-good",
+    candidateKeySuffix:"-candidate",
     transientCompanyKeys:[
       "runtime",
       "socialMemoryDebug",
       "socialConflictDebug",
       "socialLeadershipDebug",
-      "lastSocialSystemsAudit"
+      "lastSocialSystemsAudit",
+      "dailyStageStatus",
+      "executiveBriefing",
+      "executiveIntelligenceSnapshot",
+      "executiveObservations",
+      "debugState",
+      "companyRiskComponents",
+      "riskPillars",
+      "staffingModel",
+      "workforceAllocationSnapshot",
+      "organizationMaturity",
+      "capabilityNeeds",
+      "capabilityCoverage",
+      "capabilityGaps",
+      "capabilityConsequences",
+      "capabilityContributors",
+      "capabilityPromotionCandidates",
+      "capabilityFulfillmentOptions",
+      "capabilityAudit",
+      "capabilityLearningSignals",
+      "capabilitySystemUpdatedDay",
+      "lastProjectRequirementAuditDay"
     ],
     maxPersistedCharacters:4700000,
-    compactFormat:"office-aquarium-compact-v1",
+    softWarningCharacters:2800000,
+    compactionThresholdCharacters:3290000,
+    hardLimitCharacters:4000000,
+    reservedMarginCharacters:700000,
+    compactFormat:"office-aquarium-compact-v2",
+    legacyCompactFormats:["office-aquarium-compact-v1"],
+    compressedEnvelopePrefix:"OA-LZW1:",
+    plainEnvelopePrefix:"OA-JSON1:",
+    compressionResetCode:65535,
+    compressionFirstCode:256,
+    stringReferencePrefix:"~@",
+    escapedStringPrefix:"~!",
+    dictionaryMinimumLength:12,
+    dictionaryMinimumUses:3,
+    dictionaryMaximumEntries:65535,
     // Append new keys only. Reordering this list would invalidate existing compact saves.
     compactKeys:[
       "saveVersion","savedAt","company","employees","ownerSystem","id","type","category",
@@ -62,7 +108,11 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       "topicKey","memoryReferences","targets","presentationOnly","exchangeIndex",
       "schemaVersion","lastConversationAt","recentCategories","zone","currentRoom","homeRoom",
       "homeZone","x","y","actionMinutes","thought","valuationRiskScore",
-      "lastAutomaticRepairCheckAt","mentorConversationRecorded"
+      "lastAutomaticRepairCheckAt","mentorConversationRecorded",
+      "saveHealth","runtimeFailure","lastSuccessfulSaveDay","lastSuccessfulSaveSize",
+      "compacted","dictionaryEntries","rawCharacters","serializedCharacters",
+      "completedWorkItemCount","projectCompletionRecorded","lastWorkItemCompletedDay",
+      "lastDecisionEscalationDay","decisionEscalationFingerprints","crisisContractorCoverageUntil"
     ]
   },
   determinism:{
@@ -79,7 +129,128 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     workdayStartMinute:480,
     workdayEndMinute:1200,
     offsiteReturnCutoffMinute:1020,
+    simulationStepMinutes:5,
+    indefiniteActionMinutes:999,
+    neverDay:-999,
+    neverAbsoluteMinute:-999999,
     unknownFutureDay:999
+  },
+  playerLanguage:{
+    interfaceLabels:{
+      projectAllocationGap:"Project allocation gap"
+    },
+    beliefLabels:{
+      launchReadiness:"Launch readiness",
+      cashRisk:"Cash concern",
+      qualityRisk:"Quality concern",
+      deadlineRisk:"Schedule concern",
+      customerSentiment:"Customer confidence",
+      staffingRisk:"Staffing concern",
+      burnoutRisk:"Burnout concern",
+      marketDemand:"Market demand",
+      projectHealth:"Project health",
+      companyTrust:"Company trust"
+    },
+    confidenceBands:{
+      low:"Low confidence - this is an early impression",
+      moderate:"Moderate confidence - some evidence supports this view",
+      high:"High confidence - recent evidence strongly supports this view"
+    }
+  },
+  validation:{
+    statuses:{
+      completed:"completed",
+      companyFailed:"company_failed",
+      timedOut:"timed_out",
+      systemError:"system_error"
+    },
+    defaultStrategy:"balanced",
+    strategies:["conservative","balanced","growth-oriented","recovery-focused"],
+    firstYearHorizonDays:365,
+    extendedSmokeHorizonDays:730,
+    developmentSeedsPerStrategy:20,
+    certificationSeedsPerStrategy:50,
+    tickBudgetMultiplier:1.05,
+    decisionLogLimit:240,
+    consoleReportDetailLimit:0,
+    survivalTargets:{
+      conservative:{minimum:65,maximum:85},
+      balanced:{minimum:70,maximum:85},
+      "growth-oriented":{minimum:45,maximum:75}
+    },
+    hiringDecision:{
+      strategy:{
+        conservative:{maximumConcurrentSearches:2,minimumCashReserve:8,minimumProjectedRunwayDays:105,targetHeadcountBuffer:0},
+        balanced:{maximumConcurrentSearches:3,minimumCashReserve:6,minimumProjectedRunwayDays:70,targetHeadcountBuffer:1},
+        "growth-oriented":{maximumConcurrentSearches:4,minimumCashReserve:3.5,minimumProjectedRunwayDays:35,targetHeadcountBuffer:3},
+        "recovery-focused":{maximumConcurrentSearches:2,minimumCashReserve:7,minimumProjectedRunwayDays:90,targetHeadcountBuffer:0}
+      },
+      defaultStrategy:{maximumConcurrentSearches:3,minimumCashReserve:6,minimumProjectedRunwayDays:70,targetHeadcountBuffer:1},
+      concurrentSearchPenalty:12,
+      cashReservePenaltyPerMillion:4,
+      runwayPenaltyMaximum:38,
+      headcountExcessPenalty:10,
+      projectedDailyLossPenalty:42,
+      deferNeedWeight:.38,
+      rejectNeedWeight:.68,
+      emergencyRunwayDays:25,
+      emergencyCashReserve:3,
+      maximumNeedScore:48,
+      emergencyApprovalPenalty:36,
+      activeCommitmentPenalty:4
+    },
+    decisionSafety:{
+      tightCashThreshold:8,
+      criticalCashThreshold:4,
+      tightRunwayDays:60,
+      criticalRunwayDays:30,
+      normalCashEffectWeight:2,
+      tightCashEffectWeight:12,
+      criticalCashEffectWeight:18,
+      tightSpendingPenalty:12,
+      criticalSpendingPenalty:28,
+      qualityWarningThreshold:55,
+      qualityCriticalThreshold:45,
+      speedWarningPenalty:14,
+      speedCriticalPenalty:30,
+      overloadedProjectCount:3,
+      projectExpansionPenalty:12,
+      blockerExpansionPenalty:2.5,
+      staffingExpansionPenalty:3,
+      strategyMultipliers:{
+        conservative:{spending:1,speed:1,expansion:1,capacityRelief:1},
+        balanced:{spending:1,speed:1,expansion:1,capacityRelief:1},
+        "growth-oriented":{spending:.7,speed:1,expansion:.4,capacityRelief:.3},
+        "recovery-focused":{spending:1,speed:1,expansion:1,capacityRelief:1}
+      }
+    }
+  },
+  runtimeRecovery:{
+    maximumSystemErrors:20,
+    safeStageLabels:{
+      "simulateMinute":"the active work cycle",
+      "dailyClose":"the daily company review",
+      "employee-outcomes":"employee updates",
+      "work-items":"project work updates",
+      "projects-portfolio":"portfolio updates",
+      "customers-manufacturing":"customer and manufacturing updates",
+      "finance":"financial updates",
+      "market-labor":"market and hiring updates",
+      "valuation":"valuation updates",
+      "investor-reaction":"investor updates",
+      "investor-relations":"investor relations updates",
+      "board":"board review",
+      "workforce":"workforce updates",
+      "social-organization":"workplace relationship updates",
+      "organizational-friction":"organizational risk updates",
+      "risk-pillars":"company risk review",
+      "crisis-lifecycle":"crisis review",
+      "learning-reviews":"organizational learning review",
+      "executive-communication":"executive communications",
+      "narrative":"company history updates",
+      "telemetry":"operating health review",
+      "save":"autosave"
+    }
   },
   defaults:{
     neutralScore:50,
@@ -89,6 +260,10 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     unknownSupplyRisk:35,
     unknownQualityRisk:35,
     unknownTeamCohesion:55,
+    sortLastIndex:Number.MAX_SAFE_INTEGER,
+    impossibleUtilityScore:-999,
+    unboundedNegativeValue:-999,
+    simulationValueCeiling:999,
     maxScore:100,
     minScore:0
   },
@@ -395,6 +570,7 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       minimumMeaningfulInteractions:2,
       edgeThreshold:44,
       memberJoinThreshold:48,
+      sustainedInteractionJoinCount:5,
       maxGroupSize:5,
       maxGroups:24,
       maxHistory:100,
@@ -442,6 +618,12 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     maxQueuedMemosBeforeRandomEvents:4,
     recentDecisionPressureDays:5,
     recentDecisionPressureLimit:4,
+    internalDecisionMinimumGapDays:18,
+    internalDecisionRepeatWindowDays:36,
+    maximumDecisionQueueLength:3,
+    informationalMinimumGapDays:14,
+    informationalRepeatWindowDays:35,
+    majorFollowUpMemoChance:.15,
     randomEventChancePerMinute:.004,
     randomEventCooldownMinutes:360,
     decisionCooldownMinutes:720
@@ -483,8 +665,9 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     requestScoreThreshold:85,
     requestSustainDays:3,
     requestConfidenceThreshold:62,
-    duplicateRequestWindowDays:28,
-    requestReviewWindowDays:35,
+    minimumRequestMemoGapDays:30,
+    duplicateRequestWindowDays:45,
+    requestReviewWindowDays:60,
     recentHireDisplayDays:45,
     resolvedRequestCleanupDays:45,
     requestStatuses:{
@@ -563,6 +746,29 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
     severanceWeeksMin:2,
     severanceWeeksMax:5,
     salarySatisfaction:65
+  },
+  economy:{
+    facilitiesBaseDaily:.010,
+    facilitiesPerEmployeeDaily:.0025,
+    softwareAndLabBaseDaily:.012,
+    softwareAndLabProgressFactorDaily:.015,
+    prototypeLabDaily:.010,
+    postPrototypeLabDaily:.022,
+    preLaunchManufacturingDaily:.004,
+    manufacturingBaseDaily:.026,
+    manufacturingCapacityDaily:.0011,
+    manufacturingCustomerDaily:.00115,
+    manufacturingSupplyPressureDaily:.00038,
+    qualityBurdenThreshold:62,
+    qualityBurdenDailyRate:.0008,
+    supportCustomerDaily:.00090,
+    supportLowTrustThreshold:55,
+    supportLowTrustDailyRate:.000006,
+    growthBaselineHeadcount:8,
+    growthOverheadPerEmployeeDaily:.012,
+    growthOverheadPerCustomerDaily:.00055,
+    launchedGrowthOverheadDaily:.035,
+    crisisDailyCost:.006
   },
   portfolioDemand:{
     scaleCashThreshold:24,
@@ -712,12 +918,183 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
       strategic:"Strategic"
     }
   },
+  projectDevelopment:{
+    majorBacklogMultiplier:1.45,
+    standardBacklogMultiplier:1.05,
+    maximumBacklogAboveDepartmentCount:5,
+    defaultEstimatedDurationDays:90,
+    recentClosedWorkItemRetentionDays:5,
+    completionTelemetryLimit:100000,
+    expectedWorkItemCycleDays:2.5,
+    minimumPlannedWorkItems:40,
+    backlogTaper:[
+      {progressBelow:55,multiplier:1},
+      {progressBelow:75,multiplier:.75},
+      {progressBelow:90,multiplier:.5},
+      {progressBelow:97,multiplier:.2},
+      {progressBelow:101,multiplier:0}
+    ],
+    closeoutBacklogProgress:97,
+    projectWorkItemLimit:52,
+    totalWorkItemLimit:96
+  },
+  portfolioGovernance:{
+    boardConcernStartDay:30,
+    boardConcernCadenceDays:60,
+    projectReviewCadenceDays:7,
+    projectReviewIntervalDays:60,
+    proposalReminderDays:45
+  },
+  crisisBalance:{
+    sustainedRiskDays:5,
+    warningRiskDays:1,
+    atRiskDays:3,
+    maximumTrackedRiskDays:12,
+    definitions:{
+      financial:{owner:"company-failure",code:"COMPANY_CASH_CRISIS_TIMEOUT",days:30,title:"Financial Runway Crisis"},
+      insolvency:{owner:"company-failure",code:"COMPANY_INSOLVENCY",days:0,title:"Insolvency Failure"},
+      payroll:{owner:"company-failure",code:"COMPANY_PAYROLL_FAILURE",days:0,title:"Payroll Failure"},
+      leadership:{owner:"ceo-fired",code:"CEO_LEADERSHIP_CRISIS_TIMEOUT",days:30,title:"Leadership Confidence Crisis"},
+      burnout:{owner:"ceo-fired",code:"CEO_BURNOUT_CRISIS_TIMEOUT",days:24,title:"Burnout Leadership Crisis"},
+      "investor-confidence":{owner:"ceo-fired",code:"CEO_INVESTOR_CRISIS_TIMEOUT",days:30,title:"Investor Confidence Crisis"},
+      reputation:{owner:"company-failure",code:"COMPANY_REPUTATION_CRISIS_TIMEOUT",days:28,title:"Reputation Crisis"},
+      product:{owner:"company-failure",code:"COMPANY_PRODUCT_CRISIS_TIMEOUT",days:30,title:"Product Delivery Crisis"},
+      staffing:{owner:"company-failure",code:"COMPANY_STAFFING_CRISIS_TIMEOUT",days:32,title:"Staffing Continuity Crisis"},
+      operational:{owner:"company-failure",code:"COMPANY_OPERATIONAL_CRISIS_TIMEOUT",days:28,title:"Operational Execution Crisis"},
+      manufacturing:{owner:"company-failure",code:"COMPANY_MANUFACTURING_CRISIS_TIMEOUT",days:26,title:"Manufacturing Delivery Crisis"},
+      governance:{owner:"ceo-fired",code:"CEO_THREE_BOARD_STRIKES",days:0,title:"Governance Failure"}
+    },
+    recovery:{
+      financial:{
+        healthyCash:7,
+        warningCash:3,
+        healthyRunwayDays:75,
+        warningRunwayDays:35,
+        healthyNetCashFlow:-.16,
+        warningNetCashFlow:-.25
+      },
+      leadership:{healthyBoard:38,warningBoard:24,maximumPressure:65,maximumStrikes:2},
+      burnout:{healthyStress:65,warningStress:74,maximumRiskStress:70},
+      investor:{healthyConfidence:35,maximumPressure:65,minimumBoard:32},
+      reputation:{healthyTrust:48,warningTrust:28,healthyCustomerSentiment:48},
+      product:{healthyQuality:55,warningQuality:38,criticalQuality:30,healthyIntegration:50,warningIntegration:45,healthyManufacturingReadiness:45,healthyBlockers:0,warningBlockers:3,healthyRisk:70},
+      staffing:{healthyMissingFte:.1,warningMissingFte:1,strainedMissingFte:2.5,criticalMissingFte:4,healthyCoverage:85,warningCoverage:70,healthyActiveEmployees:8,warningActiveEmployees:6,healthyTechnicalEmployees:3,warningTechnicalEmployees:2,maximumOpenRoles:1,healthyStress:72,warningStress:76},
+      operational:{healthyBlockers:2,warningBlockers:4,healthyExecutionMomentum:-5,healthyStress:74},
+      manufacturing:{maximumSupplyRisk:72,minimumReadiness:45,minimumYield:45,minimumCapacity:35}
+    },
+    recoveryImprovement:{
+      financialCashGain:3,
+      financialRunwayGainDays:15,
+      leadershipBoardGain:8,
+      leadershipPressureRelief:15,
+      burnoutStressRelief:10,
+      investorConfidenceGain:15,
+      reputationGain:12,
+      productBlockerRelief:3,
+      projectRiskRelief:15,
+      staffingAssignmentRelief:2,
+      operationalExecutionGain:15,
+      manufacturingSupplyRelief:15
+    },
+    interventions:{
+      blockerClearCount:3,
+      blockerRiskRelief:8,
+      blockerStressRelief:3,
+      qualityGain:3,
+      integrationGain:2,
+      mistakeResolutionCount:3,
+      investorConfidenceGain:10,
+      investorPressureRelief:12,
+      boardConfidenceGain:4,
+      reputationTrustGain:5,
+      customerSentimentGain:6,
+      employeeStressRelief:8,
+      employeeMoraleGain:3,
+      manufacturingSupplyRelief:15,
+      manufacturingReadinessGain:8,
+      manufacturingYieldGain:6,
+      manufacturingInvestmentCost:.8,
+      contractorCoverageDays:30
+    },
+    financial:{
+      warningCash:4.5,
+      warningDailyLoss:.08,
+      severeDailyLoss:.25,
+      severeLossCash:6.5,
+      severeLossRunwayDays:45
+    },
+    product:{
+      criticalQuality:24,
+      warningQuality:38,
+      severeProjectRisk:84,
+      severeProjectScheduleVariance:24,
+      severeProjectBlockers:2
+    },
+    operational:{
+      warningBlockedItems:5,
+      immediateBlockedItems:9,
+      minimumAffectedProjects:2,
+      minimumAffectedDepartments:2,
+      warningExecutionMomentum:-10,
+      immediateExecutionMomentum:-32
+    }
+  },
   manufacturing:{
     fulfillmentThreshold:.62,
     revenuePenaltyRate:.45,
     trustPenaltyScale:2.4,
     customerSentimentPenaltyScale:3,
     customerTrustPenaltyScale:2
+  },
+  customerMarket:{
+    strategicMemoCooldownDays:28,
+    recoveryIssueResolutionCount:2,
+    supportIssueResolutionCount:1,
+    segmentDefinitions:{
+      enterprise:{label:"Enterprise",weight:.30,contractValue:.0048,reliability:1.25,support:1.15,price:.75,roadmap:1.15,switching:68},
+      smallBusiness:{label:"Small Business",weight:.26,contractValue:.0017,reliability:.82,support:1.05,price:1.35,roadmap:.78,switching:38},
+      education:{label:"Education",weight:.14,contractValue:.0011,reliability:.86,support:.90,price:1.55,roadmap:1.05,switching:47},
+      government:{label:"Government",weight:.12,contractValue:.0039,reliability:1.35,support:.95,price:.90,roadmap:1.10,switching:74},
+      strategicPartners:{label:"Strategic Partners",weight:.18,contractValue:.0058,reliability:1.08,support:.85,price:.72,roadmap:1.30,switching:62}
+    }
+  },
+  investorRelations:{
+    reaction:{
+      previousConfidenceWeight:.72,
+      derivedConfidenceWeight:.28,
+      dailyNoiseMinimum:-1.25,
+      dailyNoiseMaximum:1.25,
+      positiveTrendWeight:.03,
+      negativeTrendWeight:.05
+    },
+    memoCadence:{
+      urgentMinimumGapDays:21,
+      routineMinimumGapDays:45,
+      fundraisingMinimumGapDays:60
+    }
+  },
+  telemetry:{
+    persistedDailySnapshots:90
+  },
+  organizationalMomentum:{
+    previousWeight:.88,
+    targetWeight:.12,
+    financialCashReference:8,
+    financialCashWeight:2,
+    financialNetCashFlowWeight:40
+  },
+  boardGovernance:{
+    strikeCooldownDays:14,
+    strikeBoardPenalty:6,
+    pipOfferCooldownDays:60,
+    pipDurationDays:91,
+    pipSuccessBoardGain:8,
+    pipTargets:{
+      minimumCash:6,
+      minimumBoard:36,
+      minimumTrust:38,
+      maximumNetDailyLoss:-.06
+    }
   },
   dailyPipeline:{
     version:1,
@@ -766,7 +1143,9 @@ globalThis.OFFICE_AQUARIUM_CONSTANTS=deepFreezeConstants({
   projectLifecycle:{
     activeStatuses:["approved","planning","prototype","execution","verification","pilot","scaling","at risk","blocked"],
     activeIncludingPausedStatuses:["approved","planning","prototype","execution","verification","pilot","scaling","at risk","blocked","paused"],
-    terminalStatuses:["completed","canceled","failed","rejected","merged"]
+    terminalStatuses:["completed","canceled","failed","rejected","merged"],
+    capacityConsumingActions:["approve","pilot","continue","resume","expand","validate"],
+    capacityReliefActions:["delay","pause","cancel","reject","reduce","split","merge"]
   },
   messageStatus:{
     queuedForCeo:"queued-for-ceo",

@@ -66,14 +66,27 @@ async function main() {
 
     const supportBefore = company.customerSegments.enterprise.supportSatisfaction;
     const qualityBefore = company.customerSegments.enterprise.reliabilitySatisfaction;
+    const supportIssue = recordCustomerExperience("enterprise", "support-delay", 72, "Enterprise support queue is delayed.", "support-regression", false);
+    const unresolvedBefore = company.customerSegments.enterprise.currentIssues.filter(issue => !issue.resolved).length;
     applyCustomerStrategyDecision({ segmentId: "enterprise", mode: "support" });
     assert(company.customerSegments.enterprise.supportSatisfaction > supportBefore, "Support intervention should improve support satisfaction");
     assert(company.customerSegments.enterprise.reliabilitySatisfaction <= qualityBefore + 1, "Support intervention should not masquerade as broad product-quality recovery");
+    assert(company.customerSegments.enterprise.currentIssues.filter(issue => !issue.resolved).length < unresolvedBefore, "Funded support should resolve at least one underlying customer issue");
+    assert(supportIssue.resolved, "Resolved customer issue should update the canonical experience record");
     const episode = (company.learningEpisodes || []).find(e => e.domain === "customer" && e.customerSegmentIds?.includes("enterprise"));
     assert(episode?.interventionType === "support-staffing", `Customer learning should record typed intervention, got ${episode?.interventionType}`);
 
+    company.phase = "launched";
+    company.trust = 70;
+    company.customers = 0;
+    const zeroCustomerCost = calculateLivingFinance();
+    company.customers = 100;
+    const hundredCustomerCost = calculateLivingFinance();
+    const customerScaleCost = hundredCustomerCost - zeroCustomerCost;
+    assert(customerScaleCost >= .24 && customerScaleCost <= .34, `One hundred launched customers should add realistic recurring operating cost, got $${customerScaleCost.toFixed(3)}M/day`);
+
     validationMode = false;
-    return { ok: failures.length === 0, failures, exposure: company.customerSegments.enterprise.productExposure, retentionOutlook: company.customerSegments.enterprise.retentionOutlook };
+    return { ok: failures.length === 0, failures, exposure: company.customerSegments.enterprise.productExposure, retentionOutlook: company.customerSegments.enterprise.retentionOutlook, customerScaleCost: Number(customerScaleCost.toFixed(3)) };
   });
 
   await browser.close();

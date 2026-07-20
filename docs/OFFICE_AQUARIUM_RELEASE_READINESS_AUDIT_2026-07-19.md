@@ -1,5 +1,10 @@
 # Office Aquarium First-Release Readiness Audit
 
+> **Historical baseline:** This document records the pre-hardening `0.40.0`
+> assessment. Release fixes are evaluated separately in
+> `OFFICE_AQUARIUM_RELEASE_READINESS_RECHECK_2026-07-19.md`; baseline findings
+> below are intentionally preserved as evidence.
+
 **Audit date:** 2026-07-19
 **Audited commit:** `15ef37b` (`main`)
 **Application version:** `0.40.0`

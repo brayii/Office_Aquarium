@@ -152,7 +152,7 @@ function concreteMemoEvidence(ev,comm,dept,msg=null){
   if(ev.customerSegmentId){const seg=company.customerSegments?.[ev.customerSegmentId],label=CUSTOMER_SEGMENT_DEFS[ev.customerSegmentId]?.label||"Customer";if(seg)lines.push(`${label} has ${Math.round(seg.activeCustomers||0)} active customer${Math.round(seg.activeCustomers||0)===1?"":"s"}, ${qualitativeBand(seg.sentiment,{low:45,high:72,lowText:"weak",midText:"mixed",highText:"healthy"})} sentiment, and ${qualitativeBand(seg.churnRisk,{low:35,high:68,lowText:"limited",midText:"material",highText:"high"})} churn risk.`);const issue=(seg?.currentIssues||[]).find(i=>!i.resolved);if(issue)lines.push(`${label} issue: ${issue.description}`);}
   if(String(ev.id||"").includes("project")){const h=company.portfolioHealth||{};lines.push(`Portfolio load includes ${h.activeProjects||0} active project${(h.activeProjects||0)===1?"":"s"}, with ${h.atRiskProjects||0} currently at risk and daily project spend near $${Number(h.totalProjectSpendDaily||0).toFixed(3)}M.`);}
   const text=String(ev.id+" "+ev.title+" "+ev.copy+" "+(ev.choices||[]).map(c=>c.title+" "+c.detail).join(" ")).toLowerCase();
-  if(dept==="finance"||eventCategory(ev)==="finance"||/cash|runway|fund|salary|hire|layoff|budget|spend|cost/.test(text))lines.push(company.finance?.runwayDays>=999?`Finance sees current cash flow as positive, but the decision can still change future flexibility.`:`Runway is around ${company.finance?.runwayDays||0} days and daily cash flow is near $${Number(company.finance?.netCashFlowDaily||0).toFixed(3)}M.`);
+  if(dept==="finance"||eventCategory(ev)==="finance"||/cash|runway|fund|salary|hire|layoff|budget|spend|cost/.test(text))lines.push(company.finance?.runwayDays>=OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay?`Finance sees current cash flow as positive, but the decision can still change future flexibility.`:`Runway is around ${company.finance?.runwayDays||0} days and daily cash flow is near $${Number(company.finance?.netCashFlowDaily||0).toFixed(3)}M.`);
   if(dept==="people"||eventCategory(ev)==="people"||/hire|staff|burnout|morale|retention|layoff|performance|coach/.test(text))lines.push(`${employees.filter(e=>e.active).length} employees are active, with ${qualitativeBand(avgStress(),{low:45,high:70,lowText:"manageable",midText:"elevated",highText:"high"})} workload pressure and ${employees.filter(e=>e.active&&(e.retentionRisk||0)>60).length} elevated retention case(s).`);
   if(dept==="quality"||eventCategory(ev)==="operations"||/quality|verify|defect|supplier|manufactur|launch|pilot/.test(text))lines.push(`Quality is ${qualitativeBand(company.quality,{low:50,high:75,lowText:"below target",midText:"mixed",highText:"healthy"})}, with ${Math.round(company.simulationMetrics?.counters?.qualityMistakes||0)} unresolved mistake(s) and ${qualitativeBand(company.manufacturing?.supplyRisk,{low:35,high:68,lowText:"limited",midText:"material",highText:"high"})} manufacturing risk.`);
   if(eventCategory(ev)==="customer"||dept==="customer success"||/customer|renewal|churn|support|segment/.test(text))lines.push(`The company has ${Math.round(company.customers||0)} customer${Math.round(company.customers||0)===1?"":"s"}, ${qualitativeBand(company.customerSentiment,{low:45,high:72,lowText:"weak",midText:"mixed",highText:"healthy"})} customer sentiment, and about $${calculateCustomerRevenueDaily().toFixed(3)}M in daily segment revenue.`);
@@ -416,7 +416,7 @@ function operatingSignalPhrase(value,{low=45,high=70,lowText="weak",midText="mix
 }
 function runwayPhrase(days){
   const n=Number(days)||0;
-  if(n>=999)return "cash-positive";
+  if(n>=OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay)return "cash-positive";
   if(n<60)return "very tight";
   if(n<120)return "tight";
   if(n<240)return "workable";
@@ -704,7 +704,7 @@ function lessonRelevanceScore(lesson,model){
   score+=lessonStateWeight(lesson)*18;
   score+=clamp((lesson.confidence||0)-55,0,35)*.45;
   score+=clamp((lesson.episodeKeys||[]).length,0,4)*5;
-  score-=clamp((company.day-(lesson.lastDay||company.day))/180,0,1)*12;
+  score-=clamp((company.day-(lesson.lastDay??company.day))/180,0,1)*12;
   score-=lesson.outcome==="mixed"?8:lesson.outcome==="negative"?4:0;
   return score;
 }
@@ -1107,6 +1107,7 @@ function informationalMemoNoticeHtml(){
   return `<div class="memo-block informational-notice"><h4>No reply needed</h4><p>This is an informational follow-up. Read it for context, then file it when you are done.</p></div>`;
 }
 function teamDisplayName(team){return {hardware:"Hardware",software:"Software",quality:"Quality",product:"Product",finance:"Finance",people:"People","customer success":"Customer Success",board:"Board",company:"Company"}[String(team||"").toLowerCase()]||team;}
+function operatingSummaryRow(label,value){return `<div class="health-summary-row"><span>${label}</span><strong>${value}</strong></div>`;}
 function departmentBriefingHtml(){
   ensureBibleSystems?.();
   const allocation=typeof buildWorkforceAllocationSnapshot==="function"?buildWorkforceAllocationSnapshot():null;
@@ -1182,10 +1183,16 @@ function projectPortfolioHtml(){
   const archiveBlock=archiveItems.length?`<details class="archive-details" style="margin-top:10px" ${archiveOpen?"open":""} ontoggle="setProjectArchiveOpen(this.open)"><summary>Project Archive (${archiveItems.length}) - completed, canceled, merged, and commercialized projects</summary><div class="briefing-grid" style="margin-top:10px">${archiveCards}</div></details>`:"";
   const missingTotal=allocation?.totals?.missingAssignments??projectStaffing.reduce((s,x)=>s+x.missing,0);
   const hasActiveWork=h.activeProjects>0||h.proposedProjects>0;
-  const activeSummary=hasActiveWork
-    ?`Active work: active ${h.activeProjects}; proposed ${h.proposedProjects}; at risk ${h.atRiskProjects}; paused ${h.pausedProjects}; spend $${h.totalProjectSpendDaily.toFixed(3)}M/day; committed $${h.committedProjectBudget.toFixed(2)}M; project-required staff ${h.staffingDemand}; currently missing ${missingTotal}; concentration risk ${h.concentrationRisk}%; next review ${h.nextProjectReview>=999?"none":`${h.nextProjectReview} ${h.nextProjectReview===1?"day":"days"}`}`
-    :"Active work: no active or proposed projects. New initiatives can be started below; completed work is filed in the archive.";
-  return `<strong>Project Portfolio</strong><br><small>${activeSummary}${archiveSummary}</small><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="small-btn" onclick="requestStrategicProjectProposal('hardware')">Hardware Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('software')">Software Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('business')">Business Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('internal')">Internal Initiative</button></div><div class="briefing-grid" style="margin-top:10px">${cards||'<div class="briefing-card"><strong>No active or proposed projects</strong><small>The active portfolio is empty. Completed, canceled, rejected, and merged projects are filed in the archive below.</small></div>'}</div>${archiveBlock}`;
+  const reviewLabel=h.nextProjectReview>=OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay?"None scheduled":`${h.nextProjectReview} ${h.nextProjectReview===1?"day":"days"}`;
+  const portfolioSummary=hasActiveWork
+    ?[
+      operatingSummaryRow("Active work",`${h.activeProjects} active, ${h.proposedProjects} proposed, ${h.pausedProjects} paused`),
+      operatingSummaryRow("Needs attention",`${h.atRiskProjects} at risk, ${missingTotal} missing assignment${missingTotal===1?"":"s"}, ${h.concentrationRisk}% concentration risk`),
+      operatingSummaryRow("Commitment",`$${h.totalProjectSpendDaily.toFixed(3)}M/day, $${h.committedProjectBudget.toFixed(2)}M approved`),
+      operatingSummaryRow("Next review",reviewLabel)
+    ].join("")
+    :operatingSummaryRow("Active work","No active or proposed projects. New initiatives can be started below.");
+  return `<strong>Project Portfolio</strong><div class="health-summary">${portfolioSummary}</div>${archiveSummary?`<small>${archiveSummary.replace(/^<br>/,"")}</small>`:""}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="small-btn" onclick="requestStrategicProjectProposal('hardware')">Hardware Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('software')">Software Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('business')">Business Initiative</button><button class="small-btn" onclick="requestStrategicProjectProposal('internal')">Internal Initiative</button></div><div class="briefing-grid" style="margin-top:10px">${cards||'<div class="briefing-card"><strong>No active or proposed projects</strong><small>The active portfolio is empty. Completed, canceled, rejected, and merged projects are filed in the archive below.</small></div>'}</div>${archiveBlock}`;
 }
 function historyImportanceThreshold(){
   if(company.day>260)return 4;
@@ -1339,7 +1346,7 @@ function buildExecutiveBriefing(){
   Object.keys(items).forEach(k=>{const seen=new Set();items[k]=items[k].sort((a,b)=>b.priority-a.priority).filter(x=>{const key=(x.title||"").toLowerCase().replace(/\d+/g,"#");if(seen.has(key))return false;seen.add(key);return true;}).slice(0,k==="beliefs"?3:3);});
   let bulletCount=Object.values(items).reduce((s,list)=>s+list.length,0);
   let trimGuard=0;
-  while(bulletCount>10&&trimGuard++<20){const key=Object.keys(items).filter(k=>(items[k]||[]).length).sort((a,b)=>(items[b].at(-1)?.priority||999)-(items[a].at(-1)?.priority||999))[0];if(!key)break;items[key].pop();bulletCount=Object.values(items).reduce((s,list)=>s+list.length,0);}
+  while(bulletCount>10&&trimGuard++<20){const fallbackPriority=OFFICE_AQUARIUM_CONSTANTS.defaults.sortLastIndex;const key=Object.keys(items).filter(k=>(items[k]||[]).length).sort((a,b)=>(items[b].at(-1)?.priority||fallbackPriority)-(items[a].at(-1)?.priority||fallbackPriority))[0];if(!key)break;items[key].pop();bulletCount=Object.values(items).reduce((s,list)=>s+list.length,0);}
   const queued=(company.escalationQueue||[]).length+(company.pendingEvent?1:0),protectedWaiting=(company.escalationQueue||[]).filter(ev=>{const msg=ev.sourceMessageId?(company.employeeMessages||[]).find(m=>m.id===ev.sourceMessageId):null;return msg?.protectedDirect;}).length;
   const actionSummary=protectedWaiting?`A protected escalation requires review.`:queued?`${queued} decision memo${queued===1?" is":"s are"} waiting.`:"No immediate decision is required.";
   const all=[...items.changed,...items.attention,...items.improving,...items.worsening,...items.beliefs];
@@ -1661,12 +1668,46 @@ function choiceFeasible(choice,ctx){
   if(choice.title?.toLowerCase().includes("double production")&&ctx.manufacturing<35)return false;
   return true;
 }
+function choiceHasDomainAction(choice={}){
+  return !!(
+    choice.hire||
+    choice.hireRole||
+    choice.deferHiring||
+    choice.rejectHiring||
+    choice.hiringPolicy||
+    choice.hiringException||
+    choice.projectDecision||
+    choice.commercializeProject||
+    choice.customerStrategy||
+    choice.layoff||
+    choice.rejectLayoff||
+    choice.fundraising||
+    choice.performance||
+    choice.launch||
+    choice.supply||
+    choice.shareholders||
+    choice.portfolioAction||
+    choice.crisisIntervention
+  );
+}
+function eventUsesExclusiveChoiceSet(ev,base){
+  const id=String(ev?.id||"");
+  const explicitWorkflow=!!(
+    ev?.hiringRequest||
+    ev?.hiringPolicyReview||
+    ev?.hiringException||
+    id.startsWith("hiring-request-")||
+    id.startsWith("hiring-exception-")||
+    id.startsWith("hiring-policy-review-")||
+    id.startsWith("board-pip-")
+  );
+  return explicitWorkflow||base.some(choiceHasDomainAction);
+}
 function contextualChoicePool(ev){
   const ctx=decisionContextSnapshot();
   const base=(ev.choices||[]).map(c=>({...c,source:"core"}));
   const category=eventCategory(ev);
-  const isHiringWorkflow=!!(ev.hiringRequest||ev.hiringPolicyReview||ev.hiringException||String(ev.id||"").startsWith("hiring-request-")||String(ev.id||"").startsWith("hiring-exception-")||String(ev.id||"").startsWith("hiring-policy-review-"));
-  if(isHiringWorkflow)return base.filter(c=>choiceFeasible(c,ctx));
+  if(eventUsesExclusiveChoiceSet(ev,base))return base.filter(c=>choiceFeasible(c,ctx));
   const extras=[];
   const add=c=>extras.push({...c,source:"contextual"});
   if(["product","operations","market","internal"].includes(category)||["launch","pilot-review","milestone","market-shift","supply-chain"].includes(ev.id)){
@@ -1744,7 +1785,7 @@ function decisionWorkSubject(ev){
 function hiddenProjectFitScore(project,choice,ev){
   if(!project)return null;
   const strategy=choice.strategy||inferDecisionStrategy(choice),reality=project.hiddenReality||{};
-  const age=company.day-(project.createdDay||company.day),timeLeft=(reality.hiddenTimingWindow??120)-age;
+  const age=typeof projectAgeDays==="function"?projectAgeDays(project):Math.max(0,company.day-(project.createdDay??company.day)),timeLeft=(reality.hiddenTimingWindow??120)-age;
   const difficulty=Number(reality.trueTechnicalDifficulty)||50,market=Number(reality.trueMarketDemand)||50,value=Number(reality.trueStrategicValue)||50,knowledge=Number(reality.trueKnowledgeValue)||50,retention=Number(reality.trueTalentRetentionValue)||50,obsolescence=Number(reality.hiddenObsolescenceRate)||20;
   const visibleRisk=Number(project.performance?.riskTrend??project.visibleRisk??50),quality=Number(project.performance?.quality??project.quality??company.quality),staffing=Number(project.performance?.staffingCoverage??derivedStaffingCoverage(project)),schedule=Number(project.performance?.scheduleVariance??0),blockers=Number(project.performance?.blockerCount??0),customer=Number(project.performance?.customerInterest??project.customerInterest??50);
   let score=50;
@@ -1951,7 +1992,7 @@ function createDecisionThread(ev,choice,comm,delayedOutcome,archivedMemo){
   company.nextDecisionThreadId=Math.max(1,Number(company.nextDecisionThreadId)||1);
   const intel=ev.memoIntelligence||buildMemoIntelligence(ev,comm),dept=intel.department||memoDepartmentFor(ev,comm),project=decisionProjectSubject(ev,choice),work=decisionWorkSubject(ev);
   const id=nextSimulationId("thread");
-  const phase2=Math.max(company.day+3,Math.min(company.day+10,delayedOutcome?.dueDay||company.day+7));
+  const phase2=Math.max(company.day+3,Math.min(company.day+10,delayedOutcome?.dueDay??company.day+7));
   const thread={id,eventId:ev.id,memoId:archivedMemo?.id||null,sourceMessageId:ev.sourceMessageId||null,subject:comm.subject,from:comm.from,role:comm.role,department:dept,category:eventCategory(ev),decision:choice.title,strategy:choice.strategy||inferDecisionStrategy(choice),createdDay:company.day,state:"Pending",phase:0,phaseDueDays:{reaction:company.day+Math.max(1,Math.round(rand(1,3))),operational:phase2,major:company.day+Math.round(rand(14,26)),legacy:company.day+Math.round(rand(32,46))},expectedTone:delayedOutcome?.tone||"mixed",expectedScore:delayedOutcome?.expectedScore||50,realizedScore:delayedOutcome?.realizedScore||50,outcomeMessage:delayedOutcome?.message||"",projectId:project?.id||delayedOutcome?.projectImpact?.projectId||null,workItemId:work?.id||delayedOutcome?.workImpact?.workItemId||null,followUps:[],audit:{reaction:false,operational:false,major:false,legacy:false}};
   company.decisionThreads.unshift(thread);
   company.decisionThreads=company.decisionThreads.slice(0,120);
@@ -2017,7 +2058,7 @@ function processDecisionThreads(){
       thread.audit.major=true;thread.phase=3;thread.state=thread.expectedTone==="negative"?"Unexpected Development":"Resolved";
       const material=Math.abs((thread.realizedScore||50)-(thread.expectedScore||50))>10||thread.expectedTone!=="mixed";
       const text=thread.outcomeMessage||`The larger consequences of "${thread.decision}" are now visible across ${teamDisplayName(thread.department)}.`;
-      recordThreadFollowUp(thread,"major",`${text} Original decision: "${thread.decision}" on ${thread.subject}.`,{memo:material&&simulationRandom()<.55,priority:thread.expectedTone==="negative"?"Urgent":"FYI"});
+      recordThreadFollowUp(thread,"major",`${text} Original decision: "${thread.decision}" on ${thread.subject}.`,{memo:material&&simulationRandom()<OFFICE_AQUARIUM_CONSTANTS.executiveInbox.majorFollowUpMemoChance,priority:thread.expectedTone==="negative"?"Urgent":"FYI"});
       updateExecutiveReputationFromOutcome(thread,thread.expectedTone);
     }
     if(!thread.audit.legacy&&company.day>=thread.phaseDueDays.legacy){
@@ -2249,7 +2290,7 @@ function eventCooldownDays(ev){return Number(ev.cooldownDays)||({performance:15,
 function eventCooldownReady(ev){
   company.eventHistory=company.eventHistory&&typeof company.eventHistory==="object"?company.eventHistory:{};
   const h=company.eventHistory[ev.id];
-  return !h||company.day-(h.lastDay??-999)>=eventCooldownDays(ev);
+  return !h||company.day-(h.lastDay??OFFICE_AQUARIUM_CONSTANTS.time.neverDay)>=eventCooldownDays(ev);
 }
 function cashEventEligible(){
   if(company.cash>12)company.cashEventArmed=true;
@@ -2278,42 +2319,218 @@ function chooseCEOEvent(){
 }
 function recordEventShown(ev){
   company.eventHistory=company.eventHistory&&typeof company.eventHistory==="object"?company.eventHistory:{};
-  const h=company.eventHistory[ev.id]||{count:0,lastDay:-999};
+  const h=company.eventHistory[ev.id]||{count:0,lastDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay};
   company.eventHistory[ev.id]={count:(h.count||0)+1,lastDay:company.day};
   const category=eventCategory(ev);
   company.recentEventCategories=[category,...(company.recentEventCategories||[]).filter(x=>x!==category)].slice(0,5);
   if(ev.id==="cash")company.cashEventArmed=false;
 }
 
-function validationDecisionScore(choice){
+function activeValidationStrategy(){
+  const requested=currentSimulationContext?.strategy;
+  return OFFICE_AQUARIUM_CONSTANTS.validation.strategies.includes(requested)
+    ?requested
+    :OFFICE_AQUARIUM_CONSTANTS.validation.defaultStrategy;
+}
+function validationDecisionContext(){
+  const finance=company.finance||{},allocation=typeof buildWorkforceAllocationSnapshot==="function"?buildWorkforceAllocationSnapshot():null;
+  const coverage=typeof organizationalRoleCoverage==="function"?organizationalRoleCoverage():null;
+  const activeRecruitingStatuses=new Set(OFFICE_AQUARIUM_CONSTANTS.hiring.activeRecruitingStatuses);
+  const activeHeadcount=employees.filter(e=>e.active).length;
+  return {
+    cash:Number(company.cash)||0,
+    runway:runwayDaysOrUnknown(finance),
+    stress:avgStress(),
+    morale:employees.filter(e=>e.active).reduce((sum,e)=>sum+(Number(e.morale)||0),0)/Math.max(1,employees.filter(e=>e.active).length),
+    quality:Number(company.quality)||0,
+    integration:Number(company.integration)||0,
+    board:Number(company.board)||0,
+    trust:Number(company.trust)||0,
+    customers:Number(company.customers)||0,
+    netCashFlow:Number(finance.netCashFlowDaily)||0,
+    activeProjects:typeof activeProjects==="function"?activeProjects().length:0,
+    activeHeadcount,
+    activeHiringCommitments:(company.recruitingPipeline||[]).filter(item=>activeRecruitingStatuses.has(item.status)).length,
+    targetHeadcount:Number(coverage?.targetHeadcount)||activeHeadcount,
+    missingAssignments:Number(allocation?.totals?.missingAssignments)||0,
+    missingProjectFte:Number(allocation?.totals?.missingProjectFte)||0,
+    blockers:(company.workItems||[]).filter(w=>w.status==="open"&&(w.blockedBy||[]).length).length,
+    risk:Number(company.companyRiskComponents?.total)||0,
+    crisisType:company.crisis?.type||null
+  };
+}
+function validationHiringPolicy(strategy){
+  const rules=OFFICE_AQUARIUM_CONSTANTS.validation.hiringDecision;
+  return rules.strategy[strategy]||rules.defaultStrategy;
+}
+function validationHiringConstraintPressure(context,strategy,marginalDailyCost=0,includeProposedHire=false){
+  const rules=OFFICE_AQUARIUM_CONSTANTS.validation.hiringDecision;
+  const policy=validationHiringPolicy(strategy);
+  const proposed=includeProposedHire?1:0;
+  const projectedNet=context.netCashFlow-Number(marginalDailyCost||0);
+  const projectedRunway=projectedNet<0
+    ?Math.max(0,context.cash/Math.max(.001,Math.abs(projectedNet)))
+    :OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay;
+  const concurrentExcess=Math.max(0,context.activeHiringCommitments+proposed-policy.maximumConcurrentSearches);
+  const cashGap=Math.max(0,policy.minimumCashReserve-context.cash);
+  const runwayGap=Math.max(0,policy.minimumProjectedRunwayDays-projectedRunway);
+  const runwayPressure=policy.minimumProjectedRunwayDays>0
+    ?runwayGap/policy.minimumProjectedRunwayDays*rules.runwayPenaltyMaximum
+    :0;
+  const projectedHeadcount=context.activeHeadcount+context.activeHiringCommitments+proposed;
+  const headcountExcess=Math.max(0,projectedHeadcount-context.targetHeadcount-policy.targetHeadcountBuffer);
+  const projectedLoss=Math.max(0,-projectedNet);
+  const emergency=projectedRunway<rules.emergencyRunwayDays||context.cash<rules.emergencyCashReserve;
+  const pressure=concurrentExcess*rules.concurrentSearchPenalty
+    +cashGap*rules.cashReservePenaltyPerMillion
+    +runwayPressure
+    +headcountExcess*rules.headcountExcessPenalty
+    +projectedLoss*rules.projectedDailyLossPenalty
+    +(emergency?rules.concurrentSearchPenalty:0);
+  return {pressure,projectedNet,projectedRunway,projectedHeadcount,concurrentExcess,cashGap,headcountExcess,emergency};
+}
+function validationDecisionScore(choice,strategy=activeValidationStrategy()){
   const eff=choice.effect||{},people=choice.people||{},supply=choice.supply||{},share=choice.shareholders||{};
+  const context=validationDecisionContext();
+  const safety=OFFICE_AQUARIUM_CONSTANTS.validation.decisionSafety;
+  const safetyStrategy=safety.strategyMultipliers[strategy]||safety.strategyMultipliers.balanced;
+  const cashEffect=Number(eff.cash)||0;
+  const tightFinance=context.cash<safety.tightCashThreshold||context.runway<safety.tightRunwayDays;
+  const criticalFinance=context.cash<safety.criticalCashThreshold||context.runway<safety.criticalRunwayDays;
   let score=0;
-  if(company.cash<8)score+=(eff.cash||0)*9;
-  else score+=(eff.cash||0)*2;
-  if(company.board<35)score+=(eff.board||0)*5;
+  score+=cashEffect*(criticalFinance?safety.criticalCashEffectWeight:tightFinance?safety.tightCashEffectWeight:safety.normalCashEffectWeight);
+  if(context.board<35)score+=(eff.board||0)*5;
   else score+=(eff.board||0)*1.5;
-  if(company.trust<45)score+=(eff.trust||0)*5;
+  if(context.trust<45)score+=(eff.trust||0)*5;
   else score+=(eff.trust||0)*1.5;
-  if(company.quality<52)score+=(eff.quality||0)*4;
+  if(context.quality<52)score+=(eff.quality||0)*4;
   else score+=(eff.quality||0)*1.2;
-  if(company.integration<55)score+=(eff.integration||0)*2.6;
+  if(context.integration<55)score+=(eff.integration||0)*2.6;
   if(company.phase!=="prototype")score+=(eff.customers||0)*1.4;
-  if(avgStress()>68)score-=Math.max(0,people.stress||0)*4;
+  if(context.stress>68)score-=Math.max(0,people.stress||0)*4;
   else score-=Math.max(0,people.stress||0)*1.2;
   score+=Math.max(0,-(people.stress||0))*3;
   score+=(people.morale||0)*2;
   if(company.manufacturing?.supplyRisk>70)score+=Math.max(0,-(supply.risk||0))*3+(supply.yield||0)*1.5+(supply.readiness||0)*1.2;
   if(company.shareholders?.pressure>65)score+=(share.confidence||0)*1.4+Math.max(0,-(share.pressure||0))*1.6;
-  if(choice.directive==="cuts"&&avgStress()>62)score-=10;
-  if(choice.directive==="speed"&&(company.quality<48||avgStress()>70))score-=12;
-  if(choice.directive==="quality"&&company.cash<5)score-=4;
-  if(choice.directive==="people"&&company.cash>4)score+=4;
+  if(choice.directive==="cuts"&&context.stress>62)score-=10;
+  if(choice.directive==="speed"&&(context.quality<48||context.stress>70))score-=12*safetyStrategy.speed;
+  if(choice.directive==="quality"&&context.cash<5)score-=4;
+  if(choice.directive==="people"&&context.cash>4)score+=4;
+  const hiringRules=OFFICE_AQUARIUM_CONSTANTS.validation.hiringDecision;
+  const hiringNeed=Math.min(
+    hiringRules.maximumNeedScore,
+    context.missingAssignments*4+context.missingProjectFte*6+Math.max(0,context.stress-58)*.4
+  );
+  const hireAction=choice.hire||choice.hiringException==="salary"||choice.hiringException==="equity";
+  if(hireAction){
+    const role=choice.hireRole||choice.role||"Software Engineer";
+    const marginalDailyCost=Number(choice.marginalDailyCost)||estimatedMarginalEmployeeDailyCost(role,context.activeHeadcount);
+    const constraint=validationHiringConstraintPressure(context,strategy,marginalDailyCost,true);
+    score+=hiringNeed
+      -constraint.pressure
+      -context.activeHiringCommitments*hiringRules.activeCommitmentPenalty
+      -(constraint.emergency?hiringRules.emergencyApprovalPenalty:0)
+      +(constraint.projectedRunway>validationHiringPolicy(strategy).minimumProjectedRunwayDays?7:0);
+  }
+  if(choice.deferHiring||choice.rejectHiring){
+    const constraint=validationHiringConstraintPressure(context,strategy,0,false);
+    const needWeight=choice.rejectHiring
+      ?OFFICE_AQUARIUM_CONSTANTS.validation.hiringDecision.rejectNeedWeight
+      :OFFICE_AQUARIUM_CONSTANTS.validation.hiringDecision.deferNeedWeight;
+    score-=hiringNeed*needWeight;
+    score+=constraint.pressure*(choice.rejectHiring?1:.82);
+  }
+  const projectAction=choice.projectDecision?.action;
+  const projectLifecycle=OFFICE_AQUARIUM_CONSTANTS.projectLifecycle;
+  const startsOrExpands=projectLifecycle.capacityConsumingActions.includes(projectAction);
+  const slowsOrStops=projectLifecycle.capacityReliefActions.includes(projectAction);
+  if(startsOrExpands)score+=Math.max(0,2-context.activeProjects)*3-context.blockers*1.4;
+  if(slowsOrStops&&context.activeProjects>2)score+=context.activeProjects*2+context.blockers;
+  if(strategy==="conservative"){
+    score+=(eff.cash||0)*5+Math.max(0,-(people.stress||0))*2+(eff.quality||0)*1.5;
+    if(choice.directive==="speed")score-=8;
+    if(startsOrExpands&&context.activeProjects>=2)score-=10;
+    if(choice.hire&&context.missingAssignments===0&&context.missingProjectFte===0)score-=8;
+    if(context.runway<75&&Number(eff.cash)<0)score+=Number(eff.cash)*5;
+  }else if(strategy==="growth-oriented"){
+    score+=(eff.customers||0)*4+(eff.valuation||0)*2+(eff.integration||0)*1.5;
+    if(choice.hire)score+=10;
+    if(startsOrExpands)score+=9;
+    if(slowsOrStops)score-=6;
+    if(context.cash<5&&Number(eff.cash)<0)score+=Number(eff.cash)*8;
+    if(context.stress>78&&Number(people.stress)>0)score-=10;
+  }else if(strategy==="recovery-focused"){
+    const recoveryPressure=Math.max(0,context.risk-50)+Math.max(0,60-context.quality)+Math.max(0,context.stress-60)+Math.max(0,60-context.board);
+    score+=(eff.cash||0)*(context.cash<8?7:2)+(eff.quality||0)*3+(eff.board||0)*2.5+(eff.trust||0)*2.5;
+    score+=Math.max(0,-(people.stress||0))*4;
+    if(choice.directive==="speed"&&recoveryPressure>25)score-=14;
+    if(startsOrExpands&&recoveryPressure>35)score-=12;
+    if(slowsOrStops&&recoveryPressure>30)score+=8;
+  }else{
+    score+=(eff.integration||0)+(eff.quality||0)+(eff.customers||0);
+    if(context.activeProjects>3&&startsOrExpands)score-=8;
+    if(context.missingAssignments>0&&choice.hire)score+=8;
+  }
+  if(cashEffect<0&&tightFinance)score-=safety.tightSpendingPenalty*safetyStrategy.spending;
+  if(cashEffect<0&&criticalFinance)score-=safety.criticalSpendingPenalty*safetyStrategy.spending;
+  if(choice.directive==="speed"){
+    if(context.quality<safety.qualityCriticalThreshold)score-=safety.speedCriticalPenalty*safetyStrategy.speed;
+    else if(context.quality<safety.qualityWarningThreshold)score-=safety.speedWarningPenalty*safetyStrategy.speed;
+  }
+  if(startsOrExpands&&(
+    context.activeProjects>=safety.overloadedProjectCount||
+    context.blockers>0||
+    context.missingAssignments>0||
+    context.missingProjectFte>0
+  )){
+    score-=(safety.projectExpansionPenalty
+      +context.blockers*safety.blockerExpansionPenalty
+      +(context.missingAssignments+context.missingProjectFte)*safety.staffingExpansionPenalty)*safetyStrategy.expansion;
+  }
+  if(slowsOrStops&&(
+    context.activeProjects>=safety.overloadedProjectCount||
+    context.blockers>0||
+    context.missingAssignments>0||
+    context.missingProjectFte>0
+  )){
+    score+=(safety.projectExpansionPenalty*.7
+      +context.blockers*safety.blockerExpansionPenalty
+      +(context.missingAssignments+context.missingProjectFte)*safety.staffingExpansionPenalty*.7)*safetyStrategy.capacityRelief;
+  }
+  if(choice.crisisIntervention){
+    score+=choice.crisisIntervention.type===context.crisisType?28:-12;
+    if(choice.crisisIntervention.mode==="clear-blockers")score+=context.blockers*5;
+    if(choice.crisisIntervention.mode==="workforce-recovery")score+=Math.max(0,context.stress-55)*1.2;
+    if(choice.crisisIntervention.mode==="investor-plan")score+=Math.max(0,60-(company.shareholders?.confidence??50))*.8;
+    if(choice.crisisIntervention.mode==="financial-controls")score+=Math.max(0,8-context.cash)*4+Math.max(0,-context.netCashFlow)*20;
+  }
   return score;
+}
+function validationDecisionReason(choice,strategy,score){
+  const context=validationDecisionContext(),signals=[];
+  if(context.cash<8||context.runway<60)signals.push(`cash $${context.cash.toFixed(1)}M and ${Math.round(context.runway)}-day runway`);
+  if(context.missingAssignments>0)signals.push(`${context.missingAssignments} uncovered staffing assignment(s)`);
+  if(context.activeHiringCommitments>0)signals.push(`${context.activeHiringCommitments} active hiring commitment(s)`);
+  if(context.activeHeadcount>context.targetHeadcount)signals.push(`${context.activeHeadcount} employees against a ${context.targetHeadcount}-employee maturity target`);
+  if(context.blockers>0)signals.push(`${context.blockers} active blocker(s)`);
+  if(context.stress>65)signals.push(`average stress ${Math.round(context.stress)}`);
+  if(context.quality<55)signals.push(`quality ${Math.round(context.quality)}`);
+  if(!signals.length)signals.push(`${context.activeProjects} active project(s) and stable operating signals`);
+  return `${strategy} selected "${choice.title}" (score ${Number(score.toFixed(2))}) using ${signals.slice(0,3).join(", ")}.`;
 }
 function chooseValidationDecisionIndex(ev){
   const choices=ev?.choices||[];
   if(!choices.length)return 0;
-  return choices.map((choice,i)=>({i,score:validationDecisionScore(choice)})).sort((a,b)=>b.score-a.score)[0].i;
+  const strategy=activeValidationStrategy();
+  const ranked=choices.map((choice,i)=>({i,choice,score:validationDecisionScore(choice,strategy)})).sort((a,b)=>b.score-a.score||a.i-b.i);
+  const selected=ranked[0];
+  if(currentSimulationContext){
+    currentSimulationContext.validationDecisionLog=Array.isArray(currentSimulationContext.validationDecisionLog)?currentSimulationContext.validationDecisionLog:[];
+    currentSimulationContext.validationDecisionLog.push({day:company.day,eventId:ev?.id||null,strategy,choice:selected.choice.title,score:Number(selected.score.toFixed(3)),reason:validationDecisionReason(selected.choice,strategy,selected.score)});
+    currentSimulationContext.validationDecisionLog=currentSimulationContext.validationDecisionLog.slice(-OFFICE_AQUARIUM_CONSTANTS.validation.decisionLogLimit);
+  }
+  return selected.i;
 }
 function policyLabel(policy){
   return ({quality:"Quality Policy",speed:"Speed Policy",people:"People Policy",cuts:"Cost Discipline Policy",revenue:"Revenue Policy"})[policy]||`${String(policy||"Policy").replace(/\b\w/g,c=>c.toUpperCase())} Policy`;
@@ -2356,7 +2573,7 @@ function completePolicyTransition(){
   company.directiveDays=0;
 }
 function normalizeInboxFlow(){
-  company.inboxFlow={day:company.day||0,openedToday:0,lastOpenedDay:-999,...(company.inboxFlow||{})};
+  company.inboxFlow={day:company.day||0,openedToday:0,lastOpenedDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(company.inboxFlow||{})};
   if(company.inboxFlow.day!==company.day){company.inboxFlow.day=company.day;company.inboxFlow.openedToday=0;}
   return company.inboxFlow;
 }
@@ -2424,19 +2641,19 @@ function applyDecision(){if(!company.pendingEvent)return;if(isInformationalExecu
     else if(d.directive==="quality")addMemory(e,"CEO_QUALITY","Leadership protected product quality.","positive",9,"CEO");
     else if(d.directive==="speed")addMemory(e,"OVERTIME","Leadership accelerated the schedule.","negative",10,"CEO");
     adjustCEOOpinion(e,d.opinion||{});
-    applyEmployeeEmotionDelta(e,{stressDelta:d.people?.stress||0,moraleDelta:d.people?.morale||0,reasonCode:"ceo-decision",sourceEventId:ev.id,exceptional:!!d.launch,ignoreCooldown:true});});if(d.launch==="full"){company.phase="launched";company.pilotDays=0;company.log.push("The product launched to the full market.");recordWeeklyEvent("The product launched to the full market.","product",6);addValuationShock(company.quality>65&&company.integration>65?2.4:-1.8,"Full launch changed outside expectations","launch",35);}else if(d.launch==="pilot"){company.phase="pilot";company.pilotDays=0;company.log.push("A limited customer pilot began.");recordWeeklyEvent("A limited customer pilot began.","product",5);addValuationShock(.8,"Limited pilot created market learning","pilot",25);}else if(d.launch==="extend"){company.phase="pilot";company.pilotDays=0;company.log.push("The customer pilot was extended for more learning.");}else if(d.launch==="repair"){company.phase="customer trial";company.pilotDays=0;company.log.push("Commercial expansion paused while the team repairs the product.");addValuationShock(-.6,"Commercial expansion paused for repair","pilot-repair",18);}if(d.projectDecision){applyProjectDecision(d.projectDecision);if(d.projectDecision.action==="cancel"||d.projectDecision.action==="reject")addValuationShock(-1.2,`Project ${d.projectDecision.action} changed portfolio expectations`,d.projectDecision.id,28);else if(["expand","validate","continue"].includes(d.projectDecision.action))addValuationShock(.45,`Project ${d.projectDecision.action} signaled portfolio commitment`,d.projectDecision.id,18);}if(d.portfolioAction){applyPortfolioAction(d.portfolioAction);}if(d.customerStrategy){applyCustomerStrategyDecision(d.customerStrategy);}if(d.hiringException){applyHiringExceptionDecision(d.hiringException);}if(d.hiringPolicy){applyHiringPolicyDecision(d.hiringPolicy);}if(d.fundraising){applyFundraisingDecision(d.fundraising);}if(d.performance){resolvePerformance(d.performance);}if(d.hire){if(d.hire==="specialist"){const approvedRole=d.hireRole||(company.openRoles||[])[0]||roleForDepartmentHire(d.hireDept||"software");startRecruiting(approvedRole,d.hire,d.hireDept||roleDepartment(approvedRole),{backfill:!d.hireRole&&(company.openRoles||[]).includes(approvedRole),source:d.hireRole?"approved-headcount":"vacancy"});}else resolveHiring(d.hire,d.hireRole);}if(d.deferHiring){company.hiringRequests.unshift({day:company.day,department:d.deferHiring.dept,role:d.deferHiring.role,status:"delayed"});employees.filter(e=>e.active&&roleDepartment(e.role)===d.deferHiring.dept).forEach(e=>adjustCEOOpinion(e,{support:-1,fairness:-1}));}if(d.rejectHiring){company.hiringRequests.unshift({day:company.day,department:d.rejectHiring.dept,role:d.rejectHiring.role,status:"rejected"});employees.filter(e=>e.active&&roleDepartment(e.role)===d.rejectHiring.dept).forEach(e=>{applyEmployeeEmotionDelta(e,{stressDelta:3,reasonCode:"rejected-hiring",sourceEventId:ev.id,ignoreCooldown:true});adjustCEOOpinion(e,{support:-3,trust:-1});});}if(d.layoff){executeLayoffPlan(d.layoff.count||1,!!d.layoff.voluntary);addValuationShock(-1.2,"Layoffs increased perceived execution risk","layoff",30);company.leadershipReputation=clamp((company.leadershipReputation??50)-2,0,100);}if(d.rejectLayoff){addBoardStrike("CEO rejected restructuring during financial pressure");}ensureBibleSystems?.();if(d.supply&&company.manufacturing){company.manufacturing.supplyRisk=clamp(company.manufacturing.supplyRisk+(d.supply.risk||0),0,100);company.manufacturing.readiness=clamp(company.manufacturing.readiness+(d.supply.readiness||0),0,100);company.manufacturing.yield=clamp(company.manufacturing.yield+(d.supply.yield||0),0,100);}if(d.shareholders)applyInvestorEffect(d.shareholders);if(ev.sourceMessageId){const msg=(company.employeeMessages||[]).find(m=>m.id===ev.sourceMessageId);if(msg)msg.status="resolved-by-ceo";}if(d.supply||d.shareholders||ev.sourceMessageId||d.layoff||d.rejectLayoff||d.deferHiring||d.rejectHiring||d.hire||d.hiringException||d.hiringPolicy||d.fundraising||d.projectDecision||d.portfolioAction)recordHistory(`CEO decision resolved ${ev.title}: ${d.title}.`,"leadership",4);
+    applyEmployeeEmotionDelta(e,{stressDelta:d.people?.stress||0,moraleDelta:d.people?.morale||0,reasonCode:"ceo-decision",sourceEventId:ev.id,exceptional:!!d.launch,ignoreCooldown:true});});if(d.launch==="full"){company.phase="launched";company.pilotDays=0;company.log.push("The product launched to the full market.");recordWeeklyEvent("The product launched to the full market.","product",6);addValuationShock(company.quality>65&&company.integration>65?2.4:-1.8,"Full launch changed outside expectations","launch",35);}else if(d.launch==="pilot"){company.phase="pilot";company.pilotDays=0;company.log.push("A limited customer pilot began.");recordWeeklyEvent("A limited customer pilot began.","product",5);addValuationShock(.8,"Limited pilot created market learning","pilot",25);}else if(d.launch==="extend"){company.phase="pilot";company.pilotDays=0;company.log.push("The customer pilot was extended for more learning.");}else if(d.launch==="repair"){company.phase="customer trial";company.pilotDays=0;company.log.push("Commercial expansion paused while the team repairs the product.");addValuationShock(-.6,"Commercial expansion paused for repair","pilot-repair",18);}if(d.projectDecision){applyProjectDecision(d.projectDecision);if(d.projectDecision.action==="cancel"||d.projectDecision.action==="reject")addValuationShock(-1.2,`Project ${d.projectDecision.action} changed portfolio expectations`,d.projectDecision.id,28);else if(["expand","validate","continue"].includes(d.projectDecision.action))addValuationShock(.45,`Project ${d.projectDecision.action} signaled portfolio commitment`,d.projectDecision.id,18);}if(d.portfolioAction){applyPortfolioAction(d.portfolioAction);}if(d.customerStrategy){applyCustomerStrategyDecision(d.customerStrategy);}if(d.hiringException){applyHiringExceptionDecision(d.hiringException);}if(d.hiringPolicy){applyHiringPolicyDecision(d.hiringPolicy);}if(d.fundraising){applyFundraisingDecision(d.fundraising);}if(d.crisisIntervention){applyCrisisIntervention(d.crisisIntervention);}if(d.performance){resolvePerformance(d.performance);}if(d.hire){if(d.hire==="specialist"){const approvedRole=d.hireRole||(company.openRoles||[])[0]||roleForDepartmentHire(d.hireDept||"software");startRecruiting(approvedRole,d.hire,d.hireDept||roleDepartment(approvedRole),{backfill:!d.hireRole&&(company.openRoles||[]).includes(approvedRole),source:d.hireRole?"approved-headcount":"vacancy"});}else resolveHiring(d.hire,d.hireRole);}if(d.deferHiring){company.hiringRequests.unshift({day:company.day,department:d.deferHiring.dept,role:d.deferHiring.role,status:"delayed"});employees.filter(e=>e.active&&roleDepartment(e.role)===d.deferHiring.dept).forEach(e=>adjustCEOOpinion(e,{support:-1,fairness:-1}));}if(d.rejectHiring){company.hiringRequests.unshift({day:company.day,department:d.rejectHiring.dept,role:d.rejectHiring.role,status:"rejected"});employees.filter(e=>e.active&&roleDepartment(e.role)===d.rejectHiring.dept).forEach(e=>{applyEmployeeEmotionDelta(e,{stressDelta:3,reasonCode:"rejected-hiring",sourceEventId:ev.id,ignoreCooldown:true});adjustCEOOpinion(e,{support:-3,trust:-1});});}if(d.layoff){executeLayoffPlan(d.layoff.count||1,!!d.layoff.voluntary);addValuationShock(-1.2,"Layoffs increased perceived execution risk","layoff",30);company.leadershipReputation=clamp((company.leadershipReputation??50)-2,0,100);}if(d.rejectLayoff){addBoardStrike("CEO rejected restructuring during financial pressure");}ensureBibleSystems?.();if(d.supply&&company.manufacturing){company.manufacturing.supplyRisk=clamp(company.manufacturing.supplyRisk+(d.supply.risk||0),0,100);company.manufacturing.readiness=clamp(company.manufacturing.readiness+(d.supply.readiness||0),0,100);company.manufacturing.yield=clamp(company.manufacturing.yield+(d.supply.yield||0),0,100);}if(d.shareholders)applyInvestorEffect(d.shareholders);if(ev.sourceMessageId){const msg=(company.employeeMessages||[]).find(m=>m.id===ev.sourceMessageId);if(msg)msg.status="resolved-by-ceo";}if(d.supply||d.shareholders||d.crisisIntervention||ev.sourceMessageId||d.layoff||d.rejectLayoff||d.deferHiring||d.rejectHiring||d.hire||d.hiringException||d.hiringPolicy||d.fundraising||d.projectDecision||d.portfolioAction)recordHistory(`CEO decision resolved ${ev.title}: ${d.title}.`,"leadership",4);
 learnFromDecision(ev,d);if(!ev.repeatable&&!company.completedEvents.includes(ev.id))company.completedEvents.push(ev.id);company.log.push(`CEO decision: ${d.title}. A longer-term outcome is expected around day ${delayedOutcome.dueDay+1}.`);recordWeeklyEvent(`CEO decision: ${d.title}.`,"leadership",4,{eventId:ev.id,choiceTitle:d.title,decisionTitle:d.title,projectId:d.projectDecision?.id||delayedOutcome?.projectImpact?.projectId||null,workItemId:delayedOutcome?.workImpact?.workItemId||null,subject:ev.title,strategy:d.strategy||inferDecisionStrategy(d)});recordHistory(`CEO decision: ${d.title}.`,"leadership",4);if(thread)recordHistory(`Decision thread opened for "${d.title}" from ${comm.from}.`,"leadership",3);company.pendingEvent=null;company.pendingCommunication=null;company.eventCooldown=OFFICE_AQUARIUM_CONSTANTS.executiveInbox.decisionCooldownMinutes;company.paused=false;if(!validationMode){updatePauseButton();saveGame();renderDecisionEvent();render();}}
 
 
 function resolvePerformance(mode){
   const target=performanceTarget();
   if(!target)return;
-  target.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(target.performance||{})};
+  target.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(target.performance||{})};
   target.performance.lastReviewDay=company.day;
   target.performance.reviewRiskDays=0;
   if(mode==="coach"){
     recordMetricEvent("coaching");
-    target.focus=clamp(target.focus+14,0,100);applyEmployeeEmotionDelta(target,{moraleDelta:12,stressDelta:-10,reasonCode:"performance-coaching",sourceEventId:`performance-${target.id}-${company.day}`,exceptional:true});target.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(target.performance||{})};target.performance.coachingDays=12;
+    target.focus=clamp(target.focus+14,0,100);applyEmployeeEmotionDelta(target,{moraleDelta:12,stressDelta:-10,reasonCode:"performance-coaching",sourceEventId:`performance-${target.id}-${company.day}`,exceptional:true});target.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(target.performance||{})};target.performance.coachingDays=12;
     target.careerHistory.push(`Received CEO-backed coaching on day ${company.day}`);
     company.log.push(`${target.name} received coaching instead of disciplinary action.`);
     recordHistory(`${target.name} was coached through a performance gap.`,"people",3);
@@ -2481,7 +2698,7 @@ function resolveHiring(mode,roleOverride=null){
     replacement.morale=70+simulationRandom()*10;
     replacement.focus=68+simulationRandom()*12;
     replacement.stress=18+simulationRandom()*10;
-    replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`Hired as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.actionOutcomeContext=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:-999,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;normalizeEmployeeRoleProfile(replacement);ensureEmployeePersonality(replacement,{force:true,salt:`hire-${company.day}-${role}-${slot}`});inheritInstitutionalLearning(replacement);
+  replacement.opinionOfCEO={trust:58,fairness:56,competence:60,support:55,fear:16};replacement.careerLevel=1;replacement.careerHistory=[`Hired as ${role} on day ${company.day}`];replacement.beliefs={};replacement.dailyBriefing=null;replacement.currentIntention=null;replacement.skills=baseSkillsForRole(role);replacement.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay};replacement.learning={caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}};replacement.actionOutcomeContext=null;replacement.learnedLessons=emptyLessonVector();replacement.lessonAcceptance=null;replacement.joinedDay=company.day;replacement.age=25+Math.floor(simulationRandom()*22);replacement.stayScore=72;replacement.retentionRisk=28;replacement.jobSearchDays=0;replacement.retirementReadiness=0;replacement.quarterlyReview=null;replacement.promotionExpectation=45;replacement.salarySatisfaction=68;replacement.recognitionSatisfaction=62;replacement.employment=defaultEmploymentForRole(role);replacement.retention={stayScore:72,riskLevel:"stable",searching:false,searchDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,salarySatisfaction:68,careerSatisfaction:62,leadershipFit:58,cultureFit:62};replacement.careerLifecycle={age:replacement.age,yearsAtCompany:0,retirementReadiness:0,earlyRetirementInterest:0,plannedRetirementDay:null,successionRisk:0};replacement.active=true;replacement.offsite=false;replacement.sickDays=0;replacement.action="arriving";replacement.thought="Starting onboarding with the team.";replacement.actionMinutes=0;normalizeEmployeeRoleProfile(replacement);ensureEmployeePersonality(replacement,{force:true,salt:`hire-${company.day}-${role}-${slot}`});inheritInstitutionalLearning(replacement);
     employees.forEach(other=>{
       if(other.id!==replacement.id){
         recordSocialEncounter(replacement,other,{type:"onboarding_introduction",gain:1.2,sourceEventId:`onboarding-intro-${replacement.id}-${other.id}-${company.day}`,cooldownMinutes:OFFICE_AQUARIUM_CONSTANTS.time.minutesPerDay});
@@ -2506,10 +2723,10 @@ function resolveHiring(mode,roleOverride=null){
   const idx=company.openRoles.indexOf(role);if(idx>=0)company.openRoles.splice(idx,1);
 }
 function normalizeSimulationMetrics(metrics){
-  const counters={actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0,...(metrics?.counters||{})};
+  const counters={actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,hires:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0,...(metrics?.counters||{})};
   counters.actions={...(metrics?.counters?.actions||{})};
   counters.qualityTelemetry={mistakesCreated:0,mistakesResolved:0,defectsReopened:0,verificationFailures:0,rushedWorkMistakes:0,stressRelatedMistakes:0,lowFocusMistakes:0,weakCultureMistakes:0,manufacturingDefects:0,reworkActions:0,...(metrics?.counters?.qualityTelemetry||{})};
-  return {daily:Array.isArray(metrics?.daily)?metrics.daily.slice(-320):[],counters,lastBalance:metrics?.lastBalance||null};
+  return {daily:Array.isArray(metrics?.daily)?metrics.daily.slice(-OFFICE_AQUARIUM_CONSTANTS.telemetry.persistedDailySnapshots):[],counters,lastBalance:metrics?.lastBalance||null};
 }
 function recordMetricEvent(type,key="count",amount=1){
   ensureBibleSystems?.();

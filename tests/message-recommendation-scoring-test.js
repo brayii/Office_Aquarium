@@ -118,6 +118,87 @@ async function main() {
     hiringPolicyChoice = recommend(makeHiringPolicyReviewEvent("Recommendation scoring regression test"));
     assert(hiringPolicyChoice !== "Freeze new headcount", `Healthy runway with real staffing pressure should not recommend a freeze, got ${hiringPolicyChoice}`);
 
+    const hiringScoreState = {
+      cash: company.cash,
+      finance: { ...(company.finance || {}) },
+      recruitingPipeline: [...(company.recruitingPipeline || [])],
+      projects: [...(company.projects || [])]
+    };
+    const approveHire = {
+      title: "Approve position",
+      hire: "specialist",
+      hireRole: "Software Engineer",
+      hireDept: "software",
+      marginalDailyCost: estimatedMarginalEmployeeDailyCost("Software Engineer"),
+      people: { stress: -2, morale: 2 }
+    };
+    const delayHire = {
+      title: "Delay position",
+      deferHiring: { dept: "software", role: "Software Engineer" },
+      people: { stress: 2, morale: -1 }
+    };
+    company.cash = 2.8;
+    company.finance = { ...(company.finance || {}), runwayDays: 14, netCashFlowDaily: -0.18 };
+    company.recruitingPipeline = Array.from({ length: 4 }, (_, index) => ({ id: `active-search-${index}`, role: "Software Engineer", status: "searching" }));
+    const emergencyApproveScore = validationDecisionScore(approveHire, "balanced");
+    const emergencyDelayScore = validationDecisionScore(delayHire, "balanced");
+    assert(emergencyDelayScore > emergencyApproveScore, `Emergency runway with four active searches should favor delaying another hire (${emergencyDelayScore} <= ${emergencyApproveScore})`);
+
+    const emergencySupportScore = validationDecisionScore({
+      title: "Fund temporary support capacity",
+      effect: { cash: -.85, quality: 2, trust: 1 },
+      people: { stress: -1, morale: 1 },
+      directive: "people",
+      customerStrategy: { segmentId: "enterprise", mode: "support" }
+    }, "balanced");
+    const emergencyHoldScore = validationDecisionScore({
+      title: "Hold the current roadmap",
+      effect: { cash: .15, trust: -1 },
+      directive: "quality",
+      customerStrategy: { segmentId: "enterprise", mode: "hold" }
+    }, "balanced");
+    assert(emergencyHoldScore > emergencySupportScore, `Critical cash pressure should favor the affordable customer option (${emergencyHoldScore} <= ${emergencySupportScore})`);
+
+    company.cash = 28;
+    company.finance = { ...(company.finance || {}), runwayDays: 220, netCashFlowDaily: 0.08 };
+    company.recruitingPipeline = [];
+    company.projects = hiringScoreState.projects;
+    const healthyApproveScore = validationDecisionScore(approveHire, "balanced");
+    const healthyDelayScore = validationDecisionScore(delayHire, "balanced");
+    assert(healthyApproveScore > healthyDelayScore, `Healthy finances with staffing pressure should favor approving a hire (${healthyApproveScore} <= ${healthyDelayScore})`);
+    company.cash = hiringScoreState.cash;
+    company.finance = hiringScoreState.finance;
+    company.recruitingPipeline = hiringScoreState.recruitingPipeline;
+
+    company.cash = 10;
+    company.finance = { ...(company.finance || {}), runwayDays: 44, netCashFlowDaily: -.18 };
+    company.staffingModel = {};
+    const restructuring = prepareStrategicDecision(makeRestructuringEvent());
+    const restructuringTitles = new Set(restructuring.choices.map(choice => choice.title));
+    [
+      "Reduce payroll by cutting roles",
+      "Offer voluntary separation",
+      "Reject workforce cuts for now"
+    ].forEach(title => assert(restructuringTitles.has(title), `Restructuring memo should preserve domain choice: ${title}`));
+    assert(!restructuringTitles.has("Trade margin for customer growth"), "Restructuring memo must not inherit an unrelated generic finance choice");
+
+    company.quality = 36;
+    company.cash = 18;
+    company.finance = { ...(company.finance || {}), runwayDays: 120, netCashFlowDaily: -.04 };
+    const unsafeSpeedScore = validationDecisionScore({
+      title: "Accelerate the release",
+      effect: { integration: 4, customers: 8, cash: -.2 },
+      people: { stress: 4 },
+      directive: "speed"
+    }, "growth-oriented");
+    const qualityRecoveryScore = validationDecisionScore({
+      title: "Run a verification sprint",
+      effect: { quality: 4, integration: 1, cash: -.2 },
+      people: { stress: 1 },
+      directive: "quality"
+    }, "growth-oriented");
+    assert(qualityRecoveryScore > unsafeSpeedScore, `Critical quality should override growth-oriented speed preference (${qualityRecoveryScore} <= ${unsafeSpeedScore})`);
+
     const layoffEv = {
       id: "recommendation-layoff-test",
       category: "finance",
@@ -153,7 +234,15 @@ async function main() {
     const fundingChoice = recommend(fundingEv);
     assert(fundingChoice !== "Remain privately funded", `Tight runway with strong investor appetite should recommend funding, got ${fundingChoice}`);
 
-    return { ok: failures.length === 0, failures, customerChoice, highCommercialChoice, weakCommercialChoice, hiringPolicyChoice, zeroRunwayChoice, layoffChoice, fundingChoice };
+    company.cash = 20;
+    company.finance = { ...(company.finance || {}), runwayDays: 180, netCashFlowDaily: -0.04 };
+    company.projects = Array.from({ length: 3 }, (_, index) => ({ id: `loaded-${index}`, title: `Loaded Project ${index}`, status: "execution", requiredHeadcount: { software: 2 }, staffAllocations: {}, performance: { blockerCount: 2, staffingCoverage: 20, riskTrend: 75 } }));
+    company.workItems = Array.from({ length: 7 }, (_, index) => ({ id: `blocked-${index}`, projectId: `loaded-${index % 3}`, status: "open", progress: 30, blockedBy: ["dependency"] }));
+    const overloadedApproveScore = validationDecisionScore({ title: "Approve pilot", projectDecision: { id: "proposal-test", action: "pilot" } }, "growth-oriented");
+    const overloadedDelayScore = validationDecisionScore({ title: "Delay proposal", projectDecision: { id: "proposal-test", action: "delay" } }, "growth-oriented");
+    assert(overloadedDelayScore > overloadedApproveScore, `Even a growth strategy should delay a new project when the portfolio is overloaded (${overloadedDelayScore} <= ${overloadedApproveScore})`);
+
+    return { ok: failures.length === 0, failures, customerChoice, highCommercialChoice, weakCommercialChoice, hiringPolicyChoice, zeroRunwayChoice, layoffChoice, fundingChoice, overloadedApproveScore, overloadedDelayScore };
   });
 
   await browser.close();

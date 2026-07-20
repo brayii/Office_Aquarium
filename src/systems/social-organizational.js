@@ -658,7 +658,7 @@ function applySocialMemoryRecallRecommendation(owner,subject,event,category){
   if(!recommendation)return null;
   const cooldowns=company.socialMemoryStore.emotionalRecallCooldowns;
   const cooldownKey=`${owner.id}:${subject.id}`;
-  const now=simulationTimestamp().absoluteMinute,last=Number(cooldowns[cooldownKey])||-999999;
+  const now=simulationTimestamp().absoluteMinute,last=Number(cooldowns[cooldownKey])||OFFICE_AQUARIUM_CONSTANTS.time.neverAbsoluteMinute;
   const cooldownRemaining=Math.max(0,SOCIAL_MEMORY_RULES.emotionalRecallCooldownMinutes-(now-last));
   if(cooldownRemaining>0){
     logSocialMemoryDebug({type:"emotional-recall",status:"cooldown",cooldownKey,cooldownRemaining,...recommendation});
@@ -755,7 +755,7 @@ function maybeCreateAutomaticConflictRepair(a,b,roomId){
   const rules=SOCIAL_ORGANIZATION_RULES.conflict.automaticRepair;
   const now=simulationTimestamp().absoluteMinute;
   const age=now-socialTimestampValue(conflict.createdAt);
-  if(age<rules.ageMinutes||now-(Number(conflict.lastAutomaticRepairCheckAt)||-999999)<rules.checkMinutes)return null;
+  if(age<rules.ageMinutes||now-(Number(conflict.lastAutomaticRepairCheckAt)||OFFICE_AQUARIUM_CONSTANTS.time.neverAbsoluteMinute)<rules.checkMinutes)return null;
   conflict.lastAutomaticRepairCheckAt=now;
   const actor=socialEmployee(conflict.actorId),subject=socialEmployee(conflict.subjectId);
   if(!actor?.active||!subject?.active||actor.offsite||subject.offsite)return null;
@@ -1202,7 +1202,10 @@ function socialGroupType(memberIds,graph){
 function deriveInformalGroups(){
   ensureSocialOrganizationalSystems();
   const graph=buildSocialRelationshipGraph(),eligibleEdges=graph.edges.filter(edge=>edge.score>=SOCIAL_GROUP_RULES.edgeThreshold);
-  const joinEdges=eligibleEdges.filter(edge=>edge.score>=SOCIAL_GROUP_RULES.memberJoinThreshold);
+  const joinEdges=eligibleEdges.filter(edge=>
+    edge.score>=SOCIAL_GROUP_RULES.memberJoinThreshold||
+    edge.meaningfulInteractions>=SOCIAL_GROUP_RULES.sustainedInteractionJoinCount
+  );
   const previousGroups=(company.informalGroups||[]).map(socialClone),unassigned=new Set(graph.nodes.map(node=>node.id)),groups=[];
   for(const seed of graph.nodes){
     if(!unassigned.has(seed.id))continue;
@@ -2076,7 +2079,7 @@ function normalizeStoredConversation(conversation){
 }
 function conversationPairCooldownReady(aId,bId,timestamp){
   const key=makeRelationshipKey(aId,bId),stored=company.socialConversationState.lastConversationByPair[key];
-  const last=socialHasFiniteNumber(stored)?Number(stored):-999999;
+  const last=socialHasFiniteNumber(stored)?Number(stored):OFFICE_AQUARIUM_CONSTANTS.time.neverAbsoluteMinute;
   return socialTimestampValue(timestamp)-last>=SOCIAL_CONVERSATION_RULES.conversationCooldownMinutes;
 }
 function conversationParticipantRoom(employee){
@@ -2481,10 +2484,13 @@ function showSocialConversationDetails(conversationId){
       <div><strong>Relevant memories</strong><br>${socialEscapeHtml(memorySummary)}</div>
       <div><strong>Relationship</strong><br>${relationship?relationshipSummaryLabel(relationship):"Still developing"}</div>
     </div>`;
-  document.getElementById("conversationModal")?.classList.remove("hidden");
+  if(typeof openAccessibleDialog==="function")openAccessibleDialog("conversationModal","conversationTitle");
+  else document.getElementById("conversationModal")?.classList.remove("hidden");
 }
 function closeSocialConversationDetails(){
-  if(typeof document!=="undefined")document.getElementById("conversationModal")?.classList.add("hidden");
+  if(typeof document==="undefined")return;
+  if(typeof closeAccessibleDialog==="function")closeAccessibleDialog("conversationModal");
+  else document.getElementById("conversationModal")?.classList.add("hidden");
 }
 function relationshipSummaryLabel(view){
   const rel=view?.interpretation||{};

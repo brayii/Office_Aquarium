@@ -352,7 +352,7 @@ const SIMULATION_HANDBOOK_SECTIONS = [
         id: "mobile-and-settings",
         title: "Mobile and settings",
         paragraphs: [
-          "On small screens, use Office, Employees, CEO Inbox, Company, and Paper tabs. Panels stack vertically so each area remains readable.",
+          "On small screens, use the five visible Office, Employees, CEO Inbox, Company, and Paper tabs. Panels stack vertically so each area remains readable without a hidden primary destination.",
           "The gear menu contains Sound, Simulation Handbook, and Restart Company. The game continues safely when audio files are missing or the browser blocks sound."
         ],
         bullets: [
@@ -1086,10 +1086,12 @@ const SIMULATION_HANDBOOK_SECTIONS = [
         id: "save-mobile-sound",
         title: "How do saves, mobile play, and sound work?",
         bullets: [
-          "The game autosaves on the current device. Clearing browser storage or using private browsing can remove or fail to preserve the save.",
+          "The game autosaves on the current device and keeps a last-known-good backup. Clearing browser storage or using private browsing can remove or fail to preserve both.",
+          "If the current save is damaged, cannot migrate, or cannot be written safely, the title screen offers the available backup, export, cancel, or new-company recovery actions.",
+          "If a company update fails, the simulation pauses, attempts an emergency save, and shows a plain-language recovery notice instead of appearing frozen.",
           "Moving the game files does not automatically move browser storage.",
           "Keep Office_Aquarium.html, src, and assets together when playing from files.",
-          "On mobile, use the top tabs to open one major area at a time.",
+          "On mobile, use the five visible top tabs to open one major area at a time.",
           "Sound defaults to Music + Alerts. The sound menu can separate music and message alerts.",
           "If audio is missing or blocked, the simulation continues silently."
         ],
@@ -1323,6 +1325,7 @@ function closeSimulationHandbook() {
   document.body.classList.remove("handbook-open");
   const returnTarget = simulationHandbookPreviousFocus;
   simulationHandbookPreviousFocus = null;
+  if (typeof returnFromStartupHandbook === "function") returnFromStartupHandbook();
   if (returnTarget?.isConnected) setTimeout(() => returnTarget.focus(), 0);
   return true;
 }

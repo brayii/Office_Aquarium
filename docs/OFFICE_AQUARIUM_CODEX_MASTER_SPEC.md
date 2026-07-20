@@ -1,7 +1,7 @@
 ﻿# Office Aquarium — Master Product, Design, and Engineering Specification
 
 **Current source of truth:** `Office_Aquarium.html` and the `src/` JavaScript source tree  
-**Current save version:** `40`
+**Current save version:** `41`
 **Target environment:** Standalone browser application, desktop and Android/mobile  
 **Architecture:** Standalone offline HTML page with external local JavaScript  
 **Player role:** CEO  
@@ -44,7 +44,9 @@ The HTML file and ordered JavaScript source files are the runtime source of trut
 
 # Current Build Notes
 
-- Save version is `40`.
+- Application channel is **Public Beta 0.9** and application/package version is
+  `0.9.0`.
+- Save version is `41`.
 - The player-facing runtime is `Office_Aquarium.html` plus ordered source files under `src/`.
 - Browser/mobile release packages are generated under `dist/`.
 - Desktop release packages are generated under `src-tauri/target/`.
@@ -68,6 +70,21 @@ Current simulation integrity rules:
 - Conversation Presence uses the shared rules in `src/core/constants.js` for grounded triggers, 4-5 turn structure, wording volume, timing, movement, spacing, critical-work protection, anti-repetition, and persistence bounds.
 - Social organizational state may influence only social preference, reporting interpretation, and bounded emotional recommendations. It must never become a direct project, work, hiring, customer, or Institutional Learning modifier.
 - The public gear menu opens the Simulation Handbook. Its structured content and behavior live in `src/ui/simulation-handbook.js`, its responsive styles live in `src/ui/simulation-handbook.css`, and reusable navigation defaults come from `src/core/constants.js`.
+- Production saves use a versioned compact-v2 envelope, validated candidate
+  promotion, and a separate last-known-good backup. Startup must distinguish
+  no save, valid save, corrupt current, backup-only, migration-required,
+  unavailable storage, and quota failure.
+- Runtime stage failures must pause, stop the speed batch, preserve diagnostic
+  state, attempt a safe emergency save, and show the player a plain-language
+  recovery dialog. Raw stacks remain developer-only.
+- `.github/workflows/ci.yml` owns the ordinary full regression and clean web
+  package smoke. `.github/workflows/long-run.yml` owns scheduled/manual
+  first-year matrices. `.github/workflows/release.yml` owns the release gate,
+  clean web package, Windows package, hashes, and installer launch attempt.
+- Release artifacts use Public Beta 0.9 filenames and may contain only runtime
+  files, player documentation, release notes, license/notices, and manifests.
+  Private plans, tests, work logs, historical archives, and repository metadata
+  must not enter public packages.
 
 ---
 
@@ -500,6 +517,17 @@ Save version 39 completes Social Personality AI Stages 6-8 and adds an evidence-
 * The Reports workspace includes People & Culture views for culture, groups, network, and leadership. Raw pair weights, hidden memory scores, and repair calculations remain Debug-only.
 * Shared rules live in `src/core/constants.js`; dedicated deterministic 90-, 180-, and 365-day social-system tests enforce bounds, source retention, save/load, UI read safety, and Work AI isolation.
 * Production saves omit transient social diagnostics, compact repeated field names through a versioned backward-compatible envelope, and bound detailed relationship evidence, cooldowns, memories, conversations, reputation observations, and Institutional Learning records. Older plain JSON saves remain readable, and regression tests enforce the release storage budget against a mature 29-employee complete relationship graph.
+
+## Implemented in save version 41
+
+Save version 41 is the Public Beta 0.9 hardening schema.
+
+* Current, candidate, and last-known-good save records are validated before promotion; corrupt, missing, migration-required, unavailable-storage, and quota states remain distinct.
+* Executive escalation cadence and repeat-suppression fingerprints persist across save/load so old decisions cannot silently requeue as new Inbox items.
+* Player-facing operating and valuation trends retain a bounded daily history, while isolated validation keeps its complete in-memory trajectory outside the live save.
+* Runtime failures preserve player-safe stage information, pause the current speed batch, attempt an emergency save, and expose recovery actions without showing raw stacks in normal play.
+* Long-run validation uses deterministic CEO strategies, exact horizon contracts, failure classification, and first-year survival targets owned by `src/core/constants.js`.
+* Save Version 41 does not add an online service, API key, analytics system, or telemetry upload.
 
 ## Implemented in save version 40
 
@@ -1313,7 +1341,7 @@ The newspaper uses:
 
 Current save version:
 
-`38`
+`41`
 
 ## 13.2 Storage
 

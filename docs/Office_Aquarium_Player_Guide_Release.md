@@ -170,7 +170,9 @@ These views summarize evidence the company has accumulated. They do not reveal e
 
 Shows Office Aquarium Weekly. The newspaper summarizes what happened recently and helps you understand the company's story over time.
 
-On mobile, the top tabs switch between Office, Employees, CEO Inbox, Company, and Paper so the same information fits on a smaller screen.
+On mobile, the five visible top tabs switch between Office, Employees, CEO
+Inbox, Company, and Paper so the same information fits on a smaller screen
+without a hidden horizontal destination.
 
 The mobile Paper tab opens the same Weekly Report information that appears in the desktop workspace.
 
@@ -573,7 +575,22 @@ One bad event usually does not end the game. The danger is sustained unresolved 
 
 # 17. Saving
 
-The game saves automatically on the current device.
+The game saves automatically on the current device. It keeps a current save
+and a last-known-good backup.
+
+If the current save is damaged, cannot be migrated, or cannot be written
+safely, the title screen explains the problem instead of pretending no company
+exists. Depending on what remains available, you can:
+
+- restore the last-known-good backup
+- export the current raw save
+- export the backup
+- start a new company
+- cancel and leave the stored data untouched
+
+During a serious simulation error, the company pauses and attempts an emergency
+save. The recovery notice explains which part of the company update stopped and
+offers safe next steps. Technical stack traces are not shown in normal play.
 
 Clearing browser storage may erase the save.
 

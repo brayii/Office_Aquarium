@@ -120,7 +120,7 @@
       width:100%;min-height:45px;margin-top:12px;border:0;border-radius:9px;color:#fff;background:var(--ink);font-weight:850
     }
     .primary:disabled{opacity:.5;cursor:not-allowed}
-    .employee-card{border-radius:10px;padding:11px;box-shadow:none}
+    .employee-card{display:block;width:100%;border-radius:10px;padding:11px;box-shadow:none;text-align:left;color:inherit;font:inherit}
     .employee-list{display:grid;gap:8px;max-height:286px;overflow:auto;padding-right:2px}
     .employee-head strong{font-size:.9rem}
     .employee-head span{font-size:.68rem;color:var(--muted)}
@@ -236,17 +236,27 @@
     @keyframes conversationGesture{from{transform:translateX(var(--face-shift,0)) rotate(-3deg)}to{transform:translateX(var(--face-shift,0)) rotate(3deg)}}
     .save-note{font-size:.75rem;color:var(--muted);margin-top:6px}
 
-    .startup-overlay,.confirm-overlay{
+    .startup-overlay,.confirm-overlay,.runtime-error-overlay{
       position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:20px;
       background:rgba(23,32,42,.78);backdrop-filter:blur(6px)
     }
-    .startup-card,.confirm-card{
+    .runtime-error-overlay{z-index:1300}
+    .startup-card,.confirm-card,.runtime-error-card{
       width:min(500px,100%);padding:24px;border-radius:16px;background:#fff;
       border:1px solid var(--line);box-shadow:0 26px 80px rgba(0,0,0,.3)
     }
-    .startup-card h2,.confirm-card h2{margin-bottom:10px;font-size:1.55rem}
-    .startup-card p,.confirm-card p{color:#435365;line-height:1.5}
+    .runtime-error-card{width:min(620px,100%)}
+    .startup-card h2,.confirm-card h2,.runtime-error-card h2{margin-bottom:10px;font-size:1.55rem}
+    .startup-card p,.confirm-card p,.runtime-error-card p{color:#435365;line-height:1.5}
     .startup-actions{display:grid;gap:10px;margin-top:18px}
+    .save-recovery-panel{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+    .save-recovery-actions,.runtime-error-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .save-recovery-actions button,.runtime-error-actions button{flex:1 1 170px}
+    .runtime-error-status{display:grid;gap:8px;margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:9px;background:#f8fbfb}
+    .runtime-error-status div{display:grid;grid-template-columns:minmax(110px,.35fr) 1fr;gap:10px}
+    .runtime-error-status span{color:var(--muted);font-weight:800}
+    .save-warning{margin:10px 0 0;padding:10px 12px;border:1px solid #d79b37;border-radius:9px;background:#fff8e8;color:#70480c;font-weight:800;line-height:1.4}
+    .save-warning.error{border-color:#d3544d;background:#fff1f0;color:#8b2019}
     .secondary{
       width:100%;min-height:45px;border:1px solid var(--line);border-radius:9px;
       background:#f8fbfb;color:var(--ink);font-weight:850;cursor:pointer
@@ -716,6 +726,24 @@
       font-size:max(.96rem,14.5px);
       line-height:1.52;
     }
+    .release-version{display:block;margin-top:10px;color:var(--muted);font-size:.82rem;font-weight:800}
+    .health-summary{display:grid;gap:0;margin-top:10px;border:1px solid rgba(68,117,127,.14);border-radius:10px;overflow:hidden;background:rgba(255,255,255,.5)}
+    .health-summary-row{display:grid;grid-template-columns:minmax(150px,.42fr) minmax(0,1fr);gap:12px;padding:9px 11px;border-bottom:1px solid rgba(68,117,127,.12);align-items:start}
+    .health-summary-row:last-child{border-bottom:0}
+    .health-summary-row>span{color:var(--muted);font-weight:850}
+    .health-summary-row>strong{font-weight:750;overflow-wrap:anywhere}
+    .briefing-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+    .insight-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+    :where(button,[href],input,select,[tabindex]:not([tabindex="-1"])):focus-visible{outline:3px solid rgba(30,184,172,.62);outline-offset:2px}
+    @media(max-width:850px){
+      .mobile-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));overflow:visible;gap:4px;padding:6px}
+      .mobile-tabs button{min-width:0;min-height:48px;padding:7px 3px;font-size:max(.72rem,11.5px);line-height:1.15;white-space:normal}
+      .tab-section{display:none!important;margin-bottom:12px}
+      .tab-section.active{display:block!important}
+      .market-range-btn,.small-btn,.comm-tab,.workspace-tab,.company-view-select,.archive-toolbar select,
+      .control-cluster .speed-btn,.control-cluster .icon-btn,.settings-wrap>.icon-btn{min-height:44px}
+      .health-summary-row{grid-template-columns:1fr;gap:3px}
+    }
     @media(max-width:430px){
       .zone{font-size:max(.74rem,11.5px)}
       .agent small{font-size:max(.66rem,10.5px)}
@@ -727,13 +755,24 @@
 
 <div id="startupOverlay" class="startup-overlay">
   <div class="startup-card">
-    <p class="eyebrow">Office Aquarium</p>
+    <p class="eyebrow">Office Aquarium - <span data-release-version>Public Beta 0.9</span></p>
     <h2>Run your autonomous company</h2>
     <p>Continue the company saved on this device, or start a completely new simulation with fresh employee relationships and slightly different starting conditions.</p>
     <div id="saveSummary" class="save-summary">Checking for a saved company...</div>
     <div class="startup-actions">
       <button class="primary" id="continueCompany">Continue Company</button>
       <button class="secondary" id="newCompany">Start New Company</button>
+      <button class="secondary" id="startupGuideBtn" type="button">How to Play</button>
+    </div>
+    <div id="saveRecoveryPanel" class="save-recovery-panel hidden">
+      <strong>Save recovery</strong>
+      <p id="saveRecoveryCopy">Your last company needs attention before it can be opened.</p>
+      <div class="save-recovery-actions">
+        <button class="secondary" id="restoreBackup" type="button">Restore Backup</button>
+        <button class="secondary" id="exportCurrentSave" type="button">Export Current Save</button>
+        <button class="secondary" id="exportBackupSave" type="button">Export Backup</button>
+        <button class="secondary" id="dismissSaveRecovery" type="button">Cancel</button>
+      </div>
     </div>
   </div>
 </div>
@@ -790,6 +829,24 @@
     </div>
   </div>
 </div>
+<div id="runtimeErrorOverlay" class="runtime-error-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="runtimeErrorTitle" aria-describedby="runtimeErrorCopy">
+  <div class="runtime-error-card">
+    <p class="eyebrow">Simulation Paused Safely</p>
+    <h2 id="runtimeErrorTitle" tabindex="-1">The company hit an internal problem.</h2>
+    <p id="runtimeErrorCopy">Office Aquarium paused before continuing so your company would not be changed unpredictably.</p>
+    <div class="runtime-error-status">
+      <div><span>While updating</span><strong id="runtimeErrorStage">the company</strong></div>
+      <div><span>Save status</span><strong id="runtimeErrorSaveStatus">Checking your last safe save...</strong></div>
+    </div>
+    <p>You can return to the title screen, restore the last-known-good backup, export diagnostics for a bug report, or restart the company.</p>
+    <div class="runtime-error-actions">
+      <button class="secondary" id="runtimeRestoreBackup" type="button">Restore Backup</button>
+      <button class="secondary" id="exportDiagnostics" type="button">Export Diagnostics</button>
+      <button class="secondary" id="returnToTitle" type="button">Return to Title</button>
+      <button class="primary danger-button" id="restartAfterRuntimeError" type="button">Restart Company</button>
+    </div>
+  </div>
+</div>
 <main class="app">
   <nav class="mobile-tabs" aria-label="Simulation sections">
     <button data-tab="office" class="active">Office</button><button data-tab="employees">Employees</button><button data-tab="inbox">CEO Inbox</button><button data-tab="company">Company</button><button data-tab="newspaper">Paper</button>
@@ -833,10 +890,12 @@
             </label>
             <button class="small-btn" id="guideBtn" type="button">Simulation Handbook</button>
             <button class="small-btn danger-button" id="resetBtn" type="button">Restart Company</button>
+            <small class="release-version" data-release-version>Public Beta 0.9</small>
           </div>
           </div>
         </div>
       </div>
+      <div id="saveWarningBanner" class="save-warning hidden" role="status" aria-live="polite"></div>
       <div class="office" id="office">
         <div id="officeAlert" class="office-alert hidden"></div>
         <div class="zone z-dev">Software Studio</div>
@@ -975,8 +1034,8 @@
   </section>
 </main>
 
-<div id="employeeModal" class="detail-modal hidden"><div class="detail-card"><div class="panel-heading"><h2 id="detailName">Employee</h2><div class="modal-actions"><button id="closeEmployee" class="small-btn">Close</button></div></div><p id="detailRole"></p><div id="detailBody"></div></div></div>
-<div id="conversationModal" class="detail-modal hidden"><div class="detail-card conversation-card"><div class="panel-heading"><div><p class="eyebrow">Office Conversation</p><h2>Conversation Context</h2></div><button id="closeConversation" class="small-btn">Close</button></div><div id="conversationDetailBody"></div></div></div>
+<div id="employeeModal" class="detail-modal hidden" role="dialog" aria-modal="true" aria-labelledby="detailName" aria-describedby="detailRole"><div class="detail-card" role="document"><div class="panel-heading"><h2 id="detailName" tabindex="-1">Employee</h2><div class="modal-actions"><button id="closeEmployee" class="small-btn" type="button" aria-label="Close employee profile">Close</button></div></div><p id="detailRole"></p><div id="detailBody"></div></div></div>
+<div id="conversationModal" class="detail-modal hidden" role="dialog" aria-modal="true" aria-labelledby="conversationTitle"><div class="detail-card conversation-card" role="document"><div class="panel-heading"><div><p class="eyebrow">Office Conversation</p><h2 id="conversationTitle" tabindex="-1">Conversation Context</h2></div><button id="closeConversation" class="small-btn" type="button" aria-label="Close conversation details">Close</button></div><div id="conversationDetailBody"></div></div></div>
 
 <script src="src/core/constants.js"></script>
 <script src="src/services/runtime-services.js"></script>

@@ -157,6 +157,34 @@ async function main() {
     assert(/needs executive direction/i.test(backgroundText), `Background memo should use a clear subject: ${backgroundText}`);
     assert(!staleExecutivePhrases.test(backgroundText), `Background memo should avoid engine wording: ${backgroundText}`);
 
+    company.escalationQueue = [];
+    company.pendingEvent = null;
+    company.messageFingerprints = {};
+    company.lastInformationalEscalationDay = OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+    company.day = 40;
+    const firstInfo = {
+      id: "info-cadence-one",
+      type: "status-report",
+      contentCode: "QUALITY_TREND",
+      status: "manager-reviewed",
+      fromId: employees[0].id,
+      fromName: employees[0].name,
+      department: "quality",
+      subject: "Quality trend update",
+      severity: 58,
+      urgency: 42,
+      confidence: 72,
+      evidence: ["Verification found a small but measurable improvement."]
+    };
+    assert(archiveInformationalEscalation(firstInfo), "First routine executive information update should enter the Inbox");
+    const secondInfo = { ...firstInfo, id: "info-cadence-two" };
+    assert(!archiveInformationalEscalation(secondInfo), "Routine executive information should respect the minimum Inbox gap");
+    company.escalationQueue = [];
+    company.day += OFFICE_AQUARIUM_CONSTANTS.executiveInbox.informationalMinimumGapDays;
+    assert(!archiveInformationalEscalation(secondInfo), "Repeated executive information should respect its longer topic cooldown");
+    company.day += OFFICE_AQUARIUM_CONSTANTS.executiveInbox.informationalRepeatWindowDays;
+    assert(archiveInformationalEscalation(secondInfo), "A materially old informational topic should be eligible again");
+
     validationMode = false;
     return { ok: failures.length === 0, failures, bannerText, internalReportText, timing: timing.summary };
   });

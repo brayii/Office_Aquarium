@@ -1,0 +1,78 @@
+name: Office Aquarium Release Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  first-year-gate:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - name: Run required 20-seed first-year matrix
+        run: npm run test:long-run
+        env:
+          OFFICE_AQUARIUM_LONG_RUN: "1"
+          OFFICE_AQUARIUM_SEED_COUNT: "20"
+          OFFICE_AQUARIUM_HORIZON_DAYS: "365"
+          OFFICE_AQUARIUM_STRATEGIES: conservative,balanced,growth-oriented
+          OFFICE_AQUARIUM_CONCURRENCY: "4"
+          OFFICE_AQUARIUM_WRITE_REPORTS: "1"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-first-year-matrix-${{ github.run_id }}
+          path: dist/reports/
+          if-no-files-found: error
+
+  build-and-certify:
+    needs: first-year-gate
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - name: Complete regression suite
+        run: npm test
+      - name: Build and launch-smoke clean web package
+        run: npm run test:package-web
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Check locked Rust dependencies
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+      - name: Build and inspect clean Windows package
+        run: npm run test:package-windows
+      - name: Install, launch, and uninstall Windows package
+        run: npm run test:windows-launch
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-aquarium-public-beta-web
+          path: |
+            dist/Office_Aquarium_Public_Beta_0.9_itch_web.zip
+            dist/Office_Aquarium_Public_Beta_0.9_itch_web.zip.sha256
+          if-no-files-found: error
+      - name: Upload Windows artifacts and hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-aquarium-public-beta-windows
+          path: dist/windows/
+          if-no-files-found: error

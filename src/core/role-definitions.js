@@ -229,7 +229,8 @@ function organizationalRoleGapForDepartment(dept){
   const coverage=organizationalRoleCoverage(),sequence=globalThis.OFFICE_AQUARIUM_CONSTANTS?.organizationGrowth?.roleSequence||allRecruitableRoles();
   return coverage.uncommittedRoles.filter(row=>row.department===dept).sort((a,b)=>{
     const aOrder=sequence.indexOf(a.role),bOrder=sequence.indexOf(b.role);
-    return (aOrder<0?999:aOrder)-(bOrder<0?999:bOrder)||b.missingCommitted-a.missingCommitted;
+    const sortLast=OFFICE_AQUARIUM_CONSTANTS.defaults.sortLastIndex;
+    return (aOrder<0?sortLast:aOrder)-(bOrder<0?sortLast:bOrder)||b.missingCommitted-a.missingCommitted;
   })[0]||null;
 }
 function roleForDepartmentHire(dept){

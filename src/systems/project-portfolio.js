@@ -3,6 +3,7 @@ const PROJECT_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS.projectLearning;
 const PROJECT_LESSON_KEYS=PROJECT_LEARNING_RULES.keys;
 const PROJECT_SOCIAL_EXPERIENCE_RULES=OFFICE_AQUARIUM_CONSTANTS.social.projectExperience;
 const PORTFOLIO_DEMAND_RULES=OFFICE_AQUARIUM_CONSTANTS.portfolioDemand;
+const PROJECT_DEVELOPMENT_RULES=OFFICE_AQUARIUM_CONSTANTS.projectDevelopment;
 const LEARNING_COVERAGE={
   testing:{producers:["quality mistakes","project QA","CEO quality decisions"],consumers:["employee lab utility","project early QA"],ui:["Lessons Learned"]},
   collaboration:{producers:["successful collaboration","project coordination"],consumers:["employee collaborate utility","project coordination"],ui:["Lessons Learned"]},
@@ -37,7 +38,7 @@ const LEARNING_COVERAGE={
   customerValidation:{producers:["validation decisions"],consumers:["portfolio recommendations"],ui:["Project Portfolio"]},
   knowledgeValue:{producers:["completed research/projects"],consumers:["proposal benefit estimates"],ui:["Project Portfolio"]}
 };
-function emptyProjectLessons(){return Object.fromEntries(PROJECT_LESSON_KEYS.map(k=>[k,{score:0,confidence:0,successEvidence:0,failureEvidence:0,sampleCount:0,lastObservedDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,effectEstimate:0,variance:1,evidence:[],episodeKeys:[],independenceGroups:[],episodeReviews:{}}]));}
+function emptyProjectLessons(){return Object.fromEntries(PROJECT_LESSON_KEYS.map(k=>[k,{score:0,confidence:0,successEvidence:0,failureEvidence:0,sampleCount:0,lastObservedDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,effectEstimate:0,variance:1,evidence:[],episodeKeys:[],independenceGroups:[],episodeReviews:{}}]));}
 function normalizeProjectLessons(){
   const defaults=emptyProjectLessons(), current=company.projectLessons&&typeof company.projectLessons==="object"?company.projectLessons:{};
   for(const key of PROJECT_LESSON_KEYS){
@@ -210,7 +211,7 @@ function makeProject({family,originType="department",originatorId=null,status="p
   const durationMultiplier=major ? 1.45 : internal ? .85 : 1.15;
   const estimatedDuration=Math.round((45+reality.trueTechnicalDifficulty*1.4+rnd()*45)*(1-estimateBias*.008)*durationMultiplier);
   const visibility=status==="proposal"?"private":(originType==="legacy"?"announced":(rnd()>.72?"announced":rnd()>.42?"rumored":"private"));
-  const p={id,family:chosen,codename:code,title:`Project ${code}: ${chosen.replace(/\b\w/g,c=>c.toUpperCase())}`,originType,originatorId,proposingDepartment:primary,createdDay:company.day,status,priority:Math.round(50+rnd()*45),scope,budgetApproved:status==="proposal"?0:estimatedCost*.45,budgetSpent:0,estimatedDuration,estimatedCost,estimatedBenefit:Math.round(reality.trueStrategicValue*(1-estimateNoise*.25)+rnd()*10+knowledgeBias*1.5),visibleRisk:Math.round(clamp(reality.trueTechnicalDifficulty*(.75+rnd()*estimateNoise)-confidence*.12-projectLessonBias("scopeControl")*.8,15,95)),visibleConfidence:Math.round(confidence),marketVisibility:visibility,requiredDepartments:projectRequiredDepartments(chosen,primary),requiredSkills:requiredSkillsForWork(primary,workItemTypeForTeam(primary)),requiredHeadcount:{[primary]:scope>1?2:1,quality:["hardware","software"].includes(primary)?1:0},assignedEmployees:[],workItemIds:[],milestones:[],deadlineDay:company.day+Math.round((45+reality.trueTechnicalDifficulty*1.8)*durationMultiplier),progress:0,quality:55,integration:35,customerInterest:Math.round(reality.trueCustomerExcitement*(.75+rnd()*.35)+validationBias),teamMoraleImpact:0,strategicNarrative:`${teamDisplayName(primary)} believes ${chosen} could strengthen the company portfolio.`,reviewHistory:[],hiddenReality:reality,seed:s,performance:{progress:0,scheduleVariance:0,budgetVariance:0,quality:55,integration:35,teamHealth:70,staffingCoverage:60,blockerCount:0,customerInterest:Math.round(reality.trueCustomerExcitement),strategicConfidence:Math.round(confidence),riskTrend:0,benefitRealization:0,forecastAtCompletion:Math.round(50+rnd()*35)},nextReviewDay:company.day+30};
+  const p={id,family:chosen,codename:code,title:`Project ${code}: ${chosen.replace(/\b\w/g,c=>c.toUpperCase())}`,originType,originatorId,proposingDepartment:primary,createdDay:company.day,status,priority:Math.round(50+rnd()*45),scope,budgetApproved:status==="proposal"?0:estimatedCost*.45,budgetSpent:0,estimatedDuration,estimatedCost,estimatedBenefit:Math.round(reality.trueStrategicValue*(1-estimateNoise*.25)+rnd()*10+knowledgeBias*1.5),visibleRisk:Math.round(clamp(reality.trueTechnicalDifficulty*(.75+rnd()*estimateNoise)-confidence*.12-projectLessonBias("scopeControl")*.8,15,95)),visibleConfidence:Math.round(confidence),marketVisibility:visibility,requiredDepartments:projectRequiredDepartments(chosen,primary),requiredSkills:requiredSkillsForWork(primary,workItemTypeForTeam(primary)),requiredHeadcount:{[primary]:scope>1?2:1,quality:["hardware","software"].includes(primary)?1:0},assignedEmployees:[],workItemIds:[],milestones:[],deadlineDay:company.day+Math.round((45+reality.trueTechnicalDifficulty*1.8)*durationMultiplier),progress:0,completedWorkItemCount:0,quality:55,integration:35,customerInterest:Math.round(reality.trueCustomerExcitement*(.75+rnd()*.35)+validationBias),teamMoraleImpact:0,strategicNarrative:`${teamDisplayName(primary)} believes ${chosen} could strengthen the company portfolio.`,reviewHistory:[],hiddenReality:reality,seed:s,performance:{progress:0,scheduleVariance:0,budgetVariance:0,quality:55,integration:35,teamHealth:70,staffingCoverage:60,blockerCount:0,customerInterest:Math.round(reality.trueCustomerExcitement),strategicConfidence:Math.round(confidence),riskTrend:0,benefitRealization:0,forecastAtCompletion:Math.round(50+rnd()*35)},nextReviewDay:company.day+30};
   reauditProjectRequirements(p);
   return p;
 }
@@ -300,7 +301,7 @@ function dormantProjectRevivalCandidate(){
   const candidates=(company.projectArchive||[]).filter(p=>{
     if(!["canceled","rejected"].includes(p.status)||existingSourceIds.has(p.id))return false;
     const age=company.day-(p.closedDay??p.completedDay??p.createdDay??company.day);
-    if(age<45||company.day-(p.lastRevivalConsideredDay||-999)<45)return false;
+    if(age<45||company.day-(p.lastRevivalConsideredDay??OFFICE_AQUARIUM_CONSTANTS.time.neverDay)<45)return false;
     return changedConditionsForDormantProject(p).length>=2;
   }).sort((a,b)=>{
     const score=p=>changedConditionsForDormantProject(p).length*20+(p.hiddenReality?.trueStrategicValue||p.estimatedBenefit||50)+(p.customerInterest||0)*.25-(p.visibleRisk||50)*.2;
@@ -350,9 +351,12 @@ function ensureProjectPortfolio(){
     p.staffAllocations=p.staffAllocations&&typeof p.staffAllocations==="object"?p.staffAllocations:{};
     p.causalLedger=Array.isArray(p.causalLedger)?p.causalLedger:[];
     p.closeoutReadyDays=Number(p.closeoutReadyDays)||0;
-    p.lastSocialPressureExperienceDay=Number.isFinite(Number(p.lastSocialPressureExperienceDay))?Number(p.lastSocialPressureExperienceDay):-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay;
-    p.lastSocialFailureExperienceDay=Number.isFinite(Number(p.lastSocialFailureExperienceDay))?Number(p.lastSocialFailureExperienceDay):-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay;
-    p.lastQualitySocialExperienceDay=Number.isFinite(Number(p.lastQualitySocialExperienceDay))?Number(p.lastQualitySocialExperienceDay):-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay;
+    p.completedWorkItemCount=Number.isFinite(Number(p.completedWorkItemCount))
+      ?clamp(Math.floor(Number(p.completedWorkItemCount)),0,PROJECT_DEVELOPMENT_RULES.completionTelemetryLimit)
+      :clamp(Math.round((Number(p.progress)||0)/100*projectPlannedWorkItemCount(p)),0,PROJECT_DEVELOPMENT_RULES.completionTelemetryLimit);
+    p.lastSocialPressureExperienceDay=Number.isFinite(Number(p.lastSocialPressureExperienceDay))?Number(p.lastSocialPressureExperienceDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+    p.lastSocialFailureExperienceDay=Number.isFinite(Number(p.lastSocialFailureExperienceDay))?Number(p.lastSocialFailureExperienceDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+    p.lastQualitySocialExperienceDay=Number.isFinite(Number(p.lastQualitySocialExperienceDay))?Number(p.lastQualitySocialExperienceDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
     p.socialCompletionExperienceRecorded=!!p.socialCompletionExperienceRecorded;
     p.commercialStatus=p.commercialStatus||((p.status==="completed"&&(p.customerInterest||0)>=65)?"ready":p.status==="completed"?"completed":"not ready");
     p.convertedCustomers=Number(p.convertedCustomers)||0;
@@ -483,9 +487,10 @@ function departmentMembers(dept){
   return company.runtime?.departmentMembers?.[dept]||[];
 }
 function projectWorkType(project,dept){
+  const family=String(project?.family||project?.type||project?.title||"").toLowerCase();
   if(dept==="quality")return "verification";
-  if(dept==="hardware")return project.family.includes("manufacturing")||project.family.includes("yield")?"quality":"architecture";
-  if(dept==="software")return project.family.includes("portal")||project.family.includes("SDK")?"software":"integration";
+  if(dept==="hardware")return family.includes("manufacturing")||family.includes("yield")?"quality":"architecture";
+  if(dept==="software")return family.includes("portal")||family.includes("sdk")?"software":"integration";
   if(dept==="product")return "customer";
   return "runway";
 }
@@ -570,11 +575,31 @@ function recordProjectLedger(projectId,source,metric,delta,reason){
   p.causalLedger.push({day:company.day,minute:company.minute,source,metric,delta:Number(delta)||0,reason});
   if(p.causalLedger.length>80)p.causalLedger=p.causalLedger.slice(-80);
 }
-function projectBacklogTarget(project,pace=projectPaceProfile(project)){
+function projectFullBacklogTarget(project,pace=projectPaceProfile(project)){
+  const rules=PROJECT_DEVELOPMENT_RULES;
   const deptCount=Math.max(1,(project.requiredDepartments||[]).length);
   const scope=Number(project.scope)||1;
   const difficulty=Number(project.hiddenReality?.trueTechnicalDifficulty||project.visibleRisk||55);
-  return clamp(Math.round(deptCount*(pace.major?1.45:1.05)+Math.max(0,scope-1)*deptCount+Math.max(0,difficulty-58)/18),deptCount,deptCount+5);
+  return clamp(
+    Math.round(deptCount*(pace.major?rules.majorBacklogMultiplier:rules.standardBacklogMultiplier)+Math.max(0,scope-1)*deptCount+Math.max(0,difficulty-58)/18),
+    deptCount,
+    deptCount+rules.maximumBacklogAboveDepartmentCount
+  );
+}
+function projectBacklogTarget(project,pace=projectPaceProfile(project)){
+  const rules=PROJECT_DEVELOPMENT_RULES;
+  const fullTarget=projectFullBacklogTarget(project,pace);
+  const progress=clamp(Number(project.progress)||0,0,100);
+  const taper=rules.backlogTaper.find(band=>progress<band.progressBelow)||rules.backlogTaper[rules.backlogTaper.length-1];
+  return taper.multiplier<=0?0:Math.max(1,Math.ceil(fullTarget*taper.multiplier));
+}
+function projectPlannedWorkItemCount(project){
+  const duration=Math.max(1,Number(project?.estimatedDuration)||PROJECT_DEVELOPMENT_RULES.defaultEstimatedDurationDays);
+  const backlog=projectFullBacklogTarget(project);
+  return Math.max(PROJECT_DEVELOPMENT_RULES.minimumPlannedWorkItems,Math.round(duration*backlog/PROJECT_DEVELOPMENT_RULES.expectedWorkItemCycleDays));
+}
+function projectCompletedWorkProgress(project){
+  return clamp((Number(project?.completedWorkItemCount)||0)/projectPlannedWorkItemCount(project)*100,0,100);
 }
 function createProjectBacklogItem(project,reason="development pressure"){
   const departments=(project.requiredDepartments||[]).filter(Boolean);
@@ -633,7 +658,8 @@ function applyProjectDevelopmentFriction(project,allItems,items,metrics){
   const qualityPressure=(metrics.riskTrend||0)>68||(project.quality||55)<50;
   const staffingPressure=(metrics.coverage||100)<72||(metrics.overload||0)>12;
   let currentOpen=items.length;
-  const maxItems=Math.min(96,52+(company.projects||[]).length*8);
+  const rules=PROJECT_DEVELOPMENT_RULES;
+  const maxItems=Math.min(rules.totalWorkItemLimit,rules.projectWorkItemLimit+(company.projects||[]).length*8);
   if(currentOpen<target&&company.workItems.length<maxItems){
     const reason=schedulePressure?"schedule pressure":qualityPressure?"quality risk":staffingPressure?"staffing pressure":"development pressure";
     const added=createProjectBacklogItem(project,reason);
@@ -704,9 +730,9 @@ function recordProjectSocialExperience(project,items,{blockers=0,scheduleVarianc
     if(result)project.socialCompletionExperienceRecorded=true;
     return result;
   }
-  const late=company.day>(project.deadlineDay||OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay)&&Number(project.progress||0)<96;
+  const late=company.day>(project.deadlineDay??OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay)&&Number(project.progress||0)<96;
   const overdueItems=(items||[]).filter(item=>item?.status==="open"&&Number(item.progress||0)<96&&company.day>Number(item.deadlineDay??OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay));
-  const longestWorkItemDelay=overdueItems.reduce((max,item)=>Math.max(max,company.day-Number(item.deadlineDay||company.day)),0);
+  const longestWorkItemDelay=overdueItems.reduce((max,item)=>Math.max(max,company.day-Number(item.deadlineDay??company.day)),0);
   const blockedOverdue=overdueItems.some(item=>(item.blockedBy||[]).length>0);
   const severe=(late&&blockers>0)||blockedOverdue||longestWorkItemDelay>=rules.severeWorkItemOverdueDays||(scheduleVariance>=rules.severeScheduleVariance&&riskTrend>=rules.severeRisk)||(coverage<rules.severeCoverage&&blockers>0&&overload>rules.pressureOverload);
   const pressured=late||overdueItems.length>0||blockers>0||scheduleVariance>=rules.pressureScheduleVariance||riskTrend>=rules.pressureRisk||(coverage<rules.pressureCoverage&&overload>rules.pressureOverload);
@@ -721,6 +747,16 @@ function recordProjectSocialExperience(project,items,{blockers=0,scheduleVarianc
     return result;
   }
   return null;
+}
+function projectAgeDays(project,referenceDay=company.day){
+  const candidate=Number(project?.createdDay);
+  const createdDay=Number.isFinite(candidate)?candidate:Number(referenceDay);
+  return Math.max(0,Number(referenceDay)-createdDay);
+}
+function projectScheduleVariance(project,progress=project?.progress){
+  const duration=Math.max(1,Number(project?.estimatedDuration)||PROJECT_DEVELOPMENT_RULES.defaultEstimatedDurationDays);
+  const elapsedPercent=projectAgeDays(project)/duration*100;
+  return Math.round((elapsedPercent-(Number(progress)||0))*projectExecutionModifiers(project).schedule);
 }
 function projectPerformanceUpdate(){
   ensureProjectPortfolio();
@@ -742,13 +778,14 @@ function projectPerformanceUpdate(){
     const staffingContribution=(coverage-50)*.012*pace.progressMultiplier-overload*.006;
     const conditionProgress=conditionDelta*.006*pace.progressMultiplier;
     const blendedProgress=(p.progress||0)*.86+avgProgress*.14*mod.progress*pace.progressMultiplier*lateDrag*(1-overload*.003)+staffingContribution+conditionProgress;
-    p.progress=clamp(Math.max(beforeProgress,blendedProgress),0,100);
+    const completedWorkProgress=projectCompletedWorkProgress(p);
+    p.progress=clamp(Math.max(beforeProgress,blendedProgress,completedWorkProgress),0,100);
     if(Math.abs(p.progress-beforeProgress)>.25)recordProjectLedger(p.id,"project-performance","progress",p.progress-beforeProgress,"Aggregated paced work-item progress and staffing coverage");
     let blockers=items.reduce((s,w)=>s+(w.blockedBy?.length||0),0);
     p.quality=clamp((p.quality||55)+(company.quality-55)*.015+conditionDelta*.018-blockers*.08*mod.defectRisk+(coverage-50)*.01-overload*.018,0,100);
     p.integration=clamp((p.integration||35)+(company.integration-45)*.012+done.length*.08,0,100);
     p.customerInterest=clamp((p.customerInterest||45)+((company.market.aiDemand-50)*.01+(company.trust-55)*.01-p.hiddenReality.hiddenObsolescenceRate*.002)*mod.customer,0,100);
-    const scheduleVariance=Math.round(((company.day-(p.createdDay||company.day))/(p.estimatedDuration||90)*100-(p.progress||0))*mod.schedule);
+    const scheduleVariance=projectScheduleVariance(p,p.progress);
     const budgetVariance=Math.round(((p.budgetSpent||0)/Math.max(.1,p.estimatedCost)-((p.progress||1)/100))*100);
     let riskTrend=clamp((p.visibleRisk||50)+blockers*5+Math.max(0,scheduleVariance)*.25+Math.max(0,budgetVariance)*.3+overload*.22-coverage*.08-Math.max(-18,conditionDelta)*.10,0,100);
     const friction=applyProjectDevelopmentFriction(p,allItems,items,{coverage,overload,scheduleVariance,budgetVariance,riskTrend,conditionDelta});
@@ -775,7 +812,7 @@ function projectPerformanceUpdate(){
       if(target&&!target.blockedBy?.length){target.blockedBy=[...(target.blockedBy||[]),contentPick(v23Content.blockers,overload)];target.qualityRisk=clamp((target.qualityRisk||40)+6,0,100);recordProjectLedger(p.id,"capacity","blocker",1,"Overloaded project staffing created a blocker");}
     }
     const doneRatio=allItems.length?done.length/Math.max(1,allItems.length):0;
-    const closeoutReady=(p.progress>=99.5)||(avgProgress>=(pace.major?99.8:99.5)&&blockers===0)||(allItems.length>0&&doneRatio>=(pace.major ? .98 : .95)&&blockers===0)||(company.day>=(p.deadlineDay||9999)&&p.progress>=(pace.major?97:96)&&blockers===0&&(p.quality||0)>=(pace.major?64:60));
+    const closeoutReady=(p.progress>=99.5)||(avgProgress>=(pace.major?99.8:99.5)&&blockers===0)||(allItems.length>0&&doneRatio>=(pace.major ? .98 : .95)&&blockers===0)||(company.day>=(p.deadlineDay??OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay)&&p.progress>=(pace.major?97:96)&&blockers===0&&(p.quality||0)>=(pace.major?64:60));
     const closeoutNeeded=pace.closeoutDays;
     p.closeoutReadyDays=closeoutReady?Math.min(closeoutNeeded+1,(p.closeoutReadyDays||0)+1):0;
     if(p.closeoutReadyDays>=closeoutNeeded&&p.progress<100){p.progress=100;p.performance.progress=100;recordProjectLedger(p.id,"project-closeout","progress",100-beforeProgress,`Near-complete project accepted after ${closeoutNeeded} readiness checks`);}

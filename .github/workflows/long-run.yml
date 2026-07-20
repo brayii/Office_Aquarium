@@ -1,0 +1,61 @@
+name: Office Aquarium Long-Run Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed_count:
+        description: Seeds per strategy
+        required: true
+        default: "20"
+      horizon_days:
+        description: Simulation horizon
+        required: true
+        default: "365"
+      strategies:
+        description: Comma-separated strategies
+        required: true
+        default: conservative,balanced,growth-oriented
+  schedule:
+    - cron: "23 7 * * 1"
+
+jobs:
+  first-year-matrix:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: Validate long-run result contract
+        run: npm run test:long-run-contract
+
+      - name: Run deterministic first-year strategy matrix
+        run: npm run test:long-run
+        env:
+          OFFICE_AQUARIUM_LONG_RUN: "1"
+          OFFICE_AQUARIUM_SEED_COUNT: ${{ inputs.seed_count || '20' }}
+          OFFICE_AQUARIUM_HORIZON_DAYS: ${{ inputs.horizon_days || '365' }}
+          OFFICE_AQUARIUM_STRATEGIES: ${{ inputs.strategies || 'conservative,balanced,growth-oriented' }}
+          OFFICE_AQUARIUM_CONCURRENCY: "4"
+          OFFICE_AQUARIUM_WRITE_REPORTS: "1"
+
+      - name: Upload long-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: office-aquarium-long-run-${{ github.run_id }}
+          path: dist/reports/
+          if-no-files-found: error

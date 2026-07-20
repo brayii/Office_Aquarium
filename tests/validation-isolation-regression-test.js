@@ -92,18 +92,18 @@ async function main() {
     const afterMatrix = summarizeLive();
 
     const failureContext = createIsolatedValidationContext({ seed: "validation-isolation-failure" });
-    let failureCaught = false;
-    try {
-      runBalanceProjection(failureContext, {
-        days: 60,
-        seed: "validation-isolation-failure",
-        failureHook: ({ day }) => {
-          if (day >= 1) throw new Error("Injected validation failure");
-        }
-      });
-    } catch (error) {
-      failureCaught = /Injected validation failure/.test(error.message);
-    }
+    const failureReport = runBalanceProjection(failureContext, {
+      days: 60,
+      seed: "validation-isolation-failure",
+      failureHook: ({ day }) => {
+        if (day >= 1) throw new Error("Injected validation failure");
+      }
+    });
+    const failureRecorded =
+      failureReport.result === OFFICE_AQUARIUM_CONSTANTS.validation.statuses.systemError &&
+      failureReport.systemErrorFree === false &&
+      failureContext.company.lastSimulationError?.phase === "validation-hook" &&
+      /Injected validation failure/.test(failureContext.company.lastSimulationError?.message || "");
     const afterFailure = summarizeLive();
 
     const matrixA = runBalanceMatrix(4, 8);
@@ -125,13 +125,14 @@ async function main() {
     const reportsIsolated = projection.storageWrites === 0 && matrix.reports.every(r => r.storageWrites === 0);
 
     return {
-      ok: unchangedAfterProjection && unchangedAfterMatrix && unchangedAfterFailure && noStorageWrites && reportsIsolated && failureCaught && manualStable && hashesA.length > 0,
+      ok: unchangedAfterProjection && unchangedAfterMatrix && unchangedAfterFailure && noStorageWrites && reportsIsolated && failureRecorded && manualStable && hashesA.length > 0,
       unchangedAfterProjection,
       unchangedAfterMatrix,
       unchangedAfterFailure,
       noStorageWrites,
       reportsIsolated,
-      failureCaught,
+      failureRecorded,
+      failureResult: failureReport.result,
       manualStable,
       before,
       afterProjection,

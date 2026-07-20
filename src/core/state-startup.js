@@ -9,14 +9,20 @@ const names=["Maya","Leo","Aisha","Noah","Priya","Ethan","Sofia","Marcus"];
 const roles=FOUNDING_ROLES;
 const colors=["#4a78c2","#ef6f6c","#2ab7a9","#d9972b","#7a5af8","#5f9f64","#d65b9e","#52606d"];
 const traits=[["perfectionist","ambitious"],["social","creative"],["focused","introverted"],["cautious","loyal"],["ambitious","social"],["skeptical","focused"],["creative","independent"],["cautious","analytical"]];
-const initialCompany={day:0,minute:OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute,randomState:OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState,nextRuntimeId:OFFICE_AQUARIUM_CONSTANTS.determinism.firstRuntimeId,cash:OFFICE_AQUARIUM_CONSTANTS.startingCompany.cash,board:OFFICE_AQUARIUM_CONSTANTS.startingCompany.board,trust:OFFICE_AQUARIUM_CONSTANTS.startingCompany.trust,chip:OFFICE_AQUARIUM_CONSTANTS.startingCompany.chip,software:OFFICE_AQUARIUM_CONSTANTS.startingCompany.software,quality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.quality,integration:OFFICE_AQUARIUM_CONSTANTS.startingCompany.integration,customers:0,dailyRevenue:0,valuation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuation,valuationRiskScore:OFFICE_AQUARIUM_CONSTANTS.riskPillars.valuationSnapshotDefault,phase:OFFICE_AQUARIUM_CONSTANTS.startingCompany.phase,marketSentiment:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketSentiment,marketConfidence:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketConfidence,leadershipReputation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.leadershipReputation,valuationQuality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuationQuality,investorAppetite:OFFICE_AQUARIUM_CONSTANTS.startingCompany.investorAppetite,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastFundraisingMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationStoryDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:OFFICE_AQUARIUM_CONSTANTS.sound.defaultMode,soundEnabled:true,pendingEvent:null,pendingCommunication:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",communicationArchiveMode:"saved",selectedArchiveMessageIndex:null,messageThreads:[],nextMessageThreadId:1,messageFingerprints:{},messageQualityHistory:[],history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,capabilityNeeds:{...DEFAULT_COMPANY_CAPABILITY_NEEDS},capabilityCoverage:{},capabilityGaps:[],capabilityConsequences:{},capabilityPromotionCandidates:[],capabilityFulfillmentOptions:{},capabilityAudit:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},socialAIModelVersion:OFFICE_AQUARIUM_CONSTANTS.social.modelVersion,socialRelationships:{},socialMemories:[],socialMemoryStore:null,socialSourceEvents:[],socialConflicts:[],socialTemporaryStates:{},socialConversationState:null,socialCulture:null,informalGroups:[],informalGroupHistory:[],teamChemistry:{},socialBridges:[],socialLeadership:{},socialLeadershipDebug:[],socialAIMigrationReport:null,emotionalTraces:[],roomPresenceCounters:{},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
+const initialCompany={day:0,minute:OFFICE_AQUARIUM_CONSTANTS.time.workdayStartMinute,randomState:OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState,nextRuntimeId:OFFICE_AQUARIUM_CONSTANTS.determinism.firstRuntimeId,cash:OFFICE_AQUARIUM_CONSTANTS.startingCompany.cash,board:OFFICE_AQUARIUM_CONSTANTS.startingCompany.board,trust:OFFICE_AQUARIUM_CONSTANTS.startingCompany.trust,chip:OFFICE_AQUARIUM_CONSTANTS.startingCompany.chip,software:OFFICE_AQUARIUM_CONSTANTS.startingCompany.software,quality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.quality,integration:OFFICE_AQUARIUM_CONSTANTS.startingCompany.integration,customers:0,dailyRevenue:0,valuation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuation,valuationRiskScore:OFFICE_AQUARIUM_CONSTANTS.riskPillars.valuationSnapshotDefault,phase:OFFICE_AQUARIUM_CONSTANTS.startingCompany.phase,marketSentiment:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketSentiment,marketConfidence:OFFICE_AQUARIUM_CONSTANTS.startingCompany.marketConfidence,leadershipReputation:OFFICE_AQUARIUM_CONSTANTS.startingCompany.leadershipReputation,valuationQuality:OFFICE_AQUARIUM_CONSTANTS.startingCompany.valuationQuality,investorAppetite:OFFICE_AQUARIUM_CONSTANTS.startingCompany.investorAppetite,marketNoiseState:0,valuationHistory:[],valuationShocks:[],boardMarketLessons:{},lastValuationReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastFundraisingMemoDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastValuationStoryDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,lastBoardValuationState:null,valuationDrivers:{},boardProfile:null,founderOwnership:100,investorOwnership:0,boardControlPressure:0,worldState:{capitalClimate:50,sectorEnthusiasm:50,interestRatePressure:50,supplyReliability:50,talentMarket:50,competitorAggression:50,customerBudgetClimate:50},marketRangeView:"1m",directive:null,directiveDays:0,policyTransition:null,selected:0,paused:false,speed:1,soundMode:OFFICE_AQUARIUM_CONSTANTS.sound.defaultMode,soundEnabled:true,pendingEvent:null,pendingCommunication:null,eventCooldown:0,eventHistory:{},recentEventCategories:[],cashEventArmed:true,completedEvents:[],crisis:null,crisisDays:0,gameOver:false,costEfficiency:1,pilotDays:0,openRoles:[],newspapers:[],weekStartSnapshot:null,weeklyEvents:[],communications:[],communicationView:"inbox",communicationArchiveMode:"saved",selectedArchiveMessageIndex:null,messageThreads:[],nextMessageThreadId:1,messageFingerprints:{},messageQualityHistory:[],history:[],lessons:[],nextLessonId:1,departmentLearning:{},lastLessonReviewDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay,delayedDecisionEffects:[],decisionHistory:[],decisionThreads:[],nextDecisionThreadId:1,executiveReputations:{},leadership:{qualityFocus:55,speedFocus:50,innovation:55,employeeWellbeing:55,financialDiscipline:55,customerFocus:55,transparency:55,riskTolerance:50,accountability:55,longTermThinking:55},organizationalMomentum:{burnout:0,turnover:0,innovation:0,trust:0,execution:0,financial:0,culture:0},quarterlyReviews:[],annualReviews:[],lastQuarterlyReviewDay:0,lastAnnualReviewDay:0,crisisRiskDays:{burnout:0,financial:0,product:0,reputation:0,leadership:0,staffing:0,operational:0},crisisType:null,crisisStage:null,capabilityNeeds:{...DEFAULT_COMPANY_CAPABILITY_NEEDS},capabilityCoverage:{},capabilityGaps:[],capabilityConsequences:{},capabilityPromotionCandidates:[],capabilityFulfillmentOptions:{},capabilityAudit:null,workItems:[],issueRecords:[],departmentObjectives:{},informationSources:{},nextWorkItemId:1,nextIssueId:1,nextMessageId:1,nextEscalationId:1,employeeMessages:[],teamReports:[],suppressionRecords:[],escalationQueue:[],escalatedMessageIds:[],communicationStats:{helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0},socialAIModelVersion:OFFICE_AQUARIUM_CONSTANTS.social.modelVersion,socialRelationships:{},socialMemories:[],socialMemoryStore:null,socialSourceEvents:[],socialConflicts:[],socialTemporaryStates:{},socialConversationState:null,socialCulture:null,informalGroups:[],informalGroupHistory:[],teamChemistry:{},socialBridges:[],socialLeadership:{},socialLeadershipDebug:[],socialAIMigrationReport:null,emotionalTraces:[],roomPresenceCounters:{},storyChains:[],nextStoryId:1,playtest:{sessions:0,notes:[],lastChecklistDay:-OFFICE_AQUARIUM_CONSTANTS.time.unknownFutureDay},operatingHealthHistory:[],executiveBriefing:null,executiveBriefingArchive:[],simulationMetrics:{daily:[],counters:{actions:{},qualityMistakes:0,sickness:0,resignations:0,firings:0,hires:0,coaching:0,ceoDecisions:0,executiveMemos:0,queuedEscalations:0,localIssues:0,collaborations:0},lastBalance:null},workforceLessons:{},culture:{innovation:55,workLife:55,communication:55,riskTolerance:50,qualityDiscipline:58,politics:25},market:{aiDemand:52,hardwareDemand:50,supplyPressure:32,capitalClimate:55,competitorHeat:45},log:["You became CEO. The office is now running without direct employee control."]};
 Object.assign(initialCompany,{
   socialMemoryDebug:[],
   socialConflictDebug:[],
   projectTeamChemistry:{},
-  socialOrganizationView:OFFICE_AQUARIUM_CONSTANTS.social.defaultOrganizationView
+  socialOrganizationView:OFFICE_AQUARIUM_CONSTANTS.social.defaultOrganizationView,
+  lastInformationalEscalationDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,
+  lastDecisionEscalationDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,
+  decisionEscalationFingerprints:{},
+  lastHiringRequestMemoDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,
+  saveHealth:{status:"ready",lastSuccessfulDay:null,lastSuccessfulSize:0,backupAvailable:false,errorCode:null},
+  runtimeFailure:null
 });
-let company,employees,timer=null,debugMode=false,selectedEmployeeId=null,validationMode=false,currentSimulationContext=null,lastValidationReport=null,lastInboxSoundCount=null,musicUnavailable=false,alertsUnavailable=false,pausedBeforeResetPrompt=false,socialAIValidatedCompany=null;
+let company,employees,timer=null,debugMode=false,selectedEmployeeId=null,validationMode=false,currentSimulationContext=null,lastValidationReport=null,lastInboxSoundCount=null,musicUnavailable=false,alertsUnavailable=false,pausedBeforeResetPrompt=false,socialAIValidatedCompany=null,handbookOpenedFromStartup=false,lastLoadFailure=null;
 function updatePauseButton(){
   const button=document.getElementById("pauseBtn");
   if(!button||!company)return;
@@ -982,7 +988,7 @@ function recordSocialEncounter(a,b,{
   if(!experienceType)return null;
   const record=socialRelationshipRecord(a.id,b.id,{create:true}),now=simulationTimestamp(),cooldownKey=`${experienceType}:${sourceEventId||roomId||"local"}`;
   pruneSocialRelationshipCooldowns(record,now.absoluteMinute);
-  const last=Number(record.cooldowns[cooldownKey])||-999999;
+  const last=Number(record.cooldowns[cooldownKey])||OFFICE_AQUARIUM_CONSTANTS.time.neverAbsoluteMinute;
   if(now.absoluteMinute-last<cooldownMinutes)return record;
   const appliedGain=clamp(Number(gain)||0,0,5);
   record.cooldowns[cooldownKey]=now.absoluteMinute;
@@ -1014,7 +1020,7 @@ function recordFamiliarityObservation(a,b,{roomId=null,minutes=0,gain=0,cooldown
   record.lastSeenAt=now;
   record.coPresenceMinutes=Math.max(0,(record.coPresenceMinutes||0)+(Number(minutes)||0));
   pruneSocialRelationshipCooldowns(record,now.absoluteMinute);
-  const last=Number(record.cooldowns[cooldownKey])||-999999;
+  const last=Number(record.cooldowns[cooldownKey])||OFFICE_AQUARIUM_CONSTANTS.time.neverAbsoluteMinute;
   if(now.absoluteMinute-last<cooldownMinutes)return record;
   record.cooldowns[cooldownKey]=now.absoluteMinute;
   pruneSocialRelationshipCooldowns(record,now.absoluteMinute);
@@ -1119,7 +1125,7 @@ function makeEmployee(i){
     actionMinutes:0,active:true,offsite:false,sickDays:0,daysAtRisk:0,achievements:0,
     motion:null,conversationPresence:null,officeFlow:null,
     lastAction:null,repeatCount:0,cooldowns:{break:0,meeting:0,socialize:0,collaborate:0,complain:0},
-    decisionTrace:{ownerSystem:AI_SYSTEM_OWNERS.work,chosen:"arriving",scores:{},reasons:[]},opinionOfCEO:{trust:62,fairness:58,competence:64,support:56,fear:12},careerLevel:1,careerHistory:["Founding team"],beliefs:{},dailyBriefing:null,currentIntention:null,skills:baseSkillsForRole(role),performance:{recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999},learning:{caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}},communication:{reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:-999,lastHelpRequestDay:-999,rumorsShared:0},knownMessages:[],actionOutcomeContext:null,activeCollaboration:null,activeMeeting:null,learnedLessons:{testing:0,collaboration:0,documentation:0,escalation:0,innovation:0,riskTaking:0,planning:0,mentoring:0,recovery:0},lessonAcceptance:null,joinedDay:company?.day||0,age:28+i*4+Math.floor(simulationRandom()*4),stayScore:72,retentionRisk:28,jobSearchDays:0,retirementReadiness:0,quarterlyReview:null,promotionExpectation:45,salarySatisfaction:65,recognitionSatisfaction:60
+    decisionTrace:{ownerSystem:AI_SYSTEM_OWNERS.work,chosen:"arriving",scores:{},reasons:[]},opinionOfCEO:{trust:62,fairness:58,competence:64,support:56,fear:12},careerLevel:1,careerHistory:["Founding team"],beliefs:{},dailyBriefing:null,currentIntention:null,skills:baseSkillsForRole(role),performance:{recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay},learning:{caution:0,mentor:0,risk:0,collaboration:0,helpSeeking:0,testing:0,focusWork:0,reporting:0,suppression:0,initiative:0,recovery:0,contextualPreferences:{}},communication:{reportsMade:0,reportsSuppressed:0,helpRequests:0,lastReportDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,lastHelpRequestDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,rumorsShared:0},knownMessages:[],actionOutcomeContext:null,activeCollaboration:null,activeMeeting:null,learnedLessons:{testing:0,collaboration:0,documentation:0,escalation:0,innovation:0,riskTaking:0,planning:0,mentoring:0,recovery:0},lessonAcceptance:null,joinedDay:company?.day||0,age:28+i*4+Math.floor(simulationRandom()*4),stayScore:72,retentionRisk:28,jobSearchDays:0,retirementReadiness:0,quarterlyReview:null,promotionExpectation:45,salarySatisfaction:65,recognitionSatisfaction:60
   });
   return ensureEmployeePersonality(employee,{salt:`founding-${i}`});
 }
@@ -1135,9 +1141,33 @@ function resetCommunicationUi(){
   if(archiveList)archiveList.innerHTML="";
   if(archiveDetail)archiveDetail.innerHTML="";
 }
-function reset(skipSave=false,randomize=false,seedState=null){document.getElementById("gameOverOverlay")?.classList.add("hidden");company=typeof structuredClone==="function"?structuredClone(initialCompany):JSON.parse(JSON.stringify(initialCompany));resetCommunicationUi();if(Number.isFinite(seedState))company.randomState=seedState>>>0;if(randomize){const climates=[{name:"Cautious market",cash:-1.5,board:4,trust:3},{name:"Investor optimism",cash:2,board:6,trust:-2},{name:"Competitive pressure",cash:0,board:-3,trust:1},{name:"Stable opening",cash:0,board:0,trust:0}];const climate=climates[Math.floor(simulationRandom()*climates.length)];company.cash=clamp(company.cash+climate.cash,14,21);company.board=clamp(company.board+climate.board,58,82);company.trust=clamp(company.trust+climate.trust,55,78);company.valuation=clamp(company.valuation+rand(-4,4),34,50);company.log=[`You became CEO during a ${climate.name.toLowerCase()}. The office is running without direct employee control.`];}employees=names.map((_,i)=>makeEmployee(i));if(randomize){const shuffled=traits.map(x=>[...x]).sort(()=>simulationRandom()-.5);employees.forEach((e,i)=>{e.traits=shuffled[i];e.energy=clamp(e.energy+rand(-8,8),55,95);e.morale=clamp(e.morale+rand(-8,8),52,90);e.focus=clamp(e.focus+rand(-8,8),45,92);});}company.weekStartSnapshot=captureWeekSnapshot();ensureBibleSystems?.();ensureProjectPortfolio?.();updateManufacturingAndStakeholders?.();updateCompanyInformationSystem?.();collectDailyMetrics?.();buildOffice();renderDecisionEvent();render();if(!validationMode)restartTimer();if(!skipSave&&!validationMode)saveGame();}
-function saveGame(){try{if(currentSimulationContext?.mode==="isolated-validation")throw new Error("Production save blocked during isolated validation.");saveRepository.write(company,employees);document.getElementById("saveNote").textContent="Saved on this device";}catch(e){document.getElementById("saveNote").textContent="Autosave unavailable";}}
-function loadGame(){try{const data=saveRepository.read();if(!data)return false;company={...saveRepository.clone(initialCompany),...(data.company||{})};const loadedRandomState=Number.isFinite(company.randomState)?(company.randomState>>>0):2463534242;const loadedNextRuntimeId=Math.max(1,Number(company.nextRuntimeId)||1);company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;const migrationEmployeeDefaults=i=>{const savedRandom=company.randomState;company.randomState=(0x9e3779b9+Math.imul(i+1,0x85ebca6b))>>>0;const fresh=makeEmployee(i);company.randomState=savedRandom;return fresh;};const savedEmployees=Array.isArray(data.employees)?data.employees:[];const employeeSlots=Math.max(names.length,...savedEmployees.map(e=>Number(e.id)).filter(Number.isFinite).map(id=>id+1));employees=Array.from({length:employeeSlots},(_,i)=>{const fresh=migrationEmployeeDefaults(i),saved=savedEmployees.find(e=>e.id===i)||{};return{
+function reset(skipSave=false,randomize=false,seedState=null){document.getElementById("gameOverOverlay")?.classList.add("hidden");document.getElementById("runtimeErrorOverlay")?.classList.add("hidden");company=typeof structuredClone==="function"?structuredClone(initialCompany):JSON.parse(JSON.stringify(initialCompany));resetCommunicationUi();if(Number.isFinite(seedState))company.randomState=seedState>>>0;if(randomize){const climates=[{name:"Cautious market",cash:-1.5,board:4,trust:3},{name:"Investor optimism",cash:2,board:6,trust:-2},{name:"Competitive pressure",cash:0,board:-3,trust:1},{name:"Stable opening",cash:0,board:0,trust:0}];const climate=climates[Math.floor(simulationRandom()*climates.length)];company.cash=clamp(company.cash+climate.cash,14,21);company.board=clamp(company.board+climate.board,58,82);company.trust=clamp(company.trust+climate.trust,55,78);company.valuation=clamp(company.valuation+rand(-4,4),34,50);company.log=[`You became CEO during a ${climate.name.toLowerCase()}. The office is running without direct employee control.`];}employees=names.map((_,i)=>makeEmployee(i));if(randomize){const shuffled=traits.map(x=>[...x]).sort(()=>simulationRandom()-.5);employees.forEach((e,i)=>{e.traits=shuffled[i];e.energy=clamp(e.energy+rand(-8,8),55,95);e.morale=clamp(e.morale+rand(-8,8),52,90);e.focus=clamp(e.focus+rand(-8,8),45,92);});}company.weekStartSnapshot=captureWeekSnapshot();ensureBibleSystems?.();ensureProjectPortfolio?.();updateManufacturingAndStakeholders?.();updateCompanyInformationSystem?.();collectDailyMetrics?.();buildOffice();renderDecisionEvent();render();if(!validationMode)restartTimer();if(!skipSave&&!validationMode)saveGame();}
+function saveStatusCopy(result,error){
+  if(error){
+    if(error.code==="QUOTA_EXCEEDED")return "Autosave stopped: this device is out of local storage.";
+    if(error.code==="SAVE_TOO_LARGE")return "Autosave stopped: this company needs save recovery.";
+    return "Autosave unavailable. Your last valid save is still protected.";
+  }
+  if(result?.sizeStatus==="compaction")return "Saved - storage use is high";
+  if(result?.sizeStatus==="warning")return "Saved - storage use is increasing";
+  return "Saved on this device";
+}
+function saveGame(options={}){
+  try{
+    if(currentSimulationContext?.mode==="isolated-validation")throw new SaveRepositoryError("VALIDATION_SAVE_BLOCKED","Production save blocked during isolated validation.");
+    const result=saveRepository.write(company,employees);
+    company.saveHealth={status:result.sizeStatus,lastSuccessfulDay:company.day,lastSuccessfulSize:result.size,backupAvailable:result.backupCreated||saveRepository.readDetailed().recoverable,errorCode:null,emergency:!!options.emergency};
+    const saveNote=document.getElementById("saveNote");if(saveNote)saveNote.textContent=saveStatusCopy(result,null);
+    renderSaveRecoveryNotice?.();
+    return {ok:true,...result};
+  }catch(error){
+    company.saveHealth={...(company.saveHealth||{}),status:"error",errorCode:error.code||"SAVE_FAILED",lastFailureDay:company.day,emergency:!!options.emergency};
+    const saveNote=document.getElementById("saveNote");if(saveNote)saveNote.textContent=saveStatusCopy(null,error);
+    renderSaveRecoveryNotice?.();
+    return {ok:false,errorCode:error.code||"SAVE_FAILED",message:saveStatusCopy(null,error)};
+  }
+}
+function loadGame(){try{const data=saveRepository.read();if(!data)return false;lastLoadFailure=null;company={...saveRepository.clone(initialCompany),...(data.company||{})};const loadedRandomState=Number.isFinite(company.randomState)?(company.randomState>>>0):OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState;const loadedNextRuntimeId=Math.max(1,Number(company.nextRuntimeId)||1);company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;const migrationEmployeeDefaults=i=>{const savedRandom=company.randomState;company.randomState=(0x9e3779b9+Math.imul(i+1,0x85ebca6b))>>>0;const fresh=makeEmployee(i);company.randomState=savedRandom;return fresh;};const savedEmployees=Array.isArray(data.employees)?data.employees:[];const employeeSlots=Math.max(names.length,...savedEmployees.map(e=>Number(e.id)).filter(Number.isFinite).map(id=>id+1));employees=Array.from({length:employeeSlots},(_,i)=>{const fresh=migrationEmployeeDefaults(i),saved=savedEmployees.find(e=>e.id===i)||{};return{
       ...fresh,...saved,
       goals:normalizeEmployeeGoals({...fresh.goals,...(saved.goals||{})}),
       memories:Array.isArray(saved.memories)?saved.memories:[],
@@ -1165,8 +1195,10 @@ company.communicationView=company.communicationView||"inbox";
 company.communicationArchiveMode=company.communicationArchiveMode==="deleted"?"deleted":"saved";
 company.selectedArchiveMessageIndex=Number.isInteger(company.selectedArchiveMessageIndex)?company.selectedArchiveMessageIndex:null;
 company.pendingCommunication=company.pendingEvent?(company.pendingCommunication||null):null;
-company.randomState=Number.isFinite(company.randomState)?(company.randomState>>>0):2463534242;
+company.randomState=Number.isFinite(company.randomState)?(company.randomState>>>0):OFFICE_AQUARIUM_CONSTANTS.determinism.defaultRandomState;
 company.nextRuntimeId=Math.max(1,Number(company.nextRuntimeId)||1);
+company.saveHealth={...initialCompany.saveHealth,...(company.saveHealth||{})};
+company.runtimeFailure=company.runtimeFailure&&typeof company.runtimeFailure==="object"?company.runtimeFailure:null;
 company.soundMode=["muted","alerts","music","both"].includes(company.soundMode)?company.soundMode:(company.soundEnabled?"both":"muted");
 company.soundEnabled=company.soundMode!=="muted";
 company.eventHistory=company.eventHistory&&typeof company.eventHistory==="object"?company.eventHistory:{};
@@ -1176,7 +1208,7 @@ company.history=Array.isArray(company.history)?company.history:[];
 company.lessons=Array.isArray(company.lessons)?company.lessons:[];
 company.nextLessonId=Number(company.nextLessonId)||1;
 company.departmentLearning=company.departmentLearning&&typeof company.departmentLearning==="object"?company.departmentLearning:{};
-company.lastLessonReviewDay=Number.isFinite(company.lastLessonReviewDay)?company.lastLessonReviewDay:-999;
+company.lastLessonReviewDay=Number.isFinite(company.lastLessonReviewDay)?company.lastLessonReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
 company.delayedDecisionEffects=Array.isArray(company.delayedDecisionEffects)?company.delayedDecisionEffects:[];
 company.decisionHistory=Array.isArray(company.decisionHistory)?company.decisionHistory:[];
 company.decisionThreads=Array.isArray(company.decisionThreads)?company.decisionThreads:[];
@@ -1216,11 +1248,15 @@ company.nextMessageId=Number(company.nextMessageId)||1;
 company.nextEscalationId=Number(company.nextEscalationId)||1;
 company.nextStoryId=Number(company.nextStoryId)||1;
 company.storyChains=Array.isArray(company.storyChains)?company.storyChains:[];
-company.playtest={sessions:0,notes:[],lastChecklistDay:-999,...(company.playtest||{})};
+company.playtest={sessions:0,notes:[],lastChecklistDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(company.playtest||{})};
 company.employeeMessages=Array.isArray(company.employeeMessages)?company.employeeMessages:[];
 company.emotionalTraces=Array.isArray(company.emotionalTraces)?company.emotionalTraces.slice(0,180):[];
 company.escalationQueue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];
 company.escalatedMessageIds=Array.isArray(company.escalatedMessageIds)?company.escalatedMessageIds:[];
+company.lastInformationalEscalationDay=Number.isFinite(Number(company.lastInformationalEscalationDay))?Number(company.lastInformationalEscalationDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+company.lastDecisionEscalationDay=Number.isFinite(Number(company.lastDecisionEscalationDay))?Number(company.lastDecisionEscalationDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+company.decisionEscalationFingerprints=company.decisionEscalationFingerprints&&typeof company.decisionEscalationFingerprints==="object"?company.decisionEscalationFingerprints:{};
+company.lastHiringRequestMemoDay=Number.isFinite(Number(company.lastHiringRequestMemoDay))?Number(company.lastHiringRequestMemoDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
 company.teamReports=Array.isArray(company.teamReports)?company.teamReports:[];
 company.communicationStats={helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0,...(company.communicationStats||{})};
 company.simulationMetrics=normalizeSimulationMetrics(company.simulationMetrics);
@@ -1229,11 +1265,154 @@ company.market={...initialCompany.market,...(company.market||{})};
 company.weekStartSnapshot=company.weekStartSnapshot||captureWeekSnapshot();
 if(company.openRole&&!company.openRoles.includes(company.openRole))company.openRoles.push(company.openRole);
 delete company.openRole;
-company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;ensureBibleSystems?.();ensureProjectPortfolio?.();rebuildRuntimeIndexes?.();ensureProjectAllocations?.();company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;buildOffice(true);renderDecisionEvent();render();restartTimer();company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;return true;}catch(e){console.warn("Save migration failed",e);return false;}}
+company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;ensureBibleSystems?.();ensureProjectPortfolio?.();rebuildRuntimeIndexes?.();ensureProjectAllocations?.();company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;buildOffice(true);renderDecisionEvent();render();restartTimer();company.randomState=loadedRandomState;company.nextRuntimeId=loadedNextRuntimeId;lastLoadFailure=null;return true;}catch(e){lastLoadFailure={code:"MIGRATION_FAILED",message:"This saved company could not be updated safely."};if(debugMode)console.warn("Save migration failed",e);return false;}}
 
 function hasSavedCompany(){return saveRepository.exists();}
 function savedCompanySummary(){return saveRepository.summary();}
-function updateStartupScreen(){const info=savedCompanySummary(),btn=document.getElementById("continueCompany"),summary=document.getElementById("saveSummary");btn.disabled=!info;if(!info){summary.textContent="No saved company was found on this device.";return;}const when=info.savedAt?new Date(info.savedAt).toLocaleString():"an earlier session";summary.textContent=`Saved company: Day ${info.day}, ${info.identity}, $${info.cash.toFixed(1)}M cash, $${info.valuation.toFixed(1)}M valuation - saved ${when}.`; }
+function saveRecoveryDetail(){return saveRepository.readDetailed();}
+function updateStartupScreen(){
+  const detail=saveRecoveryDetail(),info=savedCompanySummary(),btn=document.getElementById("continueCompany"),summary=document.getElementById("saveSummary");
+  const recovery=document.getElementById("saveRecoveryPanel"),recoveryCopy=document.getElementById("saveRecoveryCopy"),restore=document.getElementById("restoreBackup"),exportCurrent=document.getElementById("exportCurrentSave"),exportBackup=document.getElementById("exportBackupSave");
+  document.querySelectorAll("[data-release-version]").forEach(element=>{element.textContent=OFFICE_AQUARIUM_CONSTANTS.release.displayVersion;});
+  const currentLoadable=["valid","migration-required"].includes(detail.current.status);
+  if(btn)btn.disabled=!currentLoadable||!!lastLoadFailure;
+  if(restore)restore.disabled=!detail.recoverable;
+  if(exportCurrent)exportCurrent.disabled=!detail.current.raw;
+  if(exportBackup)exportBackup.disabled=!detail.backup.raw;
+  const needsRecovery=!!lastLoadFailure||["corrupt-current-backup-available","backup-only","corrupt-no-backup","storage-unavailable"].includes(detail.status);
+  recovery?.classList.toggle("hidden",!needsRecovery);
+  if(recoveryCopy){
+    recoveryCopy.textContent=lastLoadFailure
+      ?"The saved company could not be updated safely. Restore the protected backup if one is available, or export the save before starting again."
+      :detail.recoverable
+      ?"A protected backup is available. Restore it to continue, or export either save before making changes."
+      :detail.status==="storage-unavailable"
+        ?"Local storage is unavailable. You can cancel and keep this page open, or start a new temporary company."
+        :"No valid backup was found. Export the damaged save before starting a new company if you want to keep it for support.";
+  }
+  if(!summary)return;
+  if(lastLoadFailure){summary.textContent="The saved company could not be updated to this release. Your stored data has not been replaced.";return;}
+  if(detail.status==="storage-unavailable"){summary.textContent="This browser is not allowing local saves. You can start a temporary company, but progress may not be preserved.";return;}
+  if(detail.status==="corrupt-current-backup-available"){summary.textContent="The current save could not be read, but a valid last-known-good backup is available.";return;}
+  if(detail.status==="backup-only"){summary.textContent="The main save is missing, but a valid last-known-good backup is available.";return;}
+  if(detail.status==="corrupt-no-backup"){summary.textContent="The saved company is damaged and no valid backup was found. You can export the raw save before starting again.";return;}
+  if(!info){summary.textContent="No saved company was found on this device.";return;}
+  const when=info.savedAt?new Date(info.savedAt).toLocaleString():"an earlier session";
+  const migration=detail.status==="migration-required"?" It will be updated safely when opened.":"";
+  summary.textContent=`Saved company: Day ${info.day}, ${info.identity}, $${info.cash.toFixed(1)}M cash, $${info.valuation.toFixed(1)}M valuation - saved ${when}.${migration}`;
+}
+function downloadLocalText(filename,text,mime="application/json"){
+  if(text===null||text===undefined)return false;
+  const blob=new Blob([text],{type:mime}),url=URL.createObjectURL(blob),link=document.createElement("a");
+  link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),0);
+  return true;
+}
+function exportSaveSlot(slot="current"){
+  try{
+    const raw=saveRepository.exportRaw(slot);
+    if(!raw)return false;
+    return downloadLocalText(
+      `office-aquarium-${slot}-save.${OFFICE_AQUARIUM_CONSTANTS.release.saveExportExtension}`,
+      raw,
+      "application/octet-stream"
+    );
+  }catch(error){return false;}
+}
+function restoreBackupCompany(){
+  try{
+    saveRepository.restoreBackup();
+    lastLoadFailure=null;
+    updateStartupScreen();
+    if(loadGame()){enterSimulation();return true;}
+  }catch(error){}
+  updateStartupScreen();
+  return false;
+}
+function dismissSaveRecovery(){document.getElementById("saveRecoveryPanel")?.classList.add("hidden");}
+function openStartupHandbook(){
+  handbookOpenedFromStartup=true;
+  document.getElementById("startupOverlay")?.classList.add("hidden");
+  openSimulationHandbook?.();
+}
+function returnFromStartupHandbook(){
+  if(!handbookOpenedFromStartup)return;
+  handbookOpenedFromStartup=false;
+  document.getElementById("startupOverlay")?.classList.remove("hidden");
+  updateStartupScreen();
+}
+function renderSaveRecoveryNotice(){
+  if(typeof document==="undefined"||!company)return;
+  const banner=document.getElementById("saveWarningBanner");
+  if(!banner)return;
+  const health=company.saveHealth||{},status=health.status;
+  const visible=["warning","compaction","error"].includes(status);
+  banner.classList.toggle("hidden",!visible);
+  banner.classList.toggle("error",status==="error");
+  if(!visible)return;
+  if(status==="error"){
+    banner.textContent=health.errorCode==="QUOTA_EXCEEDED"
+      ?"Autosave has stopped because this device is out of local storage. Your last valid save and backup are still protected."
+      :"Autosave could not finish. Your last valid save is still protected; return to the title screen for recovery options.";
+  }else{
+    banner.textContent=status==="compaction"
+      ?"This company is using a large amount of local save storage. Office Aquarium is compacting repeated history while preserving outcomes."
+      :"This company is growing. Local save storage is being monitored and remains available.";
+  }
+}
+function playerSafeRuntimeStage(phase){
+  const raw=String(phase||"simulation"),stage=raw.includes(":")?raw.split(":").pop():raw;
+  return OFFICE_AQUARIUM_CONSTANTS.runtimeRecovery.safeStageLabels[stage]||"the company simulation";
+}
+function runtimeDiagnosticsPayload(){
+  return {
+    product:"Office Aquarium",
+    applicationVersion:OFFICE_AQUARIUM_CONSTANTS.release.applicationVersion,
+    saveVersion:SAVE_VERSION,
+    exportedAt:new Date().toISOString(),
+    company:{day:company?.day,minute:company?.minute,phase:company?.phase,employees:employees?.filter(e=>e.active).length,projects:company?.projects?.length||0},
+    runtimeFailure:company?.runtimeFailure||null,
+    lastSimulationError:company?.lastSimulationError||null,
+    lastDailyCloseStatus:company?.lastDailyCloseStatus||null,
+    systemErrors:(company?.systemErrors||[]).slice(0,OFFICE_AQUARIUM_CONSTANTS.runtimeRecovery.maximumSystemErrors),
+    saveHealth:company?.saveHealth||null,
+    userAgent:typeof navigator!=="undefined"?navigator.userAgent:"unavailable"
+  };
+}
+function exportRuntimeDiagnostics(){
+  return downloadLocalText(`office-aquarium-diagnostics-day-${(company?.day||0)+1}.json`,JSON.stringify(runtimeDiagnosticsPayload(),null,2));
+}
+function showRuntimeFailure(errorRecord,saveResult=null){
+  if(!company)return;
+  const record=errorRecord||company.lastSimulationError||{};
+  const prior=company.runtimeFailure&&company.runtimeFailure.phase===record.phase?company.runtimeFailure:null;
+  company.runtimeFailure={
+    day:company.day,
+    minute:company.minute,
+    phase:record.phase||"simulation",
+    safeStage:playerSafeRuntimeStage(record.phase),
+    saveStatus:saveResult?.ok
+      ?"Emergency save verified"
+      :prior?.saveStatus||(company.saveHealth?.backupAvailable
+        ?"Emergency save failed; last-known-good backup available"
+        :"Emergency save failed; keep the game open and export diagnostics")
+  };
+  if(typeof document==="undefined"||validationMode)return;
+  const overlay=document.getElementById("runtimeErrorOverlay");
+  const stage=document.getElementById("runtimeErrorStage"),saveStatus=document.getElementById("runtimeErrorSaveStatus"),restore=document.getElementById("runtimeRestoreBackup");
+  if(stage)stage.textContent=company.runtimeFailure.safeStage;
+  if(saveStatus)saveStatus.textContent=company.runtimeFailure.saveStatus;
+  if(restore)restore.disabled=!saveRepository.readDetailed().recoverable;
+  overlay?.classList.remove("hidden");
+  document.getElementById("runtimeErrorTitle")?.focus();
+}
+function restoreBackupAfterRuntimeError(){
+  try{
+    saveRepository.restoreBackup();
+    document.getElementById("runtimeErrorOverlay")?.classList.add("hidden");
+    if(loadGame()){enterSimulation();return true;}
+  }catch(error){}
+  return false;
+}
 function soundWantsMusic(){return soundController.wantsMusic();}
 function soundWantsAlerts(){return soundController.wantsAlerts();}
 function syncSoundUi(){soundController.syncUi();}
@@ -1244,8 +1423,9 @@ function applySoundMode(value){
   soundController.applyMode(value);
   if(!validationMode)saveGame();
 }
-function enterSimulation(){document.getElementById("startupOverlay").classList.add("hidden");syncSoundUi();startBackgroundMusic();}
-function startNewCompany(){saveRepository.remove();reset(false,true);enterSimulation();document.getElementById("confirmResetOverlay").classList.add("hidden");}
+function enterSimulation(){document.getElementById("startupOverlay").classList.add("hidden");document.getElementById("saveRecoveryPanel")?.classList.add("hidden");syncSoundUi();startBackgroundMusic();}
+function startNewCompany(){lastLoadFailure=null;saveRepository.remove();reset(false,true);enterSimulation();document.getElementById("confirmResetOverlay").classList.add("hidden");}
+function returnToTitle(){if(company){company.paused=true;updatePauseButton();}stopBackgroundMusic();document.getElementById("runtimeErrorOverlay")?.classList.add("hidden");document.getElementById("startupOverlay")?.classList.remove("hidden");updateStartupScreen();}
 function requestReset(){pausedBeforeResetPrompt=!!company.paused;company.paused=true;updatePauseButton();document.getElementById("confirmResetOverlay").classList.remove("hidden");}
 function cancelResetPrompt(){document.getElementById("confirmResetOverlay").classList.add("hidden");if(company){company.paused=pausedBeforeResetPrompt;updatePauseButton();}}
 
@@ -1286,7 +1466,7 @@ function updateMarket(){
   company.market.competitorHeat=clamp(company.market.competitorHeat+rand(-1,1.8)+(company.customers>40 ? .18 : 0),10,95);
 }
 function performanceScore(e){
-  const p={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
+  const p={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(e.performance||{})};
   const team=employeeTeam(e);
   const rolePressure=team==="hardware"?company.manufacturing?.supplyRisk||0:team==="software"?100-company.integration:team==="quality"?100-company.quality:team==="product"?100-company.customerSentiment:100-(company.shareholders?.confidence||50);
   const lowOutput=Math.max(0,6-p.recentOutput)*2.5;
@@ -1300,15 +1480,15 @@ function performanceScore(e){
 }
 function updatePerformanceReviewRisk(e){
   if(!e.active)return;
-  e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
+  e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(e.performance||{})};
   const score=performanceScore(e);
   if(score>28)e.performance.reviewRiskDays=clamp((e.performance.reviewRiskDays||0)+1,0,12);
   else e.performance.reviewRiskDays=clamp((e.performance.reviewRiskDays||0)-1,0,12);
 }
 function performanceTarget(){
   return employees.filter(e=>e.active).map(e=>{
-    e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:-999,...(e.performance||{})};
-    return {e,score:performanceScore(e),riskDays:e.performance.reviewRiskDays||0,lastReviewDay:e.performance.lastReviewDay??-999};
+    e.performance={recentOutput:0,absenceDays:0,qualityMistakes:0,coachingDays:0,reviewRiskDays:0,lastReviewDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay,...(e.performance||{})};
+    return {e,score:performanceScore(e),riskDays:e.performance.reviewRiskDays||0,lastReviewDay:e.performance.lastReviewDay??OFFICE_AQUARIUM_CONSTANTS.time.neverDay};
   }).filter(x=>x.score>28&&x.riskDays>=4&&company.day-x.lastReviewDay>=20).sort((a,b)=>(b.riskDays-a.riskDays)||(b.score-a.score))[0]?.e||null;
 }
 function memoryBias(e,type){
@@ -1407,6 +1587,10 @@ company.nextEscalationId=Number(company.nextEscalationId)||1;
 company.employeeMessages=Array.isArray(company.employeeMessages)?company.employeeMessages:[];
 company.escalationQueue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];
 company.escalatedMessageIds=Array.isArray(company.escalatedMessageIds)?company.escalatedMessageIds:[];
+company.lastInformationalEscalationDay=Number.isFinite(Number(company.lastInformationalEscalationDay))?Number(company.lastInformationalEscalationDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+company.lastDecisionEscalationDay=Number.isFinite(Number(company.lastDecisionEscalationDay))?Number(company.lastDecisionEscalationDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+company.decisionEscalationFingerprints=company.decisionEscalationFingerprints&&typeof company.decisionEscalationFingerprints==="object"?company.decisionEscalationFingerprints:{};
+company.lastHiringRequestMemoDay=Number.isFinite(Number(company.lastHiringRequestMemoDay))?Number(company.lastHiringRequestMemoDay):OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
 company.teamReports=Array.isArray(company.teamReports)?company.teamReports:[];
 company.communicationStats={helpRequests:0,statusReports:0,riskReports:0,opportunityReports:0,suppressedReports:0,rumors:0,...(company.communicationStats||{})};
 company.simulationMetrics=normalizeSimulationMetrics(company.simulationMetrics);

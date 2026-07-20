@@ -107,6 +107,19 @@ async function main() {
     assert(JSON.stringify(company.investorSentiment) === investorBefore, "Investor reaction should update at most once per day");
     assert(company.randomState === investorRandomBefore, "Repeated investor reaction should not consume random state");
 
+    company.investorSentiment.confidence = 70;
+    company.shareholders.confidence = 70;
+    company.valuationHistory = [{ day: company.day, valuation: company.valuation }];
+    const stableInvestorStart = company.investorSentiment.confidence;
+    for (let offset = 1; offset <= 90; offset += 1) {
+      company.day += 1;
+      company.lastInvestorUpdateDay = OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
+      company.valuationHistory.push({ day: company.day, valuation: company.valuation });
+      updateInvestorReaction();
+    }
+    const stableInvestorEnd = company.investorSentiment.confidence;
+    assert(stableInvestorEnd > 50, `Stable strong fundamentals should not create automatic investor collapse (${stableInvestorStart.toFixed(1)} to ${stableInvestorEnd.toFixed(1)})`);
+
     company.lastInvestorRelationsReportDay = -999;
     company.investorRelationsForecasts = [];
     boardValuationView();
@@ -134,6 +147,7 @@ async function main() {
       failures,
       weak,
       strong,
+      stableInvestor: { start: stableInvestorStart, end: stableInvestorEnd },
       forecasts: company.investorRelationsForecasts.length,
       seriesDays: allSeries.map(point => point.day)
     };

@@ -205,6 +205,52 @@ async function main() {
     assert(completedTiming.short.includes("Completed on day 157"), `Completed project timing should show completion day, got ${completedTiming.short}`);
     assert(!/\d+-\d+ day/.test(completedTiming.short), `Completed project should not show a future estimate, got ${completedTiming.short}`);
 
+    const taperProject = makeControlledProject({
+      id: "backlog-taper-regression",
+      title: "Project Backlog Taper: Regression",
+      requiredDepartments: ["hardware", "software", "quality"],
+      requiredHeadcount: { hardware: 1, software: 1, quality: 1 },
+      progress: 0
+    });
+    const initialBacklogTarget = projectBacklogTarget(taperProject);
+    taperProject.progress = 82;
+    const lateBacklogTarget = projectBacklogTarget(taperProject);
+    taperProject.progress = 98;
+    const closeoutBacklogTarget = projectBacklogTarget(taperProject);
+    assert(initialBacklogTarget > lateBacklogTarget, `Project backlog should taper as progress advances (${initialBacklogTarget} vs ${lateBacklogTarget})`);
+    assert(closeoutBacklogTarget === 0, `Closeout-stage project should stop generating replacement scope, got target ${closeoutBacklogTarget}`);
+
+    const dayBeforeTimingCheck = company.day;
+    company.day = 90;
+    const dayZeroProject = makeControlledProject({
+      id: "day-zero-schedule-regression",
+      title: "Project Day Zero Schedule Regression",
+      createdDay: 0,
+      estimatedDuration: 90,
+      progress: 50
+    });
+    const dayZeroAge = projectAgeDays(dayZeroProject);
+    const dayZeroScheduleVariance = projectScheduleVariance(dayZeroProject, 50);
+    assert(dayZeroAge === 90, `A project created on Day 0 should be 90 days old on Day 90, got ${dayZeroAge}`);
+    assert(dayZeroScheduleVariance >= 40, `A half-complete Day 0 project at its 90-day estimate should report a material delay, got ${dayZeroScheduleVariance}`);
+    assert(projectAgeDays({}) === 0, "A project with no creation day should safely default to the current day");
+    const plannedWorkItems = projectPlannedWorkItemCount(dayZeroProject);
+    dayZeroProject.completedWorkItemCount = Math.round(plannedWorkItems / 2);
+    const completedWorkProgress = projectCompletedWorkProgress(dayZeroProject);
+    assert(completedWorkProgress >= 49 && completedWorkProgress <= 51, `Completed project work should produce a proportional progress floor, got ${completedWorkProgress}`);
+
+    const openFixture = Array.from({ length: 40 }, (_, index) => ({ id: `open-${index}`, status: "open", createdDay: 0 }));
+    const closedFixture = Array.from({ length: 90 }, (_, index) => ({ id: `closed-${index}`, status: "closed", closedDay: company.day - 1 }));
+    const compactedFixture = compactWorkItemHistory([...openFixture, ...closedFixture]);
+    assert(compactedFixture.filter(work => work.status === "open").length === openFixture.length, "Work-item compaction must preserve every open project item");
+    assert(compactedFixture.length === OFFICE_AQUARIUM_CONSTANTS.projectDevelopment.totalWorkItemLimit, `Work-item compaction should retain the centralized history budget, got ${compactedFixture.length}`);
+    company.day = dayBeforeTimingCheck;
+
+    company.projects = [taperProject];
+    company.workItems = [];
+    maintainWorkItems();
+    assert(company.workItems.filter(work => work.projectId === taperProject.id && work.status === "open").length === 0, "Closeout-stage maintenance must not create replacement project work");
+
     const frictionProject = makeControlledProject({
       id: "friction-regression",
       title: "Project Friction: Regression",
@@ -250,6 +296,17 @@ async function main() {
       universityCondition,
       sensitivityDrop,
       completedTiming,
+      backlogTargets: {
+        initial: initialBacklogTarget,
+        late: lateBacklogTarget,
+        closeout: closeoutBacklogTarget
+      },
+      dayZeroTiming: {
+        age: dayZeroAge,
+        scheduleVariance: dayZeroScheduleVariance,
+        plannedWorkItems,
+        completedWorkProgress
+      },
       htmlPreview: html.slice(0, 600)
     };
   });

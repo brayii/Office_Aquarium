@@ -7,7 +7,7 @@ const mainTestScript = packageJson.scripts.test || "";
 const scripts = mainTestScript
   .split("&&")
   .map(part => part.trim())
-  .filter(part => /^npm\s+run\s+test:/.test(part));
+  .filter(part => /^npm\s+run\s+(?:test:|verify:)/.test(part));
 
 if (!scripts.length) {
   console.error("No test scripts found in package.json test command.");

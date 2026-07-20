@@ -1,10 +1,4 @@
-const CUSTOMER_SEGMENT_DEFS={
-  enterprise:{label:"Enterprise",weight:.30,contractValue:.0048,reliability:1.25,support:1.15,price:.75,roadmap:1.15,switching:68},
-  smallBusiness:{label:"Small Business",weight:.26,contractValue:.0017,reliability:.82,support:1.05,price:1.35,roadmap:.78,switching:38},
-  education:{label:"Education",weight:.14,contractValue:.0011,reliability:.86,support:.90,price:1.55,roadmap:1.05,switching:47},
-  government:{label:"Government",weight:.12,contractValue:.0039,reliability:1.35,support:.95,price:.90,roadmap:1.10,switching:74},
-  strategicPartners:{label:"Strategic Partners",weight:.18,contractValue:.0058,reliability:1.08,support:.85,price:.72,roadmap:1.30,switching:62}
-};
+const CUSTOMER_SEGMENT_DEFS=OFFICE_AQUARIUM_CONSTANTS.customerMarket.segmentDefinitions;
 function defaultCustomerSegmentState(id,count=0,sentiment=null){
   const d=CUSTOMER_SEGMENT_DEFS[id]||CUSTOMER_SEGMENT_DEFS.enterprise,base=Number.isFinite(sentiment)?sentiment:(company.customerSentiment??company.trust??55);
   return {activeCustomers:Math.max(0,Math.round(count)),prospects:Math.round(12+d.weight*55),sentiment:clamp(base,0,100),retentionOutlook:clamp(base+(d.switching-50)*.22,0,100),trust:clamp(company.trust??base,0,100),productFit:clamp(48+(company.integration||20)*.25+(company.quality||40)*.15,0,100),switchingCost:d.switching,priceSensitivity:Math.round(42+d.price*24),supportSatisfaction:clamp(base-2,0,100),reliabilitySatisfaction:clamp(company.quality??base,0,100),roadmapConfidence:clamp(company.trust??base,0,100),churnRisk:0,expansionPotential:0,contractValue:d.contractValue,productExposure:{},recentExperiences:[],currentIssues:[],lastUpdatedDay:company.day||0};
@@ -16,7 +10,7 @@ function ensureCustomerMarketSystems(){
   company.customerLearningEpisodes=Array.isArray(company.customerLearningEpisodes)?company.customerLearningEpisodes:[];
   company.nextCustomerExperienceId=Math.max(1,Number(company.nextCustomerExperienceId)||1);
   company.nextCustomerLearningEpisodeId=Math.max(1,Number(company.nextCustomerLearningEpisodeId)||1);
-  company.lastCustomerUpdateDay=Number.isFinite(company.lastCustomerUpdateDay)?company.lastCustomerUpdateDay:-999;
+  company.lastCustomerUpdateDay=Number.isFinite(company.lastCustomerUpdateDay)?company.lastCustomerUpdateDay:OFFICE_AQUARIUM_CONSTANTS.time.neverDay;
   company.customerLocalResponses=Array.isArray(company.customerLocalResponses)?company.customerLocalResponses:[];
   company.customerMarketStats={acquired:0,renewed:0,expanded:0,churned:0,complaints:0,...(company.customerMarketStats||{})};
   company.customerSegments=company.customerSegments&&typeof company.customerSegments==="object"?company.customerSegments:{};
@@ -178,7 +172,7 @@ function processCustomerLocalResponses(){
     const issues=(seg.currentIssues||[]).filter(i=>!i.resolved);
     if(!issues.length)continue;
     for(const issue of issues.slice(0,2)){
-      const age=company.day-(issue.day||company.day);
+      const age=company.day-(issue.day??company.day);
       const resolveChance=clamp((supportCapacity-(issue.severity||50))*0.012+age*.018+((seg.trust||50)-45)*.002,0.04,0.72);
       if(simulationRandom()<resolveChance){
         issue.resolved=true;issue.resolutionDay=company.day;
@@ -284,7 +278,7 @@ function reviewCustomerLearningEpisodes(){
         if(window==="long")ep.status="resolved";
       }
     });
-    if(company.day-(ep.startedDay||company.day)>50)ep.status="resolved";
+    if(company.day-(ep.startedDay??company.day)>50)ep.status="resolved";
   });
 }
 function customerMarketDebugHtml(){
@@ -318,10 +312,12 @@ function maybeQueueCustomerStrategicMemo(){
   if(company.pendingEvent||company.day<12)return;
   const pressure=customerStrategicPressure();
   if(pressure.score<66)return;
-  const key=`customer|${pressure.riskSegment?.id||"market"}|${Math.floor(company.day/14)}`;
+  const cooldown=OFFICE_AQUARIUM_CONSTANTS.customerMarket.strategicMemoCooldownDays;
+  const segmentId=pressure.riskSegment?.id||"market";
+  const key=`customer|${segmentId}`;
   company.messageFingerprints=company.messageFingerprints&&typeof company.messageFingerprints==="object"?company.messageFingerprints:{};
-  if(company.messageFingerprints[key]&&company.day-company.messageFingerprints[key].day<14)return;
-  if((company.escalationQueue||[]).some(ev=>ev.category==="customer"&&ev.customerSegmentId===(pressure.riskSegment?.id)))return;
+  if(company.messageFingerprints[key]&&company.day-company.messageFingerprints[key].day<cooldown)return;
+  if((company.escalationQueue||[]).some(ev=>ev.category==="customer"&&ev.customerSegmentId===pressure.riskSegment?.id))return;
   company.messageFingerprints[key]={day:company.day,status:"queued"};
   company.escalationQueue=Array.isArray(company.escalationQueue)?company.escalationQueue:[];
   company.escalationQueue.push(makeCustomerStrategicMemo());
@@ -332,11 +328,21 @@ function applyCustomerStrategyDecision(strategy){
   const seg=company.customerSegments[strategy.segmentId]||company.customerSegments.enterprise,label=CUSTOMER_SEGMENT_DEFS[strategy.segmentId]?.label||"Customer";
   const learningBaseline=typeof companyLearningBaseline==="function"?companyLearningBaseline():null;
   const interventionType=strategy.mode==="support"?"support-staffing":strategy.mode==="recovery"?"account-outreach":"roadmap-communication";
-  if(strategy.mode==="recovery"){recordCustomerExperience(strategy.segmentId,"rapid-resolution",35,`${label} customers received a bounded recovery commitment.`,"ceo-customer",true);const target=company.customerSegments[strategy.segmentId]||seg;target.sentiment=clamp((target.sentiment||50)+6,0,100);target.trust=clamp((target.trust||50)+5,0,100);target.churnRisk=clamp((target.churnRisk||0)-14,0,100);updateRetentionOutlook(target);}
-  else if(strategy.mode==="support"){recordCustomerExperience(strategy.segmentId,"rapid-resolution",30,`${label} support capacity improved after CEO approval.`,"ceo-support",false);const target=company.customerSegments[strategy.segmentId]||seg;target.supportSatisfaction=clamp((target.supportSatisfaction||50)+8,0,100);target.churnRisk=clamp((target.churnRisk||0)-9,0,100);updateRetentionOutlook(target);}
+  if(strategy.mode==="recovery"){recordCustomerExperience(strategy.segmentId,"rapid-resolution",35,`${label} customers received a bounded recovery commitment.`,"ceo-customer",true);const target=company.customerSegments[strategy.segmentId]||seg;resolveCustomerIssuesFromStrategy(target,OFFICE_AQUARIUM_CONSTANTS.customerMarket.recoveryIssueResolutionCount,"customer recovery plan");target.sentiment=clamp((target.sentiment||50)+6,0,100);target.trust=clamp((target.trust||50)+5,0,100);target.churnRisk=clamp((target.churnRisk||0)-14,0,100);updateRetentionOutlook(target);}
+  else if(strategy.mode==="support"){recordCustomerExperience(strategy.segmentId,"rapid-resolution",30,`${label} support capacity improved after CEO approval.`,"ceo-support",false);const target=company.customerSegments[strategy.segmentId]||seg;resolveCustomerIssuesFromStrategy(target,OFFICE_AQUARIUM_CONSTANTS.customerMarket.supportIssueResolutionCount,"temporary support capacity");target.supportSatisfaction=clamp((target.supportSatisfaction||50)+8,0,100);target.churnRisk=clamp((target.churnRisk||0)-9,0,100);updateRetentionOutlook(target);}
   else if(strategy.mode==="hold"){recordCustomerExperience(strategy.segmentId,"roadmap-slip",58,`${label} customers saw leadership hold the roadmap line instead of making special commitments.`,"ceo-focus",true);const target=company.customerSegments[strategy.segmentId]||seg;target.roadmapConfidence=clamp((target.roadmapConfidence||50)-4,0,100);target.churnRisk=clamp((target.churnRisk||0)+7,0,100);updateRetentionOutlook(target);}
   createLearningEpisode({domain:"customer",sourceId:`customer-strategy-${strategy.segmentId}`,decisionTitle:"Customer strategy",choiceTitle:strategy.mode,strategy:strategy.mode,department:"product",customerSegmentIds:[strategy.segmentId],interventionType,baseline:learningBaseline,reviewSchedule:[company.day+7,company.day+21,company.day+45],hypotheses:[{strategy:strategy.mode,expected:"Customer outcome will be reviewed after support, renewal, and sentiment changes appear."}]});
   syncCustomerSummaryFromSegments();
+}
+function resolveCustomerIssuesFromStrategy(segment,count,reason){
+  const unresolved=(segment?.currentIssues||[]).filter(issue=>!issue.resolved).sort((a,b)=>(b.severity||0)-(a.severity||0));
+  unresolved.slice(0,Math.max(0,Number(count)||0)).forEach(issue=>{
+    issue.resolved=true;
+    issue.resolutionDay=company.day;
+    issue.resolutionReason=reason;
+    const source=(company.customerExperiences||[]).find(item=>item.id===issue.id);
+    if(source){source.resolved=true;source.resolutionDay=company.day;source.resolutionReason=reason;}
+  });
 }
 function makeProjectCommercializationEvent(project){
   updateProjectCommercialStats(project);
