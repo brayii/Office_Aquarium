@@ -204,6 +204,7 @@ function checkValidationIsolationGuards(files) {
 
 function checkPublicReleaseUi() {
   const html = read("Office_Aquarium.html");
+  const startup = read(path.join("src", "core", "state-startup.js"));
   const forbiddenPublicUi = [
     [/id="developerToolsPanel"/, "developer tools panel"],
     [/id="aiDebugToggle"/, "AI Debug button"],
@@ -213,7 +214,15 @@ function checkPublicReleaseUi() {
   ];
   const found = forbiddenPublicUi.filter(([pattern]) => pattern.test(html)).map(([, label]) => label);
   if (found.length) throw new Error(`Public UI contains release-hidden control(s): ${found.join(", ")}`);
-  return forbiddenPublicUi.length;
+  for (let index = 0; index < 8; index++) {
+    if (!new RegExp(`\\.avatar\\.color-${index}\\s*\\{\\s*background\\s*:`).test(html)) {
+      throw new Error(`Missing desktop-safe avatar color class: color-${index}`);
+    }
+  }
+  if (/class="avatar"\s+style="background:/.test(startup)) {
+    throw new Error("Employee avatars must use CSS color classes instead of inline background styles");
+  }
+  return forbiddenPublicUi.length + 9;
 }
 
 function checkSimulationHandbookStructure() {

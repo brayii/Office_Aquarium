@@ -1882,7 +1882,7 @@ function renderNewspapers(){
     </article>`;
 }
 
-function buildOffice(preservePositions=false){const office=document.getElementById("office");office.querySelectorAll(".agent").forEach(n=>n.remove());employees.filter(e=>e.active).forEach(e=>{const n=document.createElement("div");n.className="agent";n.id=`agent-${e.id}`;const color=colors[e.id%colors.length]||"#2ab7a9";n.innerHTML=`<div class="thought"></div><div class="avatar" style="background:${color}">${(e.name||"?")[0]}<span class="activity-dot"></span></div><small>${e.name}</small>`;n.onclick=()=>showEmployee(e.id);office.appendChild(n);if(preservePositions&&Number.isFinite(e.x)&&Number.isFinite(e.y)){n.style.transition="none";n.style.left=e.x+"%";n.style.top=e.y+"%";setTimeout(()=>n.style.transition="",20);}else moveToZone(e,e.zone,true);});}
+function buildOffice(preservePositions=false){const office=document.getElementById("office");office.querySelectorAll(".agent").forEach(n=>n.remove());employees.filter(e=>e.active).forEach(e=>{const n=document.createElement("div");n.className="agent";n.id=`agent-${e.id}`;const colorIndex=Math.abs(Number(e.id)||0)%colors.length;n.innerHTML=`<div class="thought"></div><div class="avatar color-${colorIndex}">${(e.name||"?")[0]}<span class="activity-dot"></span></div><small>${e.name}</small>`;n.onclick=()=>showEmployee(e.id);office.appendChild(n);if(preservePositions&&Number.isFinite(e.x)&&Number.isFinite(e.y)){n.style.transition="none";n.style.left=e.x+"%";n.style.top=e.y+"%";setTimeout(()=>n.style.transition="",20);}else moveToZone(e,e.zone,true);});}
 function simulationRandom(){
   if(company){
     company.randomState=Number(company.randomState)||((company.day+1)*1103515245+12345);
