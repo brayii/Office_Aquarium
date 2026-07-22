@@ -5,6 +5,8 @@ while employees choose their own work, communicate, learn, and escalate strategi
 decisions. Open `Office_Aquarium.html` in a browser to play from the source tree,
 or build the clean web and Windows release packages described below.
 
+Public game page: https://brayii.itch.io/office-aquarium
+
 No account, network connection, API key, analytics service, or telemetry service is
 required. Saves stay on the device unless the player exports one.
 
