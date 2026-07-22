@@ -1,10 +1,10 @@
 # Office Aquarium Long-Run Strategy Matrix Report
 
 **Release target:** Public Beta 0.9
-**Validation date:** 2026-07-19
+**Validation date:** 2026-07-21
 **First-year horizon:** Day 365
 **First-year sample:** 20 seeds per strategy, 60 companies total
-**Command:** `tools/run-long-run-matrix.ps1 -SeedCount 20 -HorizonDays 365 -Strategies conservative,balanced,growth-oriented -Concurrency 10 -WriteReports`
+**Command:** `OFFICE_AQUARIUM_SEED_COUNT=20`, `OFFICE_AQUARIUM_HORIZON_DAYS=365`, `OFFICE_AQUARIUM_STRATEGIES=conservative,balanced,growth-oriented`, `OFFICE_AQUARIUM_CONCURRENCY=30`, `OFFICE_AQUARIUM_WRITE_REPORTS=1`, then `npm run test:long-run`
 
 ## Executive Result
 
@@ -35,9 +35,9 @@ reported:
 
 | Strategy | Avg stress | Avg morale | Final investor confidence | Final board | Final company risk | Decisions/month | Memos/month | Max save chars |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Conservative | 32 | 64 | 58 | 72 | 40 | 6.2 | 9.7 | 1,387,036 |
-| Balanced | 32 | 64 | 71 | 72 | 36 | 6.2 | 9.7 | 1,466,060 |
-| Growth-oriented | 32 | 64 | 49 | 66 | 46 | 7.0 | 10.7 | 1,487,688 |
+| Conservative | 32 | 64 | 58 | 72 | 40 | 6.2 | 9.7 | 1,386,984 |
+| Balanced | 32 | 64 | 71 | 72 | 36 | 6.2 | 9.7 | 1,465,596 |
+| Growth-oriented | 32 | 64 | 49 | 66 | 46 | 7.0 | 10.7 | 1,487,720 |
 
 ## Failure Analysis
 
@@ -90,3 +90,8 @@ The matrix runner writes ignored development evidence to:
 The scheduled and release workflows rerun the same deterministic first-year
 gate. They fail on a system error, timeout, false completion, or survival
 outside the ranges in `src/core/constants.js`.
+
+The local runner now writes partial checkpoints while the matrix is in
+progress. If a long local certification run is interrupted, rerunning the same
+seed count, horizon, and strategy list resumes completed seed reports instead
+of starting over.

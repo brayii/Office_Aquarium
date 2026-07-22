@@ -8,6 +8,11 @@ $Installer = Get-ChildItem -LiteralPath $Stage -File -Filter "*_$($Version)_x64-
 if (-not $Installer) {
   throw "Build the Windows release before running the install smoke test."
 }
+$Portable = Get-ChildItem -LiteralPath $Stage -File -Filter "Office_Aquarium_$($Version)_windows_x64.exe" |
+  Select-Object -First 1
+if (-not $Portable) {
+  throw "Build the Windows release before running the launch smoke test."
+}
 
 $SmokeRoot = Join-Path $env:TEMP "office-aquarium-install-smoke-$PID"
 $InstallDirectory = Join-Path $SmokeRoot "app"
@@ -16,6 +21,22 @@ $Uninstaller = $null
 New-Item -ItemType Directory -Force -Path $SmokeRoot | Out-Null
 
 try {
+  $PortableProcess = $null
+  try {
+    $PortableProcess = Start-Process -FilePath $Portable.FullName -PassThru -WindowStyle Hidden
+    Start-Sleep -Seconds 8
+    if ($PortableProcess.HasExited) {
+      throw "The portable application exited during its launch smoke window."
+    }
+  } catch {
+    throw "The portable Windows application could not be launched: $($_.Exception.Message)"
+  } finally {
+    if ($PortableProcess -and -not $PortableProcess.HasExited) {
+      Stop-Process -Id $PortableProcess.Id -Force -ErrorAction SilentlyContinue
+      $PortableProcess.WaitForExit()
+    }
+  }
+
   $Install = Start-Process -FilePath $Installer.FullName `
     -ArgumentList @("/S", "/D=$InstallDirectory") `
     -PassThru -Wait -WindowStyle Hidden

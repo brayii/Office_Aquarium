@@ -8,13 +8,13 @@
 
 ## Executive Summary
 
-**Overall recommendation: Not Ready for full public release. Web beta candidate is strong, but full release certification is incomplete.**
+**Overall recommendation: Not Ready for full Windows release. Web beta candidate is release-ready pending owner upload checks.**
 
 Office Aquarium is substantially stronger than the historical 2026-07-19 baseline audit. The source suite, constants ownership, save/recovery, package metadata, web package smoke, Windows package integrity, Handbook, message lifecycle, hiring, projects, social AI, emotional systems, Institutional Learning, crisis/loss paths, and release UI checks all pass on the audited source.
 
-The game is suitable for a cautious web beta candidate if the owner accepts the remaining release caveats. It is not fully certified as a public release because the local environment still blocks the Windows install/launch/uninstall smoke and the full Day-365 20-seed matrix did not complete inside the local audit time budget.
+The game is suitable for a cautious web beta release if the owner accepts the remaining release caveats. It is not fully certified as a Windows release because the local environment still blocks the Windows portable/installer launch smoke.
 
-The current release risk is no longer "missing simulation architecture." The risk is release proof: completing the slow long-run matrix in CI or a dedicated runner, certifying the Windows binary on a machine that allows unsigned apps to launch, and confirming asset ownership before broad distribution.
+The current release risk is no longer "missing simulation architecture." The risk is release proof for Windows: certifying the binary on a machine that allows unsigned apps to launch and confirming asset ownership before broad distribution.
 
 ## Audit Evidence
 
@@ -25,20 +25,20 @@ Fresh checks performed during this audit:
 | Private spec ignored | Pass | `git check-ignore -v CODEX_RELEASE_READINESS_AUDIT_SPEC.md` matched `.gitignore:48:CODEX_*.md` |
 | Release metadata | Pass | `npm.cmd run verify:release-metadata` returned `ok: true` for `0.9.0`, offline, telemetry false |
 | Constants ownership | Pass | `npm.cmd run test:constants` passed 211 checks across release, storage, validation, rooms, hiring, project, executive inbox, crisis, pipeline, and social ownership sections |
-| Full source report | Pass | `npm.cmd run test:report` passed 51/51 groups in 380.7 seconds |
-| Web package smoke | Pass | `npm.cmd run test:package-web` passed; ZIP had 26 files, 1,555,157 bytes, SHA-256 `193894326fa365f5288725ae56ba82121d7d5e491eeaa0beb7c899c180ab9650` |
+| Full source report | Pass | `npm.cmd run test:report` passed 51/51 groups in 344.3 seconds |
+| Web package smoke | Pass | `npm.cmd run test:package-web` passed; ZIP had 26 files, 1,555,157 bytes, SHA-256 `4578def49390a5b44758cff65f99d20c953e2981b89d397f71cc4dab044ac16e` |
 | Windows package integrity | Pass | `npm.cmd run test:package-windows` passed after allowing the Tauri NSIS bundler; installer and portable EXE were produced and inspected |
-| Windows launch/install smoke | Blocked | `npm.cmd run test:windows-launch` failed at `Start-Process` with `Access is denied` before install launch certification could run |
+| Windows launch/install smoke | Blocked | `npm.cmd run test:windows-launch` failed at portable launch with `Access is denied` before installer certification could run |
 | Short deterministic projection | Pass | Default `npm.cmd run test:long-run` reached Day 60 for conservative, balanced, and growth-oriented strategies with zero system errors, timeouts, or false passes |
-| Full Day-365 local matrix | Incomplete | 20 seeds x 3 strategies timed out after 20 minutes; 3 seeds x 3 strategies timed out after 10 minutes; neither produced a final local report |
+| Full Day-365 local matrix | Pass | 20 seeds x 3 strategies completed through checkpoint/resume; conservative 65%, balanced 85%, growth-oriented 55%, with zero system errors, timeouts, false passes, or range failures |
 
 Generated package evidence:
 
 | Artifact | Size | SHA-256 |
 |---|---:|---|
-| `dist/Office_Aquarium_Public_Beta_0.9_itch_web.zip` | 1,555,157 bytes | `193894326fa365f5288725ae56ba82121d7d5e491eeaa0beb7c899c180ab9650` |
-| `dist/windows/Office Aquarium_0.9.0_x64-setup.exe` | 3,304,526 bytes | `ef2d010d54c139cb0c51917a1d6e6cf7ccb9ec1ae3e94e5b7130e15a9bc29713` |
-| `dist/windows/Office_Aquarium_0.9.0_windows_x64.exe` | 10,084,864 bytes | `8a900fc06c2acade2392aebaefba6b2c47259a35da188772e5dd255ad95de218` |
+| `dist/Office_Aquarium_Public_Beta_0.9_itch_web.zip` | 1,555,157 bytes | `4578def49390a5b44758cff65f99d20c953e2981b89d397f71cc4dab044ac16e` |
+| `dist/windows/Office Aquarium_0.9.0_x64-setup.exe` | 3,304,526 bytes | `1a7703b1fbf2d66a584bf3e15b7c64fcd53ba815a74ea3c769483a237c25e7c3` |
+| `dist/windows/Office_Aquarium_0.9.0_windows_x64.exe` | 10,084,864 bytes | `47b665066906c0cc6880333180017cb435e06824eaa35885717cd07e7979f531` |
 
 ## Release Score
 
@@ -46,17 +46,17 @@ Generated package evidence:
 |---|---:|---|
 | Onboarding | 92 | The Handbook, player guide, first-launch flow, restart confirmation, and package smoke all verify that a new player can start, read help, restart safely, and continue a save. |
 | User Interface | 87 | Release UI, Handbook, package smoke, Inbox/archive, project reports, Paper, and mobile-tab behavior are covered. Remaining risk is normal beta polish and physical-device review. |
-| Gameplay | 84 | Hiring, projects, blockers, customers, messages, loss paths, and crisis recovery pass targeted tests. Long first-year balance proof did not complete locally in this audit. |
+| Gameplay | 88 | Hiring, projects, blockers, customers, messages, loss paths, crisis recovery, and the full Day-365 balance matrix pass targeted tests. |
 | AI Systems | 92 | Work AI, Social Personality AI, emotional homeostasis, Institutional Learning, conversation presence, social organization, and ownership boundaries pass the current suite. |
 | Simulation Quality | 88 | The simulation has active producers/consumers for operating health, project staffing, blockers, customer state, risk pillars, and learning evidence. |
-| Balance | 78 | Short projection passes and previous hardening docs report a passing 20-seed matrix, but this audit could not reproduce the full Day-365 matrix locally inside the time budget. |
-| Performance | 78 | The 51-group suite completes in about 6.3 minutes and the web package is small, but Day-365 local matrix throughput is now the largest release-proof concern. |
+| Balance | 88 | Short projection passes and the full 20-seed-per-strategy Day-365 matrix now passes its survival gates with zero technical failures. |
+| Performance | 82 | The 51-group suite completes in about 6.3 minutes and the web package is small. Day-365 matrix validation is slow, but checkpoint/resume now prevents lost work and gives live progress. |
 | Stability | 89 | Runtime recovery, save recovery, static structure, browser smoke, and package smoke pass. Windows launch certification is still blocked by the environment. |
 | Polish | 84 | Release messages, newspaper clarity, accessible release UI, Handbook, audio wiring, and archive behavior are covered. Final player-facing polish should continue during beta. |
 | Documentation | 90 | README, player guide, release notes, build certification, master spec, and historical audit/recheck docs are present and mostly current. |
 | Testing | 86 | The source suite is broad and passes. The remaining gap is not unit coverage; it is completing long-run and Windows-launch release gates in an environment that allows them. |
 
-**Overall release score: 84 / 100**
+**Overall release score: 89 / 100**
 
 ## Category Review
 
@@ -74,9 +74,16 @@ Verdict: **Beta-ready with normal polish monitoring.**
 
 ### 3. Gameplay Balance
 
-The default short projection reached Day 60 with all three strategies alive and no technical failures. The previous hardening recheck documents a passing 20-seed Day-365 matrix, but this audit could not reproduce that full matrix locally because both the 20-seed and 3-seed Day-365 runs timed out before producing reports.
+The default short projection reached Day 60 with all three strategies alive and no technical failures. The full Day-365 matrix also completed after checkpoint/resume:
 
-Verdict: **Adequate for web beta, not enough fresh local proof for final release.**
+- Conservative: 65% survival
+- Balanced: 85% survival
+- Growth-oriented: 55% survival
+- System errors: 0
+- Timeouts: 0
+- False passes: 0
+
+Verdict: **Release-ready for beta balance.**
 
 ### 4. Simulation Quality
 
@@ -92,9 +99,9 @@ Verdict: **Beta-ready.**
 
 ### 6. Performance
 
-The full source suite passed in 380.7 seconds. Web package size is 1.56 MB. The slow Day-365 matrix is the major performance/readiness caveat: it may be fine in CI, but locally it did not finish inside 10-20 minutes and provided no progress output while running.
+The full source suite passed in 344.3 seconds. Web package size is 1.56 MB. The Day-365 matrix is slow locally, but it now reports each completed seed and can resume from a partial checkpoint.
 
-Verdict: **Runtime looks stable; long-run validation throughput needs attention.**
+Verdict: **Runtime looks stable; long-run validation is slow but usable.**
 
 ### 7. Determinism
 
@@ -122,9 +129,9 @@ Verdict: **Acceptable for beta.**
 
 ### 11. Testing
 
-The local suite is broad and passed 51/51. Package tests pass for web and Windows integrity. The manual failure-test page is covered by automation. CI is configured to run the complete release suite, a web package smoke, and Rust check; release workflow includes the long-run gate and Windows package steps.
+The local suite is broad and passed 51/51. Package tests pass for web and Windows integrity. The manual failure-test page is covered by automation. CI is configured to run the complete release suite, a web package smoke, and Rust check; release workflow includes the long-run gate and Windows package steps. The strict Windows launch smoke still requires an environment that can start unsigned applications.
 
-Verdict: **Strong, with two release-gate caveats.**
+Verdict: **Strong, with one Windows release-gate caveat.**
 
 ### 12. Visual And UX Polish
 
@@ -146,25 +153,25 @@ Verdict: **Good beta hook.**
 
 ## Findings
 
-### RA-01 - Windows install/launch/uninstall certification is still blocked
+### RA-01 - Windows portable/install/launch/uninstall certification is still blocked
 
 - **Severity:** Major
 - **Affected file(s):** `tests/windows-install-launch-smoke.ps1`, `tools/package-windows-release.ps1`, `dist/windows/`
 - **Affected system:** Windows release certification
-- **Evidence:** `npm.cmd run test:package-windows` passed and produced a valid installer plus portable EXE. `npm.cmd run test:windows-launch` failed before launch at `Start-Process` with `Access is denied`.
+- **Evidence:** `npm.cmd run test:package-windows` passed and produced a valid installer plus portable EXE. `npm.cmd run test:windows-launch` failed before launch with `The portable Windows application could not be launched: ... Access is denied.`
 - **Player impact:** The Windows artifact exists and passes integrity checks, but this environment has not proven install, launch, save/continue, audio, close, and uninstall behavior.
 - **Recommended fix:** Run `npm.cmd run test:windows-launch` on a Windows machine or CI runner that permits unsigned beta executables. Record the pass in build certification before broad Windows release.
 - **Blocks release:** Blocks full Windows release certification; does not block web beta.
 
-### RA-02 - Full Day-365 matrix did not complete locally during this audit
+### RA-02 - Full Day-365 matrix is slow enough to need checkpointing
 
-- **Severity:** Major
+- **Severity:** Minor
 - **Affected file(s):** `tests/long-run-balance-test.js`, `tools/run-long-run-matrix.ps1`, `.github/workflows/long-run.yml`
 - **Affected system:** Long-run balance validation
-- **Evidence:** A 20-seed-per-strategy Day-365 run timed out after 20 minutes with no final output. A smaller 3-seed-per-strategy Day-365 run timed out after 10 minutes with no final output. The default Day-60 projection passed in 31.3 seconds.
-- **Player impact:** The game may still be balanced, but this audit could not freshly reproduce the first-year matrix evidence locally. Lack of progress output also makes long runs hard to diagnose while they are running.
-- **Recommended fix:** Use the GitHub long-run workflow or a dedicated local run with a larger timeout for release certification. Consider adding periodic progress output so a slow matrix does not look stuck.
-- **Blocks release:** Blocks final release proof; does not block cautious web beta if previous matrix evidence is accepted.
+- **Evidence:** A 20-seed-per-strategy Day-365 run timed out after completing 31 of 60 seeds. The next run resumed from the checkpoint and completed all 60 runs successfully.
+- **Player impact:** None directly. Release engineers need to know the matrix can be slow and may require resume on local machines.
+- **Recommended fix:** Keep checkpoint/resume and progress output in place. Use CI or a dedicated local run for final release evidence.
+- **Blocks release:** No.
 
 ### RA-03 - Asset ownership/provenance remains an owner confirmation item
 
@@ -186,38 +193,38 @@ Verdict: **Good beta hook.**
 - **Recommended fix:** Continue the existing modularization trend after beta by splitting long files around existing lifecycle ownership and preserving deterministic regression tests.
 - **Blocks release:** No.
 
-### RA-05 - Long-run matrix lacks live progress feedback
+### RA-05 - Long-run matrix remains expensive
 
 - **Severity:** Minor
 - **Affected file(s):** `tests/long-run-balance-test.js`
 - **Affected system:** Developer validation ergonomics
-- **Evidence:** The Day-365 runs produced no console progress before timing out. The default short run prints only at completion.
-- **Player impact:** None directly. Release engineers can mistake a slow matrix for a hang.
-- **Recommended fix:** Add optional progress logging at worker/job completion, preferably gated by an environment variable or always concise enough for CI logs.
+- **Evidence:** Progress output and checkpoint/resume now exist, but the Day-365 matrix still required more than one local command window to finish in this environment.
+- **Player impact:** None directly. Release engineers should expect this to be a release-gate job rather than a quick smoke test.
+- **Recommended fix:** Keep using the long-run workflow or a dedicated local certification run. Consider later optimizing the projection engine if release cadence demands faster matrices.
 - **Blocks release:** No.
 
 ## Top 10 Release Blockers
 
-1. **Windows launch certification is incomplete.** Integrity passes, but install/launch/uninstall is blocked by `Access is denied` in this environment.
-2. **Fresh local Day-365 matrix evidence is incomplete.** The long-run matrix did not finish in this audit's local time budget.
-3. **Asset provenance needs owner confirmation.** Package notices exist, but user-provided audio ownership is not machine-verifiable.
-4. **Run the release workflow on GitHub before upload.** The configured workflow is the proper all-gates proof path.
-5. **Run one physical Windows install session.** Automated local launch was blocked, so a permissive Windows machine should certify it.
-6. **Run one physical mobile browser session.** Automated mobile-style checks pass, but actual mobile touch/audio behavior should be felt before public upload.
-7. **Keep an eye on first-year memo pace.** Short projection shows roughly 9.5-12 memos/month in early play, which may be acceptable but should be watched in player testing.
-8. **Keep long-run validation reports with the release.** The public beta should ship with the exact matrix evidence used to approve it.
-9. **Confirm itch.io package launch after upload.** The local extracted ZIP passes; itch hosting should still be checked once uploaded.
-10. **Do not label the Windows artifact fully certified until `test:windows-launch` passes.**
+1. **Windows launch certification is incomplete.** Integrity passes, but portable launch and install/launch/uninstall are blocked by `Access is denied` in this environment.
+2. **Asset provenance needs owner confirmation.** Package notices exist, but user-provided audio ownership is not machine-verifiable.
+3. **Run the release workflow on GitHub before upload.** The configured workflow is the proper all-gates proof path.
+4. **Run one physical Windows install session.** Automated local launch was blocked, so a permissive Windows machine should certify it.
+5. **Run one physical mobile browser session.** Automated mobile-style checks pass, but actual mobile touch/audio behavior should be felt before public upload.
+6. **Keep an eye on first-year memo pace.** Short projection shows roughly 9.5-12 memos/month in early play, which may be acceptable but should be watched in player testing.
+7. **Keep long-run validation reports with the release.** The public beta should ship with the exact matrix evidence used to approve it.
+8. **Confirm itch.io package launch after upload.** The local extracted ZIP passes; itch hosting should still be checked once uploaded.
+9. **Do not label the Windows artifact fully certified until `test:windows-launch` passes.**
+10. **Preserve the checkpointed Day-365 matrix evidence.** The full matrix now passes, and its generated reports should stay attached to the release record.
 
-Only the first two are technical release gates. The others are publishing discipline and owner-certification items.
+Only the first item is a remaining technical release gate for Windows. The others are publishing discipline, owner-certification, or final upload checks.
 
 ## Top 10 Nice-To-Have Improvements
 
-1. Add progress output to the long-run matrix runner.
-2. Add a one-command "release audit" script that runs metadata, constants, report, package web, package Windows, and summarizes known environment gates.
+1. Add a one-command "release audit" script that runs metadata, constants, report, package web, package Windows, and summarizes known environment gates.
+2. Add a lower-cost medium-run balance test between Day 60 and Day 365 for quicker local confidence.
 3. Add optional physical-device checklist documents for mobile and Windows release sessions.
 4. Continue splitting the largest runtime modules after beta.
-5. Add a lower-cost medium-run balance test between Day 60 and Day 365 for quicker local confidence.
+5. Keep refining long-run projection speed so the full matrix finishes comfortably in one local command.
 6. Add release screenshots for itch.io and docs.
 7. Add explicit audio provenance fields to `ASSET_ATTRIBUTION.md`.
 8. Add optional reduced-motion preference handling if player feedback asks for it.
@@ -228,6 +235,6 @@ Only the first two are technical release gates. The others are publishing discip
 
 DO NOT RELEASE YET
 
-The web beta candidate is strong: the source, package, save, UI, simulation, and documentation evidence is in good shape. However, the requested release-readiness audit has to judge the full public release, not only the web ZIP.
+The web beta candidate is strong: the source, package, save, UI, simulation, balance matrix, and documentation evidence is in good shape. However, the requested release-readiness audit has to judge the full public release, not only the web ZIP.
 
-Do not call the release fully ready until the Windows launch smoke passes on a permissive Windows environment and the Day-365 matrix is rerun successfully through the intended release workflow.
+Do not call the Windows release fully ready until the Windows launch smoke passes on a permissive Windows environment.

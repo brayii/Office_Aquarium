@@ -18,6 +18,10 @@ function positiveIntegerEnvironment(name, fallback) {
   return value;
 }
 
+function progressEnabled() {
+  return process.env.OFFICE_AQUARIUM_PROGRESS !== "0";
+}
+
 async function main() {
   const constants = loadOfficeAquariumConstants();
   const validationRules = constants.validation;
@@ -36,9 +40,39 @@ async function main() {
     throw new Error(`OFFICE_AQUARIUM_STRATEGIES contains unsupported values: ${invalidStrategies.join(", ") || "none supplied"}.`);
   }
   const concurrency = Math.max(1, Math.min(Number(process.env.OFFICE_AQUARIUM_CONCURRENCY) || Math.min(4, os.cpus().length), seedCount * strategies.length));
-  const jobs = strategies.flatMap(strategy => Array.from({ length: seedCount }, (_, index) => ({ strategy, seed: `release-${strategy}-${index + 1}` })));
+  const reportSuffix = targetDay === validationRules.firstYearHorizonDays ? "" : `-day-${targetDay}`;
+  const reportDir = path.resolve("dist", "reports");
+  const checkpointPath = path.join(reportDir, `long-run-strategy-matrix${reportSuffix}.partial.json`);
+  const writeReports = process.env.OFFICE_AQUARIUM_WRITE_REPORTS === "1";
+  const resumeReports = writeReports && process.env.OFFICE_AQUARIUM_RESUME !== "0";
+  const allJobs = strategies.flatMap(strategy => Array.from({ length: seedCount }, (_, index) => ({ strategy, seed: `release-${strategy}-${index + 1}` })));
   const reports = [];
+  if (resumeReports && fs.existsSync(checkpointPath)) {
+    try {
+      const checkpoint = JSON.parse(fs.readFileSync(checkpointPath, "utf8"));
+      const sameRun = checkpoint
+        && checkpoint.seedCount === seedCount
+        && checkpoint.targetDay === targetDay
+        && JSON.stringify(checkpoint.strategies || []) === JSON.stringify(strategies);
+      if (sameRun && Array.isArray(checkpoint.reports)) {
+        reports.push(...checkpoint.reports);
+        if (progressEnabled() && reports.length) {
+          console.error(`[long-run] resumed ${reports.length}/${allJobs.length} checkpointed run(s) from ${checkpointPath}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[long-run] ignored unreadable checkpoint ${checkpointPath}: ${error.message}`);
+    }
+  }
+  const completedKeys = new Set(reports.map(report => `${report.strategy}|${report.seed}`));
+  const jobs = allJobs.filter(job => !completedKeys.has(`${job.strategy}|${job.seed}`));
   let cursor = 0;
+  let completed = reports.length;
+  const writeCheckpoint = () => {
+    if (!writeReports) return;
+    fs.mkdirSync(reportDir, { recursive: true });
+    fs.writeFileSync(checkpointPath, JSON.stringify({ seedCount, targetDay, strategies, reports }, null, 2));
+  };
   const runWorker = async () => {
     const page = await browser.newPage();
     page.on("pageerror", error => errors.push(error.message));
@@ -47,6 +81,13 @@ async function main() {
       const job = jobs[cursor++];
       const report = await page.evaluate(({ targetDay, seed, strategy }) => runBalanceProjection(targetDay, { seed, strategy }), { targetDay, ...job });
       reports.push(report);
+      completed += 1;
+      writeCheckpoint();
+      if (progressEnabled()) {
+        const status = report.result || (report.survival ? "completed" : "unknown");
+        const day = report.finalDay ?? report.daysRun ?? report.targetDay ?? targetDay;
+        console.error(`[long-run] ${completed}/${allJobs.length} ${job.strategy} ${job.seed}: ${status} day ${day}`);
+      }
     }
     await page.close();
   };
@@ -104,9 +145,7 @@ async function main() {
     return range && (byStrategy[strategy].survivalRate < range[0] || byStrategy[strategy].survivalRate > range[1]);
   }) : [];
   const result = { ok: systemErrors === 0 && timeouts === 0 && falsePasses === 0 && rangeFailures.length === 0, full: fullRun, seedCount, targetDay, strategies, concurrency, survivalRangeGateApplied, systemErrors, timeouts, falsePasses, rangeFailures, byStrategy, reports };
-  if (process.env.OFFICE_AQUARIUM_WRITE_REPORTS === "1") {
-    const reportDir = path.resolve("dist", "reports");
-    const reportSuffix = targetDay === validationRules.firstYearHorizonDays ? "" : `-day-${targetDay}`;
+  if (writeReports) {
     fs.mkdirSync(reportDir, { recursive: true });
     fs.writeFileSync(path.join(reportDir, `long-run-strategy-matrix${reportSuffix}.json`), JSON.stringify(result, null, 2));
     const rows = strategies.map(strategy => {
@@ -115,6 +154,7 @@ async function main() {
     });
     const markdown = `# Office Aquarium Long-Run Strategy Matrix\n\nHorizon: Day ${targetDay}  \nSeeds per strategy: ${seedCount}  \nFirst-year survival gate applied: ${survivalRangeGateApplied ? "yes" : "no"}  \nSystem errors: ${systemErrors}  \nTimeouts: ${timeouts}\n\n| Strategy | Runs | Survival | Median failure day | Median cash | Avg headcount | Avg completions | Avg active projects | Avg final blockers | Avg final backlog | Avg investor | Avg board | Avg risk | Decisions/month | Memos/month | Max save chars |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n${rows.join("\n")}\n\n## Failure Causes\n\n\`\`\`json\n${JSON.stringify(Object.fromEntries(strategies.map(strategy => [strategy, byStrategy[strategy].failureCauses])), null, 2)}\n\`\`\`\n`;
     fs.writeFileSync(path.join(reportDir, `long-run-strategy-matrix${reportSuffix}.md`), markdown);
+    if (fs.existsSync(checkpointPath)) fs.unlinkSync(checkpointPath);
   }
   const ok = errors.length === 0 && result.ok;
   const detailLimit = Math.max(0, Number(process.env.OFFICE_AQUARIUM_CONSOLE_REPORT_LIMIT) || validationRules.consoleReportDetailLimit || 0);

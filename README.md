@@ -120,6 +120,8 @@ Run a local first-year matrix and write its reports to `dist\reports\`:
 powershell -ExecutionPolicy Bypass -File tools\run-long-run-matrix.ps1 -SeedCount 20 -HorizonDays 365 -WriteReports
 ```
 
+Long matrix runs write a partial checkpoint beside the report. If a local run is interrupted, rerun the same seed count, horizon, and strategy list to resume completed seeds. Set `OFFICE_AQUARIUM_RESUME=0` when you intentionally want to discard the checkpoint and start the matrix over.
+
 Useful targeted checks:
 
 ```powershell
