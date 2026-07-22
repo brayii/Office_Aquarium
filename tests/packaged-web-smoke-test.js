@@ -311,8 +311,10 @@ async function main() {
           !document.getElementById("newspaperArchive")?.innerText.includes("No issue yet"),
         inboxQueued: (company.escalationQueue || []).some(event => event.id === "packaged-web-smoke-update"),
         audioSources: {
-          music: musicAudio?.src || "",
-          alert: messageAudio?.src || ""
+          musicPrimary: musicAudio?.dataset?.primarySrc || "",
+          alertPrimary: messageAudio?.dataset?.primarySrc || "",
+          musicFallbacks: [...(musicAudio?.querySelectorAll("source") || [])].map(source => source.src),
+          alertFallbacks: [...(messageAudio?.querySelectorAll("source") || [])].map(source => source.src)
         }
       };
     });
@@ -398,8 +400,10 @@ async function main() {
     check(archivedMessageVisible > 0 && archivedMessageDetail, "clean package files the read message in Old Messages");
     check(destinationSmoke.companyVisible && destinationSmoke.reportsAvailable, "clean package opens Company reports");
     check(destinationSmoke.newspaperVisible && destinationSmoke.newspaperReadable, "clean package opens the Paper archive");
-    check(packagedSystems.audioSources.music.includes("game_music_loop.mp3"), "clean package wires the music asset");
-    check(packagedSystems.audioSources.alert.includes("new_message_alert.mp3"), "clean package wires the alert asset");
+    check(packagedSystems.audioSources.musicPrimary.includes("game_music_loop.webm"), "clean package wires the WebM music asset first");
+    check(packagedSystems.audioSources.alertPrimary.includes("new_message_alert.webm"), "clean package wires the WebM alert asset first");
+    check(packagedSystems.audioSources.musicFallbacks.some(src => src.includes("game_music_loop.mp3")), "clean package keeps MP3 music fallback");
+    check(packagedSystems.audioSources.alertFallbacks.some(src => src.includes("new_message_alert.mp3")), "clean package keeps MP3 alert fallback");
     check(recoveryUi.runtimeVisible && recoveryUi.runtimeStage.length > 0, "clean package exposes the runtime recovery notice");
     check(recoveryUi.lossVisible, "clean package exposes the company loss flow");
     check(saveRecovery.panelVisible && saveRecovery.recoverable, "clean package distinguishes corrupt current data from a valid backup");

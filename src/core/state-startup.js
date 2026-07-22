@@ -31,7 +31,16 @@ function updatePauseButton(){
   button.setAttribute("aria-label",button.title);
 }
 const saveRepository=new SaveRepository(SAVE_KEY,SAVE_VERSION);
-const soundController=new SoundController({musicSrc:"assets/audio/game_music_loop.mp3",alertSrc:"assets/audio/new_message_alert.mp3"});
+const soundController=new SoundController({
+  musicSources:[
+    {src:"./assets/audio/game_music_loop.webm",type:"audio/webm"},
+    {src:"./assets/audio/game_music_loop.mp3",type:"audio/mpeg"}
+  ],
+  alertSources:[
+    {src:"./assets/audio/new_message_alert.webm",type:"audio/webm"},
+    {src:"./assets/audio/new_message_alert.mp3",type:"audio/mpeg"}
+  ]
+});
 const simulationTimer=new SimulationTimer();
 const validationSession=new ValidationSession(saveRepository,simulationTimer);
 const musicAudio=soundController.music,messageAudio=soundController.alert;

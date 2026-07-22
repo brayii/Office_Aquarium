@@ -337,12 +337,26 @@ class SaveRepository{
 }
 
 class SoundController{
-  constructor({musicSrc,alertSrc}){this.music=this.create(musicSrc,{loop:true,volume:.28,kind:"music"});this.alert=this.create(alertSrc,{volume:.78,kind:"alerts"});this.userGestureSeen=false;this.musicBlocked=false;this.alertBlocked=false;}
+  constructor({musicSrc,alertSrc,musicSources,alertSources}){this.music=this.create(musicSources||musicSrc,{loop:true,volume:.28,kind:"music"});this.alert=this.create(alertSources||alertSrc,{volume:.78,kind:"alerts"});this.userGestureSeen=false;this.musicBlocked=false;this.alertBlocked=false;}
+  normalizeSources(src){
+    if(Array.isArray(src))return src.map(item=>typeof item==="string"?{src:item}:item).filter(item=>item&&item.src);
+    return src?[{src}]:[];
+  }
   create(src,{loop=false,volume=1,kind="audio"}={}){
     try{
       if(typeof Audio==="undefined")return null;
-      const audio=new Audio(src);audio.loop=loop;audio.volume=volume;
+      const sources=this.normalizeSources(src);
+      if(!sources.length)return null;
+      const audio=new Audio();audio.loop=loop;audio.volume=volume;
+      sources.forEach(item=>{
+        const source=document.createElement("source");
+        source.src=item.src;
+        if(item.type)source.type=item.type;
+        audio.appendChild(source);
+      });
+      audio.dataset.primarySrc=sources[0].src;
       audio.addEventListener?.("error",()=>{if(kind==="music")musicUnavailable=true;else alertsUnavailable=true;this.syncUi();});
+      audio.load?.();
       return audio;
     }catch(e){if(kind==="music")musicUnavailable=true;else alertsUnavailable=true;return null;}
   }
