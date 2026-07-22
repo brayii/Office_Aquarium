@@ -35,8 +35,11 @@ Get-ChildItem -LiteralPath $DistRoot -File -Filter "Office_Aquarium*itch_web*.zi
 
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $Root "Office_Aquarium.html") -Destination (Join-Path $Stage "index.html")
-Copy-Item -LiteralPath (Join-Path $Root "src") -Destination (Join-Path $Stage "src") -Recurse
+& node (Join-Path $PSScriptRoot "build-single-file-web.js") (Join-Path $Stage "index.html")
+if ($LASTEXITCODE -ne 0) {
+  throw "Single-file itch web build failed."
+}
+
 Copy-Item -LiteralPath (Join-Path $Root "assets") -Destination (Join-Path $Stage "assets") -Recurse
 Copy-Item -LiteralPath (Join-Path $Root "LICENSE") -Destination (Join-Path $Stage "LICENSE")
 Copy-Item -LiteralPath (Join-Path $Root "ASSET_ATTRIBUTION.md") -Destination (Join-Path $Stage "ASSET_ATTRIBUTION.md")

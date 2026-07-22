@@ -43,9 +43,9 @@ with zero system errors, timeouts, or false passes.
 | Item | Value |
 |---|---|
 | Archive | `Office_Aquarium_Public_Beta_0.9_itch_web.zip` |
-| Size | 3,061,669 bytes |
-| SHA-256 | `10965ebc50551d61bfc0e680ca39e1bc85b6997ef433e4769412676a9ecbdf54` |
-| Manifest entries | 27 |
+| Size | 3,048,254 bytes |
+| SHA-256 | `e12d69beab53a69e000337063c8f55b4b65ab2898db07832e9968a9c15b5d1d6` |
+| Manifest entries | 9 |
 | Browser errors | 0 |
 | Failed asset requests | 0 |
 
@@ -65,6 +65,7 @@ and verified:
 - company-loss flow
 - corrupt-current/valid-backup recovery and restore
 - normal UI exclusion of developer controls
+- itch-style sandboxed iframe startup with same-window Start New Company behavior
 
 ## Windows Package
 

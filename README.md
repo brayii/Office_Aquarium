@@ -236,7 +236,9 @@ dist\Office_Aquarium_Public_Beta_0.9_itch_web.zip
 dist\Office_Aquarium_Public_Beta_0.9_itch_web.zip.sha256
 ```
 
-Upload that ZIP to itch.io as an HTML game. The package renames `Office_Aquarium.html` to `index.html` inside the ZIP, which is what itch.io expects for browser-playable games.
+Upload that ZIP to itch.io as an HTML game. The package builds a single-file
+`index.html` with the application CSS and JavaScript inlined so the game can run
+reliably inside itch.io's embedded browser frame.
 
 The staged web package is also available at:
 
@@ -250,8 +252,8 @@ Build and launch-smoke the exact extracted ZIP:
 npm run test:package-web
 ```
 
-The package contains only runtime source, audio assets, the player guide, release
-notes, license, third-party notices, and SHA-256 manifests. Tests, private plans,
+The package contains the single-file runtime HTML, audio assets, the player guide,
+release notes, license, third-party notices, and SHA-256 manifests. Tests, private plans,
 work logs, repository metadata, and developer archives are excluded.
 
 ### Desktop Binary

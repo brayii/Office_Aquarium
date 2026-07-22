@@ -156,7 +156,6 @@ async function main() {
       "RELEASE_NOTES.md",
       "release-manifest.json",
       "SHA256SUMS.txt",
-      "src",
       "THIRD_PARTY_NOTICES.md"
     ]);
     const topLevel = fs.readdirSync(extractionRoot).sort();
@@ -171,9 +170,12 @@ async function main() {
     check(forbidden.length === 0, `web package excludes private and developer files: ${forbidden.join(", ")}`);
 
     const manifest = JSON.parse(fs.readFileSync(path.join(extractionRoot, "release-manifest.json"), "utf8"));
+    const packagedIndex = fs.readFileSync(path.join(extractionRoot, "index.html"), "utf8");
     check(manifest.version === release.applicationVersion, "package manifest uses the release version");
     check(manifest.packageType === "itch-web", "package manifest identifies the web package");
     check(manifest.offline === true && manifest.telemetry === false, "package manifest records offline privacy behavior");
+    check(!/<script[^>]+src=/i.test(packagedIndex), "itch web package inlines JavaScript into index.html");
+    check(!/<link[^>]+href="src\//i.test(packagedIndex), "itch web package inlines source stylesheets into index.html");
     const manifestFailures = manifest.files.filter(entry => {
       const file = path.join(extractionRoot, ...entry.path.split("/"));
       return !fs.existsSync(file) || fs.statSync(file).size !== entry.bytes || sha256(file) !== entry.sha256;
