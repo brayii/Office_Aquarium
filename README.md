@@ -280,6 +280,43 @@ Build a raw Windows executable and NSIS installer:
 npm run test:package-windows
 ```
 
+### Optional Windows Code Signing
+
+Unsigned beta builds may be blocked by SmartScreen or by managed Windows
+policies. To sign a Windows package with your own code-signing certificate, set
+one of these before building:
+
+```powershell
+$env:OFFICE_AQUARIUM_SIGN_WINDOWS = "1"
+$env:OFFICE_AQUARIUM_SIGN_CERT_THUMBPRINT = "YOUR_CERT_THUMBPRINT"
+```
+
+or:
+
+```powershell
+$env:OFFICE_AQUARIUM_SIGN_WINDOWS = "1"
+$env:OFFICE_AQUARIUM_SIGN_CERT_PATH = "D:\path\to\certificate.pfx"
+$env:OFFICE_AQUARIUM_SIGN_CERT_PASSWORD = "pfx-password"
+```
+
+Then run:
+
+```powershell
+npm run test:package-windows
+```
+
+For local-only testing, the signing script can create a developer certificate:
+
+```powershell
+$env:OFFICE_AQUARIUM_SIGN_WINDOWS = "1"
+$env:OFFICE_AQUARIUM_SIGN_DEV_CERT = "1"
+npm run test:package-windows
+```
+
+A developer certificate signs the EXE, but Windows will not treat it as a
+publicly trusted publisher unless that certificate is trusted on the test
+machine. Do not use the developer certificate as a public release certificate.
+
 Clean, versioned release artifacts are copied to:
 
 ```text

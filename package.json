@@ -7,6 +7,7 @@
     "package:web": "powershell -ExecutionPolicy Bypass -File tools/package-itch-web.ps1",
     "package:desktop-assets": "powershell -ExecutionPolicy Bypass -File tools/package-tauri-frontend.ps1",
     "package:windows": "powershell -ExecutionPolicy Bypass -File tools/package-windows-release.ps1",
+    "sign:windows": "powershell -ExecutionPolicy Bypass -File tools/sign-windows-release.ps1 -Stage All",
     "generate:notices": "node tools/generate-third-party-notices.js",
     "verify:release-metadata": "node tools/release-metadata.js verify",
     "test:package-web": "npm run package:web && node tests/packaged-web-smoke-test.js",

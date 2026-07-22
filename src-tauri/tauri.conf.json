@@ -6,6 +6,7 @@
   "build": {
     "beforeDevCommand": "powershell -ExecutionPolicy Bypass -File tools/package-tauri-frontend.ps1",
     "beforeBuildCommand": "powershell -ExecutionPolicy Bypass -File tools/package-tauri-frontend.ps1",
+    "beforeBundleCommand": "powershell -ExecutionPolicy Bypass -File tools/sign-windows-release.ps1 -Stage BeforeBundle",
     "frontendDist": "../dist/desktop"
   },
   "app": {

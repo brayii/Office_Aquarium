@@ -74,6 +74,21 @@ An earlier 0.9.0 installer and portable executable exist locally, but they
 predate the final hardening documents and package manifest. They are not release
 artifacts.
 
+The Windows release workflow now includes optional code signing support. When a
+trusted code-signing certificate is provided, the build signs the raw Tauri
+executable before bundling and then signs the packaged portable executable and
+installer after they are copied into `dist/windows`.
+
+Supported signing inputs:
+
+- `OFFICE_AQUARIUM_SIGN_CERT_THUMBPRINT` for a certificate installed in the
+  current user's certificate store.
+- `OFFICE_AQUARIUM_SIGN_CERT_PATH` and `OFFICE_AQUARIUM_SIGN_CERT_PASSWORD` for
+  a `.pfx` certificate.
+- `OFFICE_AQUARIUM_SIGN_DEV_CERT=1` for local developer-only signing. This is
+  not a public release certificate and is trusted only on machines where the
+  developer certificate has been explicitly installed and trusted.
+
 The hardened release workflow requires:
 
 1. a clean Tauri build
