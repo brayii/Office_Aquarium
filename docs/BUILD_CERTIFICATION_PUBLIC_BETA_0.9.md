@@ -43,8 +43,8 @@ with zero system errors, timeouts, or false passes.
 | Item | Value |
 |---|---|
 | Archive | `Office_Aquarium_Public_Beta_0.9_itch_web.zip` |
-| Size | 3,061,666 bytes |
-| SHA-256 | `b859480224c6144034ff0394b015d70fe74223d41e7680abd1133e09d51f013f` |
+| Size | 3,061,669 bytes |
+| SHA-256 | `10965ebc50551d61bfc0e680ca39e1bc85b6997ef433e4769412676a9ecbdf54` |
 | Manifest entries | 27 |
 | Browser errors | 0 |
 | Failed asset requests | 0 |

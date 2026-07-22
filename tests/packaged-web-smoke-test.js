@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const fs = require("fs");
+const http = require("http");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
@@ -29,6 +30,95 @@ function recursiveFiles(directory) {
     const absolute = path.join(directory, entry.name);
     return entry.isDirectory() ? recursiveFiles(absolute) : [absolute];
   });
+}
+
+function contentType(file) {
+  return {
+    ".css": "text/css",
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".json": "application/json",
+    ".md": "text/plain",
+    ".mp3": "audio/mpeg",
+    ".txt": "text/plain"
+  }[path.extname(file).toLowerCase()] || "application/octet-stream";
+}
+
+function createItchLikeServer(root) {
+  const server = http.createServer((request, response) => {
+    const pathname = decodeURIComponent((request.url || "/").split("?")[0]);
+    if (pathname === "/sandbox") {
+      response.writeHead(200, { "Content-Type": "text/html" });
+      response.end(`<!doctype html><html><body style="margin:0"><iframe id="game" sandbox="allow-scripts allow-pointer-lock allow-downloads" src="/index.html" style="border:0;width:1200px;height:800px"></iframe></body></html>`);
+      return;
+    }
+    if (pathname === "/favicon.ico") {
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+    const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+    const file = path.resolve(root, requested);
+    if (!file.startsWith(path.resolve(root)) || !fs.existsSync(file)) {
+      response.writeHead(404, { "Content-Type": "text/plain" });
+      response.end("Not found");
+      return;
+    }
+    response.writeHead(200, { "Content-Type": contentType(file) });
+    fs.createReadStream(file).pipe(response);
+  });
+  return new Promise(resolve => {
+    server.listen(0, "127.0.0.1", () => resolve({
+      server,
+      url: `http://127.0.0.1:${server.address().port}`
+    }));
+  });
+}
+
+async function runItchFrameStartupSmoke(browser, extractionRoot) {
+  const { server, url } = await createItchLikeServer(extractionRoot);
+  const errors = [];
+  try {
+    const page = await browser.newPage({ viewport: { width: 1300, height: 900 } });
+    page.on("pageerror", error => errors.push(error.message));
+    page.on("console", message => {
+      if (message.type() === "error" && !/favicon/i.test(message.text())) errors.push(message.text());
+    });
+    page.on("requestfailed", request => {
+      if (!/favicon/i.test(request.url())) errors.push(`${request.url()} - ${request.failure()?.errorText || "failed"}`);
+    });
+    await page.goto(`${url}/sandbox`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(700);
+    const frame = page.frames().find(candidate => candidate.url().includes("/index.html"));
+    if (!frame) return { ok: false, errors: errors.concat("itch frame did not load index.html") };
+    const before = await frame.evaluate(() => ({
+      summary: document.getElementById("saveSummary")?.textContent || "",
+      newCompanyDisabled: document.getElementById("newCompany")?.disabled ?? true,
+      continueDisabled: document.getElementById("continueCompany")?.disabled ?? false
+    }));
+    await frame.click("#newCompany");
+    await page.waitForTimeout(500);
+    const after = await frame.evaluate(() => ({
+      startupHidden: document.getElementById("startupOverlay")?.classList.contains("hidden") || false,
+      heading: document.querySelector("h1")?.textContent || "",
+      employeeCount: Array.isArray(employees) ? employees.filter(employee => employee.active).length : 0
+    }));
+    await page.close();
+    return {
+      ok: before.summary !== "Checking for a saved company..." &&
+        !before.newCompanyDisabled &&
+        before.continueDisabled &&
+        after.startupHidden &&
+        after.heading === "Office Aquarium" &&
+        after.employeeCount === 8 &&
+        errors.length === 0,
+      before,
+      after,
+      errors
+    };
+  } finally {
+    server.close();
+  }
 }
 
 async function main() {
@@ -262,6 +352,7 @@ async function main() {
       document.getElementById("startupOverlay").classList.contains("hidden") &&
       !company.gameOver
     );
+    const itchFrameStartup = await runItchFrameStartupSmoke(browser, extractionRoot);
 
     check(initial.heading === "Office Aquarium", "clean package launches Office Aquarium");
     check(initial.version === release.displayVersion, "clean package displays the release version");
@@ -290,6 +381,7 @@ async function main() {
     check(recoveryUi.lossVisible, "clean package exposes the company loss flow");
     check(saveRecovery.panelVisible && saveRecovery.recoverable, "clean package distinguishes corrupt current data from a valid backup");
     check(backupRestored && restoredCompanyVisible, "clean package restores the last-known-good backup");
+    check(itchFrameStartup.ok, `itch-style iframe startup works: ${JSON.stringify(itchFrameStartup)}`);
     check(browserErrors.length === 0, `clean package has no browser errors: ${browserErrors.join("; ")}`);
     check(failedRequests.length === 0, `clean package has no missing assets: ${failedRequests.join("; ")}`);
     await browser.close();
@@ -312,6 +404,7 @@ async function main() {
         inboxAndArchive: archivedMessageDetail,
         projectReportsAndPaper: packagedSystems.projectRendered && packagedSystems.reportsRendered && packagedSystems.newspaperPublished,
         runtimeAndSaveRecovery: recoveryUi.runtimeVisible && saveRecovery.recoverable && backupRestored,
+        itchFrameStartup: itchFrameStartup.ok,
         browserErrors: browserErrors.length,
         failedRequests: failedRequests.length
       }
