@@ -102,8 +102,21 @@ async function runItchFrameStartupSmoke(browser, extractionRoot) {
       startupHidden: document.getElementById("startupOverlay")?.classList.contains("hidden") || false,
       heading: document.querySelector("h1")?.textContent || "",
       employeeCount: Array.isArray(employees) ? employees.filter(employee => employee.active).length : 0,
-      soundGestureSeen: soundController?.userGestureSeen === true
+      soundGestureSeen: soundController?.userGestureSeen === true,
+      soundOptionsDisabledAfterStart: [...document.getElementById("soundMode").options].map(option => option.disabled)
     }));
+    const soundAfterModeChange = await frame.evaluate(() => {
+      const select = document.getElementById("soundMode");
+      select.value = "music";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return {
+        value: select.value,
+        disabled: [...select.options].map(option => option.disabled),
+        musicMuted: soundController?.music?.muted ?? null,
+        alertMuted: soundController?.alert?.muted ?? null,
+        alertVolume: soundController?.alert?.volume ?? null
+      };
+    });
     await page.close();
     return {
       ok: before.summary !== "Checking for a saved company..." &&
@@ -113,9 +126,15 @@ async function runItchFrameStartupSmoke(browser, extractionRoot) {
         after.heading === "Office Aquarium" &&
         after.employeeCount === 8 &&
         after.soundGestureSeen &&
+        after.soundOptionsDisabledAfterStart.filter(Boolean).length === 0 &&
+        soundAfterModeChange.value === "music" &&
+        soundAfterModeChange.disabled.filter(Boolean).length === 0 &&
+        soundAfterModeChange.alertMuted !== true &&
+        soundAfterModeChange.alertVolume !== 0 &&
         errors.length === 0,
       before,
       after,
+      soundAfterModeChange,
       errors
     };
   } finally {

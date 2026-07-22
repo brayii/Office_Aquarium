@@ -356,9 +356,9 @@ class SoundController{
     if(!this.alert&&company.soundMode==="both")company.soundMode=this.music?"music":"muted";
     company.soundEnabled=company.soundMode!=="muted";
     select.value=company.soundMode;
-    select.options[1].disabled=!this.alert||alertsUnavailable;
-    select.options[2].disabled=!this.music||musicUnavailable;
-    select.options[3].disabled=!this.alert||!this.music||alertsUnavailable||musicUnavailable;
+    select.options[1].disabled=!this.alert;
+    select.options[2].disabled=!this.music;
+    select.options[3].disabled=!this.alert||!this.music;
     select.title=(!this.music&&!this.alert)?"Sound unavailable":"Sound options";
     select.classList.toggle("active",company.soundMode!=="muted");
   }
@@ -366,9 +366,9 @@ class SoundController{
     if(!this.music||!this.wantsMusic()||musicUnavailable)return;
     this.musicBlocked=false;
     try{const promise=this.music.play();if(promise&&typeof promise.catch==="function")promise.catch(error=>{this.musicBlocked=true;});}
-    catch(e){musicUnavailable=true;this.stopMusic();this.syncUi();}
+    catch(e){this.musicBlocked=true;}
   }
-  stopMusic(){try{if(this.music){this.music.pause();this.music.currentTime=0;}}catch(e){musicUnavailable=true;}}
+  stopMusic(){try{if(this.music){this.music.pause();this.music.currentTime=0;}}catch(e){this.musicBlocked=true;}}
   playAlert(){
     if(!this.alert||!this.wantsAlerts()||alertsUnavailable)return;
     this.alertBlocked=false;
@@ -378,16 +378,6 @@ class SoundController{
   unlockFromGesture(){
     this.userGestureSeen=true;
     if(this.music&&this.wantsMusic()&&!musicUnavailable)this.startMusic();
-    if(this.alert&&!alertsUnavailable){
-      try{
-        const priorMuted=this.alert.muted,priorVolume=this.alert.volume;
-        this.alert.muted=true;this.alert.volume=0;this.alert.currentTime=0;
-        const promise=this.alert.play();
-        if(promise&&typeof promise.then==="function")promise.then(()=>{
-          this.alert.pause();this.alert.currentTime=0;this.alert.muted=priorMuted;this.alert.volume=priorVolume;
-        }).catch(()=>{this.alert.muted=priorMuted;this.alert.volume=priorVolume;});
-      }catch(e){}
-    }
   }
   applyMode(value){
     if(!company)return;
