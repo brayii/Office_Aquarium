@@ -337,7 +337,7 @@ class SaveRepository{
 }
 
 class SoundController{
-  constructor({musicSrc,alertSrc}){this.music=this.create(musicSrc,{loop:true,volume:.28,kind:"music"});this.alert=this.create(alertSrc,{volume:.78,kind:"alerts"});}
+  constructor({musicSrc,alertSrc}){this.music=this.create(musicSrc,{loop:true,volume:.28,kind:"music"});this.alert=this.create(alertSrc,{volume:.78,kind:"alerts"});this.userGestureSeen=false;this.musicBlocked=false;this.alertBlocked=false;}
   create(src,{loop=false,volume=1,kind="audio"}={}){
     try{
       if(typeof Audio==="undefined")return null;
@@ -364,14 +364,30 @@ class SoundController{
   }
   startMusic(){
     if(!this.music||!this.wantsMusic()||musicUnavailable)return;
-    try{const promise=this.music.play();if(promise&&typeof promise.catch==="function")promise.catch(()=>{});}
+    this.musicBlocked=false;
+    try{const promise=this.music.play();if(promise&&typeof promise.catch==="function")promise.catch(error=>{this.musicBlocked=true;});}
     catch(e){musicUnavailable=true;this.stopMusic();this.syncUi();}
   }
   stopMusic(){try{if(this.music){this.music.pause();this.music.currentTime=0;}}catch(e){musicUnavailable=true;}}
   playAlert(){
     if(!this.alert||!this.wantsAlerts()||alertsUnavailable)return;
-    try{this.alert.volume=this.wantsMusic()?.95:.78;this.alert.currentTime=0;const promise=this.alert.play();if(promise&&typeof promise.catch==="function")promise.catch(()=>{});}
+    this.alertBlocked=false;
+    try{this.alert.volume=this.wantsMusic()?.95:.78;this.alert.currentTime=0;const promise=this.alert.play();if(promise&&typeof promise.catch==="function")promise.catch(error=>{this.alertBlocked=true;});}
     catch(e){alertsUnavailable=true;this.syncUi();}
+  }
+  unlockFromGesture(){
+    this.userGestureSeen=true;
+    if(this.music&&this.wantsMusic()&&!musicUnavailable)this.startMusic();
+    if(this.alert&&!alertsUnavailable){
+      try{
+        const priorMuted=this.alert.muted,priorVolume=this.alert.volume;
+        this.alert.muted=true;this.alert.volume=0;this.alert.currentTime=0;
+        const promise=this.alert.play();
+        if(promise&&typeof promise.then==="function")promise.then(()=>{
+          this.alert.pause();this.alert.currentTime=0;this.alert.muted=priorMuted;this.alert.volume=priorVolume;
+        }).catch(()=>{this.alert.muted=priorMuted;this.alert.volume=priorVolume;});
+      }catch(e){}
+    }
   }
   applyMode(value){
     if(!company)return;

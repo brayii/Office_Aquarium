@@ -101,7 +101,8 @@ async function runItchFrameStartupSmoke(browser, extractionRoot) {
     const after = await frame.evaluate(() => ({
       startupHidden: document.getElementById("startupOverlay")?.classList.contains("hidden") || false,
       heading: document.querySelector("h1")?.textContent || "",
-      employeeCount: Array.isArray(employees) ? employees.filter(employee => employee.active).length : 0
+      employeeCount: Array.isArray(employees) ? employees.filter(employee => employee.active).length : 0,
+      soundGestureSeen: soundController?.userGestureSeen === true
     }));
     await page.close();
     return {
@@ -111,6 +112,7 @@ async function runItchFrameStartupSmoke(browser, extractionRoot) {
         after.startupHidden &&
         after.heading === "Office Aquarium" &&
         after.employeeCount === 8 &&
+        after.soundGestureSeen &&
         errors.length === 0,
       before,
       after,

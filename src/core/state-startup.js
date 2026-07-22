@@ -1419,6 +1419,7 @@ function syncSoundUi(){soundController.syncUi();}
 function startBackgroundMusic(){soundController.startMusic();}
 function stopBackgroundMusic(){soundController.stopMusic();}
 function playMessageAlert(){soundController.playAlert();}
+function userGestureUnlockSound(){soundController.unlockFromGesture?.();}
 function applySoundMode(value){
   soundController.applyMode(value);
   if(!validationMode)saveGame();
