@@ -43,9 +43,9 @@ with zero system errors, timeouts, or false passes.
 | Item | Value |
 |---|---|
 | Archive | `Office_Aquarium_Public_Beta_0.9_itch_web.zip` |
-| Size | 3,589,247 bytes |
-| SHA-256 | `bc00fb05d7deea4da3b28aabc7c17c28979f8b3eec47c5b44b0dd7df9586ef7f` |
-| Manifest entries | 11 |
+| Size | 2,097,924 bytes |
+| SHA-256 | `b8d7562897e4747dbf6bea37e63cd708244194baafd10b630bcf52ccb6767715` |
+| Manifest entries | 6 |
 | Browser errors | 0 |
 | Failed asset requests | 0 |
 
@@ -61,7 +61,7 @@ and verified:
 - all five primary destinations
 - Handbook access
 - optional audio assets and fail-soft sound wiring
-- WebM/Opus audio served before MP3 fallback for itch compatibility
+- WebM/Opus audio and MP3 fallback inlined into `index.html` for itch compatibility
 - runtime recovery notice
 - company-loss flow
 - corrupt-current/valid-backup recovery and restore

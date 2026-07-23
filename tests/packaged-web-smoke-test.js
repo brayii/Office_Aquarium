@@ -169,7 +169,6 @@ async function main() {
     }
 
     const expectedTopLevel = new Set([
-      "assets",
       "ASSET_ATTRIBUTION.md",
       "index.html",
       "LICENSE",
@@ -197,6 +196,7 @@ async function main() {
     check(manifest.offline === true && manifest.telemetry === false, "package manifest records offline privacy behavior");
     check(!/<script[^>]+src=/i.test(packagedIndex), "itch web package inlines JavaScript into index.html");
     check(!/<link[^>]+href="src\//i.test(packagedIndex), "itch web package inlines source stylesheets into index.html");
+    check(!/assets\/audio\//i.test(packagedIndex), "itch web package inlines audio instead of requesting assets/audio");
     const manifestFailures = manifest.files.filter(entry => {
       const file = path.join(extractionRoot, ...entry.path.split("/"));
       return !fs.existsSync(file) || fs.statSync(file).size !== entry.bytes || sha256(file) !== entry.sha256;
@@ -400,10 +400,10 @@ async function main() {
     check(archivedMessageVisible > 0 && archivedMessageDetail, "clean package files the read message in Old Messages");
     check(destinationSmoke.companyVisible && destinationSmoke.reportsAvailable, "clean package opens Company reports");
     check(destinationSmoke.newspaperVisible && destinationSmoke.newspaperReadable, "clean package opens the Paper archive");
-    check(packagedSystems.audioSources.musicPrimary.includes("game_music_loop.webm"), "clean package wires the WebM music asset first");
-    check(packagedSystems.audioSources.alertPrimary.includes("new_message_alert.webm"), "clean package wires the WebM alert asset first");
-    check(packagedSystems.audioSources.musicFallbacks.some(src => src.includes("game_music_loop.mp3")), "clean package keeps MP3 music fallback");
-    check(packagedSystems.audioSources.alertFallbacks.some(src => src.includes("new_message_alert.mp3")), "clean package keeps MP3 alert fallback");
+    check(packagedSystems.audioSources.musicPrimary.startsWith("data:audio/webm"), "clean package inlines WebM music first");
+    check(packagedSystems.audioSources.alertPrimary.startsWith("data:audio/webm"), "clean package inlines WebM alert first");
+    check(packagedSystems.audioSources.musicFallbacks.some(src => src.startsWith("data:audio/mpeg")), "clean package keeps inline MP3 music fallback");
+    check(packagedSystems.audioSources.alertFallbacks.some(src => src.startsWith("data:audio/mpeg")), "clean package keeps inline MP3 alert fallback");
     check(recoveryUi.runtimeVisible && recoveryUi.runtimeStage.length > 0, "clean package exposes the runtime recovery notice");
     check(recoveryUi.lossVisible, "clean package exposes the company loss flow");
     check(saveRecovery.panelVisible && saveRecovery.recoverable, "clean package distinguishes corrupt current data from a valid backup");

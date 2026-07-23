@@ -40,7 +40,6 @@ if ($LASTEXITCODE -ne 0) {
   throw "Single-file itch web build failed."
 }
 
-Copy-Item -LiteralPath (Join-Path $Root "assets") -Destination (Join-Path $Stage "assets") -Recurse
 Copy-Item -LiteralPath (Join-Path $Root "LICENSE") -Destination (Join-Path $Stage "LICENSE")
 Copy-Item -LiteralPath (Join-Path $Root "ASSET_ATTRIBUTION.md") -Destination (Join-Path $Stage "ASSET_ATTRIBUTION.md")
 Copy-Item -LiteralPath (Join-Path $Root "THIRD_PARTY_NOTICES.md") -Destination (Join-Path $Stage "THIRD_PARTY_NOTICES.md")

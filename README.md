@@ -240,8 +240,9 @@ Upload that ZIP to itch.io as an HTML game. The package builds a single-file
 `index.html` with the application CSS and JavaScript inlined so the game can run
 reliably inside itch.io's embedded browser frame.
 
-The web build uses WebM/Opus audio first and keeps MP3 files as a fallback. This
-avoids itch/browser cases where MP3 asset requests are blocked.
+The itch.io web build inlines WebM/Opus audio and MP3 fallbacks into
+`index.html`. That avoids itch/browser cases where `/assets/audio/...` file
+requests are blocked.
 
 The staged web package is also available at:
 
@@ -255,9 +256,9 @@ Build and launch-smoke the exact extracted ZIP:
 npm run test:package-web
 ```
 
-The package contains the single-file runtime HTML, audio assets, the player guide,
-release notes, license, third-party notices, and SHA-256 manifests. Tests, private plans,
-work logs, repository metadata, and developer archives are excluded.
+The package contains the single-file runtime HTML with inlined audio, the player
+guide, release notes, license, third-party notices, and SHA-256 manifests. Tests,
+private plans, work logs, repository metadata, and developer archives are excluded.
 
 ### Desktop Binary
 
