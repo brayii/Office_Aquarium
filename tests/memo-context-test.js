@@ -96,6 +96,23 @@ async function main() {
     assert(eventCopy.includes("Project Phoenix Release Validation"), "Inbox summary should name the related project");
     assert(choiceText.includes("Applies to: Project: Project Phoenix Release Validation"), "Choice cards should say what project the option applies to");
     assert(!/project-phoenix-context\b/.test(memoText), "Normal memo should prefer the project name over the internal id");
+    const duplicateDecision = prepareStrategicDecision({
+      id: "semantic-choice-regression",
+      title: "Project Phoenix validation path",
+      category: "project",
+      projectDecision: { id: project.id, action: "review" },
+      choices: [
+        { title: "Approve a validation sprint", detail: "Give the team one bounded sprint to reduce release risk.", strategy: "quality", projectDecision: { id: project.id, action: "validate" }, effect: { quality: 1 } },
+        { title: "Stage a controlled validation sprint", detail: "Run the same bounded validation work before committing.", strategy: "quality", projectDecision: { id: project.id, action: "validate" }, effect: { quality: 1 } },
+        { title: "Continue the current plan", detail: "Keep the current release plan and monitor the next checkpoint.", strategy: "speed", projectDecision: { id: project.id, action: "continue" }, effect: { integration: 1 } },
+        { title: "Reduce the first-release scope", detail: "Remove lower-priority scope from the first release.", strategy: "quality", projectDecision: { id: project.id, action: "scope" }, effect: { quality: 1, trust: 1 } }
+      ]
+    });
+    const semanticCheck = validateDistinctDecisionChoices(duplicateDecision.choices);
+    const duplicateTitles = duplicateDecision.choices.map(c => c.title);
+    assert(semanticCheck.distinct, `Prepared memo choices should be semantically distinct (${semanticCheck.keys.join(" | ")})`);
+    assert(!(duplicateTitles.includes("Approve a validation sprint") && duplicateTitles.includes("Stage a controlled validation sprint")), "Differently titled validation choices should not both survive when they perform the same action");
+    assert(new Set(duplicateDecision.choices.map(c => c.strategy)).size >= 2, "Prepared memo should keep at least two strategic directions when possible");
 
     company.manufacturing = { ...(company.manufacturing || {}), supplyRisk: 92, readiness: 38, yield: 44 };
     const speedChoice = { title: "Commit to the market window", detail: "Move quickly while demand is visible.", strategy: "speed", projectDecision: { id: project.id, action: "continue" } };

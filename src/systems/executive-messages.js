@@ -994,14 +994,16 @@ function convertSupersededMemoToUpdate(ev,reason){
 }
 function memoQualityAudit(ev,comm,intel){
   const choices=Array.isArray(ev.choices)?ev.choices:[];
+  const distinctChoices=validateDistinctDecisionChoices(choices);
+  const strategyCount=new Set(choices.map(c=>c.strategy||inferDecisionStrategy(c))).size;
   const evidenceSignals=(intel.evidence||[]).map((text,i)=>({index:i,text,ids:evidenceSignalIds(text)}));
   const choiceLinks=choices.map(c=>{
     const ids=choiceEvidenceIds(c),matches=evidenceSignals.filter(e=>e.ids.some(id=>ids.includes(id)));
     return {choice:c.title,evidence:matches.length,evidenceIds:ids,matchedEvidence:matches.map(e=>e.index)};
   });
-  const checks={sender:!!comm.from,chain:(intel.chainOfCommand||[]).length>0,situation:!!comm.message,evidence:(intel.evidence||[]).length>=2,recommendation:!!intel.recommendation,noAction:!!intel.noActionForecast&&/\d/.test(intel.noActionForecast),uncertainty:!!intel.uncertainty,choices:choices.length===3,choiceLinks:choiceLinks.every(x=>x.evidence>0)};
+  const checks={sender:!!comm.from,chain:(intel.chainOfCommand||[]).length>0,situation:!!comm.message,evidence:(intel.evidence||[]).length>=2,recommendation:!!intel.recommendation,noAction:!!intel.noActionForecast&&/\d/.test(intel.noActionForecast),uncertainty:!!intel.uncertainty,choices:choices.length===3,distinctChoices:distinctChoices.distinct,strategyDiversity:strategyCount>=Math.min(2,choices.length),choiceLinks:choiceLinks.every(x=>x.evidence>0)};
   const passed=Object.values(checks).filter(Boolean).length;
-  return {relevanceScore:Math.round(passed/Object.keys(checks).length*100),evidenceCoverage:(intel.evidence||[]).length,recommendationConflict:(intel.alternativeRecommendations||[]).some(v=>v.confidence<60)||new Set((intel.alternativeRecommendations||[]).map(v=>v.recommendation)).size>1,uncertaintyPresent:checks.uncertainty,chainOfCommandValid:checks.chain,choiceEvidenceLinks:choiceLinks,checks,ok:passed===Object.keys(checks).length};
+  return {relevanceScore:Math.round(passed/Object.keys(checks).length*100),evidenceCoverage:(intel.evidence||[]).length,recommendationConflict:(intel.alternativeRecommendations||[]).some(v=>v.confidence<60)||new Set((intel.alternativeRecommendations||[]).map(v=>v.recommendation)).size>1,uncertaintyPresent:checks.uncertainty,chainOfCommandValid:checks.chain,choiceEvidenceLinks:choiceLinks,choiceDistinctness:distinctChoices,checks,ok:passed===Object.keys(checks).length};
 }
 function memoIntelligenceHtml(ev,comm){
   const intel=ev.memoIntelligence||buildMemoIntelligence(ev,comm);ev.memoIntelligence=intel;
@@ -1649,6 +1651,7 @@ function decisionContextSnapshot(){
   };
 }
 function inferDecisionStrategy(choice){
+  if(choice?.strategy)return choice.strategy;
   const s=`${choice.title||""} ${choice.detail||""} ${choice.directive||""}`.toLowerCase();
   if(choice.performance==="fire"||s.includes("fire")||s.includes("cut"))return "cost-control";
   if(choice.performance==="coach"||choice.hire==="specialist"||s.includes("coach")||s.includes("hire")||s.includes("support"))return "people";
@@ -1891,19 +1894,79 @@ function decorateStrategicChoice(choice,ctx){
   if(!risks.length)risks.push("results depend on execution and market response");
   c.benefits=benefits.slice(0,3);
   c.risks=risks.slice(0,3);
+  const existingConfidence=Number(c.estimatedConfidence);
   const baseConfidence=Math.round(decisionOptionScore(c,ctx));
-  c.estimatedConfidence=clamp(baseConfidence+Math.round(rand(-8,8)),18,91);
-  c.uncertainty=c.estimatedConfidence>=72?"Moderate":c.estimatedConfidence>=48?"Material":"High";
+  c.estimatedConfidence=Number.isFinite(existingConfidence)?clamp(Math.round(existingConfidence),18,91):clamp(baseConfidence+Math.round(rand(-8,8)),18,91);
+  c.uncertainty=c.uncertainty||(c.estimatedConfidence>=72?"Moderate":c.estimatedConfidence>=48?"Material":"High");
   c.outcomeLabel=c.outcomeLabel||"Immediate and later effects depend on fit with reality.";
   return c;
 }
-function pickThreeStrategicChoices(pool,ctx){
-  const unique=[];
-  const seen=new Set();
-  for(const c of pool){
-    const key=(c.title||"").toLowerCase();
-    if(!seen.has(key)){seen.add(key);unique.push(decorateStrategicChoice(c,ctx));}
+function normalizedChoiceEffectBand(value){
+  const n=Number(value)||0;
+  if(Math.abs(n)<.001)return 0;
+  return n>0?1:-1;
+}
+function normalizedActionValue(value){
+  if(value===null||value===undefined)return "";
+  if(typeof value==="object"){
+    return Object.keys(value).sort().map(key=>`${key}:${normalizedActionValue(value[key])}`).join(",");
   }
+  return String(value);
+}
+function strategicChoiceSemanticKey(choice={}){
+  const effect=choice.effect||{},people=choice.people||{},culture=choice.culture||{},projectDecision=choice.projectDecision||{},commercializeProject=choice.commercializeProject||{},customerStrategy=choice.customerStrategy||{};
+  const domainAction=[
+    choice.hireRole?`hire-role:${choice.hireRole}`:null,
+    choice.hire?`hire:${choice.hire}`:null,
+    choice.deferHiring?"hiring:defer":null,
+    choice.rejectHiring?"hiring:reject":null,
+    choice.hiringPolicy?.mode?`hiring-policy:${choice.hiringPolicy.mode}`:null,
+    choice.hiringException?.action?`hiring-exception:${choice.hiringException.action}`:null,
+    projectDecision.action?`project:${projectDecision.id||"current"}:${projectDecision.action}`:null,
+    commercializeProject.mode?`commercial:${commercializeProject.id||"current"}:${commercializeProject.mode}`:null,
+    customerStrategy.mode?`customer:${customerStrategy.mode}`:null,
+    choice.layoff?`layoff:${normalizedActionValue(choice.layoff)}`:null,
+    choice.rejectLayoff?"layoff:reject":null,
+    choice.fundraising?`fundraising:${normalizedActionValue(choice.fundraising)}`:null,
+    choice.performance?`performance:${normalizedActionValue(choice.performance)}`:null,
+    choice.launch?`launch:${normalizedActionValue(choice.launch)}`:null,
+    choice.supply?`supply:${normalizedActionValue(choice.supply)}`:null,
+    choice.shareholders?`shareholders:${normalizedActionValue(choice.shareholders)}`:null,
+    choice.portfolioAction?`portfolio:${normalizedActionValue(choice.portfolioAction)}`:null,
+    choice.crisisIntervention?`crisis:${normalizedActionValue(choice.crisisIntervention)}`:null
+  ].filter(Boolean).join("|");
+  if(domainAction)return domainAction.toLowerCase();
+  return JSON.stringify({
+    strategy:choice.strategy||inferDecisionStrategy(choice),
+    directive:choice.directive||null,
+    cash:normalizedChoiceEffectBand(effect.cash),
+    quality:normalizedChoiceEffectBand(effect.quality),
+    integration:normalizedChoiceEffectBand(effect.integration),
+    customers:normalizedChoiceEffectBand(effect.customers),
+    board:normalizedChoiceEffectBand(effect.board),
+    trust:normalizedChoiceEffectBand(effect.trust),
+    stress:normalizedChoiceEffectBand(people.stress),
+    morale:normalizedChoiceEffectBand(people.morale),
+    innovation:normalizedChoiceEffectBand(culture.innovation),
+    qualityDiscipline:normalizedChoiceEffectBand(culture.qualityDiscipline),
+    workLife:normalizedChoiceEffectBand(culture.workLife)
+  });
+}
+function uniqueStrategicChoices(choices,ctx){
+  const unique=[],seen=new Set();
+  (choices||[]).forEach(choice=>{
+    const decorated=decorateStrategicChoice(choice,ctx);
+    const key=strategicChoiceSemanticKey(decorated);
+    if(!seen.has(key)){seen.add(key);unique.push(decorated);}
+  });
+  return unique;
+}
+function validateDistinctDecisionChoices(choices){
+  const keys=(choices||[]).map(strategicChoiceSemanticKey);
+  return {count:keys.length,uniqueCount:new Set(keys).size,keys,distinct:keys.length===new Set(keys).size};
+}
+function pickThreeStrategicChoices(pool,ctx){
+  const unique=uniqueStrategicChoices(pool,ctx);
   const picked=[];
   const remaining=[...unique];
   while(picked.length<3&&remaining.length){
@@ -1941,7 +2004,7 @@ function prepareStrategicDecision(ev){
   }
   const pool=contextualChoicePool(ev);
   if(pool.length>=3)ev.choices=pickThreeStrategicChoices(pool,ctx);
-  else ev.choices=(ev.choices||[]).map(c=>decorateStrategicChoice(c,ctx));
+  else ev.choices=uniqueStrategicChoices(ev.choices||[],ctx);
   ev.decisionContext=ctx;
   ev._strategicPrepared=true;
   (ev.choices||[]).forEach(c=>{c.outcomeLabel=decisionOutcomeLabel(c,ev);});
