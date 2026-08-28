@@ -1,21 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { chromium } = require("playwright");
-
-const chromeCandidates = [
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-];
-
-async function launchBrowser() {
-  for (const executablePath of chromeCandidates) {
-    if (fs.existsSync(executablePath)) return chromium.launch({ headless: true, executablePath });
-  }
-  return chromium.launch({ headless: true });
-}
-
+const { launchBrowser } = require("./helpers/browser");
 async function main() {
   const errors = [];
   const browser = await launchBrowser();

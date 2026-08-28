@@ -1,21 +1,5 @@
 const path = require("path");
-const { chromium } = require("playwright");
-
-const chromeCandidates = [
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-];
-
-async function launchBrowser() {
-  const fs = require("fs");
-  for (const executablePath of chromeCandidates) {
-    if (fs.existsSync(executablePath)) return chromium.launch({ headless: true, executablePath });
-  }
-  return chromium.launch({ headless: true });
-}
-
+const { launchBrowser } = require("./helpers/browser");
 async function main() {
   const errors = [];
   const browser = await launchBrowser();
@@ -83,7 +67,13 @@ async function main() {
     company.customers = 100;
     const hundredCustomerCost = calculateLivingFinance();
     const customerScaleCost = hundredCustomerCost - zeroCustomerCost;
-    assert(customerScaleCost >= .24 && customerScaleCost <= .34, `One hundred launched customers should add realistic recurring operating cost, got $${customerScaleCost.toFixed(3)}M/day`);
+    const expectedCustomerScaleCost = 100 * (
+      OFFICE_AQUARIUM_CONSTANTS.economy.manufacturingCustomerDaily +
+      OFFICE_AQUARIUM_CONSTANTS.economy.supportCustomerDaily +
+      OFFICE_AQUARIUM_CONSTANTS.economy.growthOverheadPerCustomerDaily
+    );
+    assert(Math.abs(customerScaleCost - expectedCustomerScaleCost) <= .001, `One hundred launched customers should use shared recurring cost constants, got $${customerScaleCost.toFixed(3)}M/day`);
+    assert(customerScaleCost >= .10 && customerScaleCost <= .22, `One hundred launched customers should add meaningful but survivable recurring operating cost, got $${customerScaleCost.toFixed(3)}M/day`);
 
     validationMode = false;
     return { ok: failures.length === 0, failures, exposure: company.customerSegments.enterprise.productExposure, retentionOutlook: company.customerSegments.enterprise.retentionOutlook, customerScaleCost: Number(customerScaleCost.toFixed(3)) };

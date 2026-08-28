@@ -1,13 +1,10 @@
 const path = require("path");
 const fs = require("fs");
-const { chromium } = require("playwright");
+const { launchBrowser } = require("./helpers/browser");
 
 async function main() {
   const longRunDriver = fs.readFileSync(path.resolve("tests", "long-run-balance-test.js"), "utf8");
-  const executablePath = fs.existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
-    ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-    : undefined;
-  const browser = await chromium.launch({ headless: true, executablePath });
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   const errors = [];
   if (!/survivalRangeGateApplied\s*=\s*fullRun\s*&&\s*targetDay\s*===\s*validationRules\.firstYearHorizonDays/.test(longRunDriver)) {

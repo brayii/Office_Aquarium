@@ -1,0 +1,7 @@
+framework/__pycache__/
+framework/*.pyc
+data/exports/
+evals/results/
+models/challengers/
+models/champion/
+runtime/context.json

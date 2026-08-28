@@ -14,6 +14,7 @@
     "test:package-windows": "npm run package:windows && node tests/windows-package-integrity-test.js",
     "test:windows-launch": "powershell -ExecutionPolicy Bypass -File tests/windows-install-launch-smoke.ps1",
     "test:static": "node tests/static-structure-check.js",
+    "test:project-learning": "powershell -ExecutionPolicy Bypass -File .project-learning/tests/run.ps1",
     "test:constants": "node tests/shared-constants-regression-test.js",
     "test:daily-pipeline": "node tests/daily-pipeline-order-test.js",
     "test:learning-causality": "node tests/institutional-learning-causality-test.js",

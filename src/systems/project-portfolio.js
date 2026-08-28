@@ -102,6 +102,9 @@ function projectExecutionModifiers(project,state={}){
     supplierRisk:clamp(1-supplier*.018, .75,1.28)
   };
 }
+function isLegacyFlagshipProject(project){
+  return project?.originType==="legacy"||/Legacy Flagship/i.test(project?.title||"");
+}
 function projectPaceProfile(project){
   const family=String(project?.family||"").toLowerCase(),dept=project?.proposingDepartment||projectDepartmentForFamily(project?.family||"");
   const major=/ai accelerator|next-generation|processor|memory controller|chip|manufacturing|yield|platform|cloud|data platform|security|firmware-hardware/.test(family)||["hardware","software"].includes(dept)&&Number(project?.scope||1)>1.1;
@@ -109,6 +112,10 @@ function projectPaceProfile(project){
   const difficulty=Number(project?.hiddenReality?.trueTechnicalDifficulty||project?.visibleRisk||55);
   const scope=Number(project?.scope||1);
   const complexity=clamp((difficulty-45)*.006+(scope-1)*.10+(major ? .16 : 0)-(internal ? .10 : 0),-.12,.34);
+  if(isLegacyFlagshipProject(project)){
+    const onboarding=PROJECT_DEVELOPMENT_RULES.legacyOnboarding||{};
+    return {major:false,internal:false,legacyOnboarding:true,complexity:Math.min(complexity,.08),progressMultiplier:onboarding.progressMultiplier||1.08,closeoutDays:onboarding.closeoutDays||3};
+  }
   return {major,internal,complexity,progressMultiplier:clamp(1-complexity,.62,1.08),closeoutDays:major?5:internal?3:4};
 }
 function projectDemandScale(project){
@@ -259,7 +266,7 @@ function reauditProjectRequirements(project){
     const activeDemand=Object.values(project.requiredHeadcount).reduce((s,v)=>s+(Number(v)||0),0);
     project.requirementScale={day:company.day,demandScale:Number(projectDemandScale(project).toFixed(2)),requiredFte:Number(activeDemand.toFixed(1)),reason:"project staffing demand scales with company size, portfolio load, scope, and commercial expectations"};
   }
-  if(project.originType==="legacy"||/Legacy Flagship/i.test(project.title||"")){
+  if(isLegacyFlagshipProject(project)){
     const startupProfile=PORTFOLIO_DEMAND_RULES.legacyFlagship||{};
     if(startupProfile.requiredHeadcount){
       project.requiredHeadcount={...startupProfile.requiredHeadcount};
@@ -275,6 +282,13 @@ function reauditProjectRequirements(project){
     }
     project.requiredRoles=(project.requiredRoles||[]).filter(role=>!["Manager","Director","Vice President","Manufacturing Engineer"].includes(role));
     project.preferredRoles=[...new Set([...(project.preferredRoles||[]),"Finance Analyst","Product Manager"])];
+    const onboarding=PROJECT_DEVELOPMENT_RULES.legacyOnboarding||{};
+    project.estimatedDuration=Math.min(
+      Number(project.estimatedDuration)||onboarding.estimatedDurationDays||PROJECT_DEVELOPMENT_RULES.defaultEstimatedDurationDays,
+      onboarding.estimatedDurationDays||PROJECT_DEVELOPMENT_RULES.defaultEstimatedDurationDays
+    );
+    const onboardingDeadline=(Number(project.createdDay)||0)+project.estimatedDuration+(onboarding.deadlineBufferDays||0);
+    project.deadlineDay=Number(project.deadlineDay)?Math.min(Number(project.deadlineDay),onboardingDeadline):onboardingDeadline;
   }
   project.requirementAudit={day:company.day,kept:["direct project work remains in requiredDepartments and requiredHeadcount"],removed:["company-wide management and executive capability is not counted as project-required staffing"],revised:[`required capabilities: ${project.requiredCapabilities.join(", ")||"none"}`,`preferred capabilities: ${project.preferredCapabilities.join(", ")||"none"}`],reason:"project requirements re-audited to separate project staffing from company capability gaps"};
   return project;
@@ -580,8 +594,9 @@ function projectFullBacklogTarget(project,pace=projectPaceProfile(project)){
   const deptCount=Math.max(1,(project.requiredDepartments||[]).length);
   const scope=Number(project.scope)||1;
   const difficulty=Number(project.hiddenReality?.trueTechnicalDifficulty||project.visibleRisk||55);
+  const legacyMultiplier=pace.legacyOnboarding?(rules.legacyOnboarding?.backlogMultiplier||1):1;
   return clamp(
-    Math.round(deptCount*(pace.major?rules.majorBacklogMultiplier:rules.standardBacklogMultiplier)+Math.max(0,scope-1)*deptCount+Math.max(0,difficulty-58)/18),
+    Math.round((deptCount*(pace.major?rules.majorBacklogMultiplier:rules.standardBacklogMultiplier)+Math.max(0,scope-1)*deptCount+Math.max(0,difficulty-58)/18)*legacyMultiplier),
     deptCount,
     deptCount+rules.maximumBacklogAboveDepartmentCount
   );
@@ -596,7 +611,12 @@ function projectBacklogTarget(project,pace=projectPaceProfile(project)){
 function projectPlannedWorkItemCount(project){
   const duration=Math.max(1,Number(project?.estimatedDuration)||PROJECT_DEVELOPMENT_RULES.defaultEstimatedDurationDays);
   const backlog=projectFullBacklogTarget(project);
-  return Math.max(PROJECT_DEVELOPMENT_RULES.minimumPlannedWorkItems,Math.round(duration*backlog/PROJECT_DEVELOPMENT_RULES.expectedWorkItemCycleDays));
+  const onboarding=PROJECT_DEVELOPMENT_RULES.legacyOnboarding||{};
+  const legacy=isLegacyFlagshipProject(project);
+  const cycle=legacy?(onboarding.workItemCycleDays||PROJECT_DEVELOPMENT_RULES.expectedWorkItemCycleDays):PROJECT_DEVELOPMENT_RULES.expectedWorkItemCycleDays;
+  const minimum=legacy?(onboarding.minimumPlannedWorkItems||PROJECT_DEVELOPMENT_RULES.minimumPlannedWorkItems):PROJECT_DEVELOPMENT_RULES.minimumPlannedWorkItems;
+  const planned=Math.max(minimum,Math.round(duration*backlog/cycle));
+  return legacy&&onboarding.maximumPlannedWorkItems?Math.min(onboarding.maximumPlannedWorkItems,planned):planned;
 }
 function projectCompletedWorkProgress(project){
   return clamp((Number(project?.completedWorkItemCount)||0)/projectPlannedWorkItemCount(project)*100,0,100);
@@ -902,10 +922,11 @@ function projectCommercialStatusLabel(project){
 }
 function commercialProjectRevenueDaily(){
   ensureProjectPortfolio();
+  const revenueRules=OFFICE_AQUARIUM_CONSTANTS.customerMarket.projectRevenue;
   return Number((company.projectArchive||[]).reduce((sum,p)=>{
     updateProjectCommercialStats(p);
-    if(p.commercialStatus==="launched")return sum+(Number(p.projectedDailyRevenue)||0)*.15;
-    if(p.commercialStatus==="pilot")return sum+(Number(p.projectedDailyRevenue)||0)*.06;
+    if(p.commercialStatus==="launched")return sum+(Number(p.projectedDailyRevenue)||0)*revenueRules.launchedMultiplier;
+    if(p.commercialStatus==="pilot")return sum+(Number(p.projectedDailyRevenue)||0)*revenueRules.pilotMultiplier;
     return sum;
   },0).toFixed(3));
 }

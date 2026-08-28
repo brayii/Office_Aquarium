@@ -163,6 +163,31 @@ npm run test:social-organization-long-run
 
 On Windows systems that block the PowerShell `npm.ps1` shim, use `npm.cmd` in the same commands.
 
+## Project Learning Framework
+
+This repository includes a local project-learning framework under `.project-learning/`.
+It records concise task evidence, stores structured learning data in SQLite,
+builds advisory retrieval context, and keeps a small champion/challenger model
+registry. Current repository evidence always overrides learned memory.
+
+Run the lifecycle command through the portable PowerShell wrapper:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .project-learning\run.ps1 status
+powershell -ExecutionPolicy Bypass -File .project-learning\run.ps1 pre-task "describe the task"
+powershell -ExecutionPolicy Bypass -File .project-learning\run.ps1 post-task --task-id TASK_ID --success --verification "checks passed" --modified "path\file.js"
+```
+
+The direct Python entry point is:
+
+```powershell
+python .project-learning\framework\lifecycle.py status
+```
+
+If `python` is not on PATH, the wrapper uses the Codex bundled Python runtime
+when available. Framework status is summarized in `.project-learning\STATUS.md`;
+machine-readable truth lives in `.project-learning\data\learning.db`.
+
 The employee work AI and social/personality AI boundary is documented in `docs/architecture/employee_ai_boundaries.md`. Future changes that touch personality, relationships, morale, stress, or employee drama should preserve that boundary unless the design is explicitly revised.
 
 Stage 1 social familiarity behavior is documented in `docs/specs/social_ai_stage_1_familiarity.md`.

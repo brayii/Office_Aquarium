@@ -1,0 +1,29 @@
+{
+  "context_retrieval": {
+    "primary_metric": "recall_at_5",
+    "secondary_metrics": [
+      "mrr",
+      "precision_at_5"
+    ]
+  },
+  "relevant_file_prediction": {
+    "primary_metric": "recall_at_5",
+    "secondary_metrics": [
+      "mrr",
+      "precision_at_5"
+    ]
+  },
+  "task_classification": {
+    "primary_metric": "macro_f1",
+    "secondary_metrics": [
+      "per_class_recall"
+    ]
+  },
+  "failure_risk_prediction": {
+    "primary_metric": "macro_f1",
+    "secondary_metrics": [
+      "precision",
+      "recall"
+    ]
+  }
+}

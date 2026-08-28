@@ -311,6 +311,7 @@ function isNonAuthoritativePath(path){
   if(/^company\.(dailyStageStatus\.\d+|lastDailyCloseStatus)\.(startedAt|completedAt|hashBefore|hashAfter)$/.test(path))return true;
   if(/^company\.learningEpisodes\.\d+\.observations$/.test(path))return true;
   if(/^employees\.\d+\.(currentRoom|roomSelectionReason|roomEffect)$/.test(path))return true;
+  if(/^company\.socialRelationships\.[^.]+\.(recentExperiences|recentInteractionTypes|reputationObservations|relationshipInputs|cooldowns)$/.test(path))return true;
   if(/^company\.(projects|projectArchive|projectProposals)\.\d+\.requirementAudit$/.test(path))return true;
   return /^company\.(projects|projectArchive|projectProposals)\.\d+\.(commercialReadiness|commercialPotential|projectedDailyRevenue)$/.test(path);
 }

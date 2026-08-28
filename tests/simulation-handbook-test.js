@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { chromium } = require("playwright");
-
+const { launchBrowser } = require("./helpers/browser");
 const expectedSections = [
   "welcome",
   "quick-start",
@@ -45,20 +44,6 @@ const requiredUiTopics = [
   "Sound",
   "Restart Company"
 ];
-
-const chromeCandidates = [
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-];
-
-async function launchBrowser() {
-  for (const executablePath of chromeCandidates) {
-    if (fs.existsSync(executablePath)) return chromium.launch({ headless: true, executablePath });
-  }
-  return chromium.launch({ headless: true });
-}
 
 async function main() {
   const errors = [];

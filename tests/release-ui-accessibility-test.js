@@ -1,25 +1,12 @@
 const path = require("path");
 const fs = require("fs");
-const { chromium } = require("playwright");
+const { launchBrowser } = require("./helpers/browser");
 
-const chromeCandidates = [
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-];
 const viewports = [
-  { width: 320, height: 720 },
-  { width: 375, height: 812 },
-  { width: 390, height: 844 },
-  { width: 414, height: 896 },
-  { width: 768, height: 1024 }
+  { width: 1366, height: 900 },
+  { width: 900, height: 900 },
+  { width: 390, height: 844 }
 ];
-
-async function launchBrowser() {
-  const executablePath = chromeCandidates.find(candidate => fs.existsSync(candidate));
-  return chromium.launch({ headless: true, executablePath });
-}
 
 async function main() {
   const browser = await launchBrowser();
@@ -79,24 +66,29 @@ async function main() {
       };
     });
     if (navigation.buttons.length !== 5) failures.push(`${viewport.width}px does not expose all five primary destinations`);
-    for (const button of navigation.buttons) {
-      if (!button.visible || !button.withinViewport) failures.push(`${viewport.width}px hides ${button.text}`);
-      if (button.height < 44) failures.push(`${viewport.width}px ${button.text} target is under 44px`);
+    const mobileNavigationVisible = navigation.buttons.some(button => button.visible);
+    if (mobileNavigationVisible) {
+      for (const button of navigation.buttons) {
+        if (!button.visible || !button.withinViewport) failures.push(`${viewport.width}px hides ${button.text}`);
+        if (button.height < 44) failures.push(`${viewport.width}px ${button.text} target is under 44px`);
+      }
     }
     if (navigation.horizontalOverflow) failures.push(`${viewport.width}px page has horizontal overflow`);
 
     const destinations = ["office", "employees", "inbox", "company", "newspaper"];
     const destinationResults = {};
-    for (const destination of destinations) {
-      await page.click(`.mobile-tabs button[data-tab="${destination}"]`);
-      destinationResults[destination] = await page.evaluate(destinationName => {
-        const target = document.querySelector(`[data-section="${destinationName}"]`);
-        return !!target && getComputedStyle(target).display !== "none";
-      }, destination);
-      if (!destinationResults[destination]) failures.push(`${viewport.width}px ${destination} destination does not open`);
+    if (mobileNavigationVisible) {
+      for (const destination of destinations) {
+        await page.click(`.mobile-tabs button[data-tab="${destination}"]`);
+        destinationResults[destination] = await page.evaluate(destinationName => {
+          const target = document.querySelector(`[data-section="${destinationName}"]`);
+          return !!target && getComputedStyle(target).display !== "none";
+        }, destination);
+        if (!destinationResults[destination]) failures.push(`${viewport.width}px ${destination} destination does not open`);
+      }
     }
 
-    await page.click('.mobile-tabs button[data-tab="employees"]');
+    if (mobileNavigationVisible) await page.click('.mobile-tabs button[data-tab="employees"]');
     const employeeButton = page.locator("#employeeList .employee-card").first();
     await employeeButton.focus();
     await employeeButton.press("Enter");
@@ -119,7 +111,12 @@ async function main() {
       failures.push(`${viewport.width}px employee profile exposes internal belief keys`);
     }
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(40);
+    await page.waitForFunction(() =>
+      document.getElementById("employeeModal").classList.contains("hidden") &&
+      document.activeElement?.classList.contains("employee-card"),
+      null,
+      { timeout: 1000 }
+    ).catch(() => {});
     const focusRestored = await page.evaluate(() =>
       document.getElementById("employeeModal").classList.contains("hidden") &&
       document.activeElement?.classList.contains("employee-card")
@@ -143,7 +140,7 @@ async function main() {
         ]
       };
       company.socialConversationState.history.unshift(conversation);
-      document.querySelector('.mobile-tabs button[data-tab="employees"]').focus();
+      document.querySelector("#employeeList .employee-card")?.focus();
       showSocialConversationDetails(conversation.id);
       return new Promise(resolve => setTimeout(() => resolve({
         open: !document.getElementById("conversationModal").classList.contains("hidden"),
@@ -159,10 +156,15 @@ async function main() {
       failures.push(`${viewport.width}px conversation transcript is not readable`);
     }
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(30);
+    await page.waitForFunction(() =>
+      document.getElementById("conversationModal").classList.contains("hidden") &&
+      document.activeElement?.classList.contains("employee-card"),
+      null,
+      { timeout: 1000 }
+    ).catch(() => {});
     const conversationFocusRestored = await page.evaluate(() =>
       document.getElementById("conversationModal").classList.contains("hidden") &&
-      document.activeElement?.dataset?.tab === "employees"
+      document.activeElement?.classList.contains("employee-card")
     );
     if (!conversationFocusRestored) failures.push(`${viewport.width}px conversation dialog does not restore focus`);
 

@@ -44,8 +44,9 @@ assert(rules.projectLifecycle.terminalStatuses.includes("failed"), "Failed proje
 assert(!rules.projectLifecycle.activeStatuses.includes("paused"), "Paused projects should not execute");
 assert(rules.projectLifecycle.activeIncludingPausedStatuses.includes("paused"), "Paused projects should remain reportable");
 
-assert(rules.hiring.onboarding.defaultDurationDays === 28, "Onboarding fallback should be consistent");
+assert(rules.hiring.onboarding.defaultDurationDays === 22, "Onboarding fallback should match the release progression balance");
 assert(rules.hiring.onboarding.minDurationDays < rules.hiring.onboarding.maxDurationDays, "Onboarding duration bounds should be valid");
+assert(rules.hiring.recruitingStage.searchingFraction > rules.hiring.recruitingStage.interviewingFraction && rules.hiring.offerAcceptance.base > .5, "Recruiting timing and offer acceptance should be centralized for release balance");
 assert(rules.hiring.advancingRecruitingStatuses.every(status => rules.hiring.activeRecruitingStatuses.includes(status)), "Advancing recruiting stages should be active stages");
 assert(rules.executiveInbox.randomEventCooldownMinutes < rules.executiveInbox.decisionCooldownMinutes, "A completed CEO decision should create the longer inbox cooldown");
 assert(rules.social.modelVersion === 4, "Canonical Social AI model version should be centralized");
@@ -117,7 +118,7 @@ assert(rules.telemetry.persistedDailySnapshots < rules.validation.firstYearHoriz
 assert(Math.abs(rules.organizationalMomentum.previousWeight + rules.organizationalMomentum.targetWeight - 1) < 0.0001, "Organizational momentum blend weights should total one");
 assert(rules.boardGovernance.pipDurationDays === rules.time.daysPerQuarter, "CEO PIP duration should use the shared quarterly calendar");
 assert(rules.boardGovernance.pipOfferCooldownDays < rules.boardGovernance.pipDurationDays, "CEO PIP offer cooldown should be shorter than a full PIP review period");
-assert(rules.hiring.minimumRequestMemoGapDays >= rules.hiring.requestCadenceDays * 2, "Hiring request cadence should be centrally rate-limited");
+assert(rules.hiring.minimumRequestMemoGapDays >= rules.hiring.requestCadenceDays && rules.hiring.minimumRequestMemoGapDays <= rules.time.daysPerWeek + 1, "Hiring request cadence should be centrally rate-limited without blocking company growth");
 assert(rules.portfolioGovernance.projectReviewIntervalDays > rules.portfolioGovernance.projectReviewCadenceDays, "Portfolio review interval should exceed its polling cadence");
 assert(rules.projectLifecycle.capacityConsumingActions.includes("pilot") && rules.projectLifecycle.capacityConsumingActions.includes("resume"), "Project capacity-consuming actions should cover pilot and resume decisions");
 assert(rules.projectLifecycle.capacityReliefActions.includes("delay") && rules.projectLifecycle.capacityReliefActions.includes("split"), "Project capacity-relief actions should cover delayed and phased decisions");
@@ -126,7 +127,10 @@ assert(rules.dailyPipeline.stageOrder[0] === "employee-outcomes" && rules.dailyP
 assert(new Set(rules.dailyPipeline.stageOrder).size === rules.dailyPipeline.stageOrder.length, "Daily pipeline stages should be unique");
 
 const roleDefinitions = read("src/core/role-definitions.js");
-const workforce = read("src/systems/workforce-leadership.js");
+const workforce = [
+  read("src/systems/workforce-leadership.js"),
+  read("src/systems/workforce-crisis.js")
+].join("\n");
 const projects = read("src/systems/project-portfolio.js");
 const operatingHealth = read("src/systems/operating-health-simulation.js");
 const executiveMessages = read("src/systems/executive-messages.js");
@@ -178,6 +182,7 @@ assert(/SIMULATION_HANDBOOK_CONFIG\s*=\s*OFFICE_AQUARIUM_CONSTANTS\.handbook/.te
 assert(!/runwayDays\s*\|\|\s*(?:999|[A-Z_]+\.unknownFutureDay)/.test(consumers), "A zero-day runway must not be replaced by the unknown-runway sentinel");
 assert(/PROJECT_LEARNING_RULES=OFFICE_AQUARIUM_CONSTANTS\.projectLearning/.test(projects), "Project learning should use shared lesson rules");
 assert(/OFFICE_AQUARIUM_CONSTANTS\.projectDevelopment/.test(projects) && /OFFICE_AQUARIUM_CONSTANTS\.projectDevelopment/.test(institutionalLearning), "Project backlog producers should share project-development rules");
+assert(/OFFICE_AQUARIUM_CONSTANTS\.customerMarket\.projectRevenue/.test(projects), "Completed-project revenue conversion should use shared commercial revenue constants");
 assert(/function projectAgeDays\(/.test(projects) && /function projectScheduleVariance\(/.test(projects), "Project age and schedule variance should use canonical helpers");
 assert(/function projectPlannedWorkItemCount\(/.test(projects) && /function projectCompletedWorkProgress\(/.test(projects), "Completed work should feed project progress through canonical planning helpers");
 assert(/function compactWorkItemHistory\(/.test(institutionalLearning) && /compactWorkItemHistory\(company\.workItems\)/.test(workforce), "Open work-item preservation should use one canonical compaction helper");

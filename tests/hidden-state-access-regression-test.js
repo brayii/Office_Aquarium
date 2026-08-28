@@ -1,12 +1,8 @@
 const path = require("path");
-const { chromium } = require("playwright");
+const { launchBrowser } = require("./helpers/browser");
 
 async function main() {
-  const fs = require("fs");
-  const executablePath = fs.existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
-    ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-    : undefined;
-  const browser = await chromium.launch({ headless: true, executablePath });
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   const errors = [];
   page.on("pageerror", err => errors.push(err.message));

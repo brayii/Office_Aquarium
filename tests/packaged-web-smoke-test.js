@@ -4,14 +4,7 @@ const http = require("http");
 const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { chromium } = require("playwright");
-
-const chromeCandidates = [
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-];
+const { launchBrowser } = require("./helpers/browser");
 
 function releaseMetadata() {
   return JSON.parse(spawnSync(
@@ -203,8 +196,7 @@ async function main() {
     });
     check(manifestFailures.length === 0, "every staged file matches the package manifest");
 
-    const executablePath = chromeCandidates.find(candidate => fs.existsSync(candidate));
-    const browser = await chromium.launch({ headless: true, executablePath });
+    const browser = await launchBrowser();
     const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
     const browserErrors = [];
     const failedRequests = [];

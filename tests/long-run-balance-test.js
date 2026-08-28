@@ -2,7 +2,7 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 const vm = require("vm");
-const { chromium } = require("playwright");
+const { launchBrowser } = require("./helpers/browser");
 
 function loadOfficeAquariumConstants() {
   const context = { globalThis: {} };
@@ -25,10 +25,7 @@ function progressEnabled() {
 async function main() {
   const constants = loadOfficeAquariumConstants();
   const validationRules = constants.validation;
-  const executablePath = fs.existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
-    ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-    : undefined;
-  const browser = await chromium.launch({ headless: true, executablePath });
+  const browser = await launchBrowser();
   const errors = [];
   const fullRun = process.env.OFFICE_AQUARIUM_LONG_RUN === "1";
   const seedCount = positiveIntegerEnvironment("OFFICE_AQUARIUM_SEED_COUNT", fullRun ? validationRules.developmentSeedsPerStrategy : 1);
@@ -144,7 +141,11 @@ async function main() {
     const range = targetRanges[strategy];
     return range && (byStrategy[strategy].survivalRate < range[0] || byStrategy[strategy].survivalRate > range[1]);
   }) : [];
-  const result = { ok: systemErrors === 0 && timeouts === 0 && falsePasses === 0 && rangeFailures.length === 0, full: fullRun, seedCount, targetDay, strategies, concurrency, survivalRangeGateApplied, systemErrors, timeouts, falsePasses, rangeFailures, byStrategy, reports };
+  const progressionFailures = targetDay >= 120 ? strategies.filter(strategy => {
+    const item = byStrategy[strategy];
+    return item.averageProjectCompletions < 1 || item.averageHeadcount < 10;
+  }) : [];
+  const result = { ok: systemErrors === 0 && timeouts === 0 && falsePasses === 0 && rangeFailures.length === 0 && progressionFailures.length === 0, full: fullRun, seedCount, targetDay, strategies, concurrency, survivalRangeGateApplied, systemErrors, timeouts, falsePasses, rangeFailures, progressionFailures, byStrategy, reports };
   if (writeReports) {
     fs.mkdirSync(reportDir, { recursive: true });
     fs.writeFileSync(path.join(reportDir, `long-run-strategy-matrix${reportSuffix}.json`), JSON.stringify(result, null, 2));
