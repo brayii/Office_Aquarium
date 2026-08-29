@@ -39,6 +39,7 @@ desktop.ini
 # Codex/local agent scratch data
 .agents/
 .codex/
+.project-learning/
 
 # Local Codex implementation specs
 OFFICE_AQUARIUM_CODEX_*.md
